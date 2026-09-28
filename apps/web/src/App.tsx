@@ -5,6 +5,8 @@ import type {
   ClientRole,
   CompetitionSetupSnapshot,
   DrawPresentationEvent,
+  LiveSnapshot,
+  LiveTeamSubmissionState,
   PresenceSnapshot,
   QualificationRound,
   QuestionAllocationSummary,
@@ -1141,6 +1143,495 @@ function AudienceDrawSurface({
   );
 }
 
+
+function phaseLabel(phase: LiveSnapshot["phase"]): string {
+  const labels: Record<LiveSnapshot["phase"], string> = {
+    IDLE: "بانتظار تجهيز الجولة",
+    ROUND_READY: "الجولة جاهزة",
+    ROUND_ACTIVE: "الجولة فعالة",
+    QUESTION_READY: "السؤال جاهز",
+    QUESTION_COUNTDOWN: "العد التنازلي",
+    QUESTION_ACTIVE: "السؤال فعال",
+    QUESTION_CLOSED: "تم إغلاق السؤال",
+    QUESTION_REVEAL: "إظهار النتيجة",
+    INTERMISSION: "استراحة",
+    ROUND_COMPLETE: "انتهت الجولة",
+  };
+
+  return labels[phase];
+}
+
+function OperatorLivePanel({
+  snapshot,
+}: {
+  snapshot: LiveSnapshot | null;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  if (!snapshot) {
+    return (
+      <section className="panel">
+        <h2>التشغيل الحي</h2>
+        <p>بانتظار حالة الجولة...</p>
+      </section>
+    );
+  }
+
+  const run = async (
+    path: string,
+    successMessage: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest(path, {
+        method: "POST",
+        body: "{}",
+      });
+      setMessage(successMessage);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تنفيذ الأمر",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const questionPosition = snapshot.question?.position ?? null;
+
+  return (
+    <section className="panel live-operator-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">M4 — Live</p>
+          <h2>التحكم بالجولة</h2>
+        </div>
+        <span className="live-phase">{phaseLabel(snapshot.phase)}</span>
+      </div>
+
+      {snapshot.round ? (
+        <div className="live-round-map">
+          <div>
+            <span>Station A</span>
+            <strong>{snapshot.round.teamA.name}</strong>
+          </div>
+          <b>VS</b>
+          <div>
+            <span>Station B</span>
+            <strong>
+              {snapshot.round.teamB?.name ?? "غير مستخدمة — SOLO"}
+            </strong>
+          </div>
+        </div>
+      ) : (
+        <p className="empty-state">
+          لا توجد جولة مجهزة حاليًا.
+        </p>
+      )}
+
+      {snapshot.round ? (
+        <div className="live-status-grid">
+          <div>
+            <span>تأكيد المحطات</span>
+            <strong>
+              {snapshot.stationsConfirmed ? "مؤكدة" : "بانتظار التأكيد"}
+            </strong>
+          </div>
+          <div>
+            <span>السؤال</span>
+            <strong>{questionPosition ?? "—"} / 10</strong>
+          </div>
+          <div>
+            <span>Team A</span>
+            <strong>
+              {snapshot.answerStatus.teamAReceived
+                ? "تم استلام الإجابة"
+                : "بانتظار الإجابة"}
+            </strong>
+          </div>
+          <div>
+            <span>Team B</span>
+            <strong>
+              {!snapshot.answerStatus.teamBRequired
+                ? "غير مطلوبة"
+                : snapshot.answerStatus.teamBReceived
+                  ? "تم استلام الإجابة"
+                  : "بانتظار الإجابة"}
+            </strong>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="actions live-actions">
+        {snapshot.phase === "IDLE" ||
+        snapshot.phase === "ROUND_COMPLETE" ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/prepare-round",
+                "تم تجهيز الجولة القادمة.",
+              )
+            }
+          >
+            تجهيز الجولة القادمة
+          </button>
+        ) : null}
+
+        {snapshot.phase === "ROUND_READY" &&
+        !snapshot.stationsConfirmed ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/confirm-stations",
+                "تم تأكيد توزيع المحطات.",
+              )
+            }
+          >
+            تأكيد Station A / B
+          </button>
+        ) : null}
+
+        {snapshot.phase === "ROUND_READY" &&
+        snapshot.stationsConfirmed ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/start-round",
+                "بدأت الجولة.",
+              )
+            }
+          >
+            بدء الجولة
+          </button>
+        ) : null}
+
+        {snapshot.phase === "ROUND_ACTIVE" ||
+        snapshot.phase === "INTERMISSION" ||
+        (snapshot.phase === "QUESTION_REVEAL" &&
+          (snapshot.question?.position ?? 0) < 10) ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/prepare-question",
+                "تم تجهيز السؤال التالي.",
+              )
+            }
+          >
+            تجهيز السؤال التالي
+          </button>
+        ) : null}
+
+        {snapshot.phase === "QUESTION_READY" ? (
+          <button
+            className="primary live-start-button"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/start-question",
+                "بدأ العد التنازلي 3-2-1.",
+              )
+            }
+          >
+            START — 3 · 2 · 1
+          </button>
+        ) : null}
+
+        {snapshot.phase === "QUESTION_CLOSED" ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/reveal",
+                "تم إظهار الإجابة.",
+              )
+            }
+          >
+            Reveal الإجابة
+          </button>
+        ) : null}
+
+        {snapshot.phase === "QUESTION_REVEAL" &&
+        snapshot.question?.position === 10 ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/complete-round",
+                "تم إنهاء الجولة.",
+              )
+            }
+          >
+            إنهاء الجولة
+          </button>
+        ) : null}
+
+        {(snapshot.phase === "ROUND_ACTIVE" ||
+          snapshot.phase === "QUESTION_REVEAL") ? (
+          <button
+            disabled={busy}
+            onClick={() =>
+              void run(
+                "/api/live/intermission",
+                "تم تفعيل وضع الاستراحة.",
+              )
+            }
+          >
+            استراحة / Hold
+          </button>
+        ) : null}
+      </div>
+
+      {snapshot.phase === "QUESTION_COUNTDOWN" ? (
+        <p className="locked-note">
+          العد التنازلي شغال. السؤال بعده مخفي عن المتسابقين.
+        </p>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_ACTIVE" ? (
+        <p className="locked-note">
+          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 45 ثانية.
+        </p>
+      ) : null}
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
+function TeamLivePanel({
+  snapshot,
+  teamState,
+  connected,
+  onSubmit,
+}: {
+  snapshot: LiveSnapshot | null;
+  teamState: LiveTeamSubmissionState | null;
+  connected: boolean;
+  onSubmit: (option: "A" | "B" | "C" | "D") => Promise<void>;
+}) {
+  const [now, setNow] = useState(Date.now());
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
+  const [busyOption, setBusyOption] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    setServerOffsetMs(snapshot.serverNowEpochMs - Date.now());
+  }, [snapshot]);
+
+  useEffect(() => {
+    if (
+      snapshot?.phase !== "QUESTION_COUNTDOWN" &&
+      snapshot?.phase !== "QUESTION_ACTIVE"
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [snapshot?.phase]);
+
+  if (!snapshot) {
+    return (
+      <section className="team-live-screen">
+        <h2>بانتظار السيرفر...</h2>
+      </section>
+    );
+  }
+
+  const station = teamState?.station ?? "A";
+  const assignedCollege =
+    station === "A"
+      ? snapshot.round?.teamA ?? null
+      : snapshot.round?.teamB ?? null;
+
+  const serverNow = now + serverOffsetMs;
+  const countdownValue =
+    snapshot.phase === "QUESTION_COUNTDOWN" &&
+    snapshot.countdownStartedAtEpochMs !== null
+      ? Math.max(
+          1,
+          Math.ceil(
+            (snapshot.countdownStartedAtEpochMs + 3000 - serverNow) /
+              1000,
+          ),
+        )
+      : null;
+
+  const remainingMs =
+    snapshot.phase === "QUESTION_ACTIVE" &&
+    snapshot.questionDeadlineEpochMs !== null
+      ? Math.max(0, snapshot.questionDeadlineEpochMs - serverNow)
+      : null;
+
+  const remainingSeconds =
+    remainingMs === null ? null : Math.ceil(remainingMs / 1000);
+
+  const submit = async (option: "A" | "B" | "C" | "D") => {
+    setBusyOption(option);
+    setSubmitError(null);
+
+    try {
+      await onSubmit(option);
+    } catch (caught) {
+      setSubmitError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إرسال الإجابة",
+      );
+    } finally {
+      setBusyOption(null);
+    }
+  };
+
+  if (!teamState?.required && snapshot.round) {
+    return (
+      <section className="team-live-screen team-waiting">
+        <p className="team-station-label">Station {station}</p>
+        <h2>هذه المحطة غير مستخدمة في الجولة الفردية</h2>
+        <p>ابقَ على الصفحة. سيتم تحديثها تلقائيًا عند الجولة التالية.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="team-live-screen">
+      <div className="team-live-header">
+        <div>
+          <p className="team-station-label">Station {station}</p>
+          <h2>{assignedCollege?.name ?? "بانتظار تعيين الكلية"}</h2>
+        </div>
+        <span className={connected ? "team-online" : "team-offline"}>
+          {connected ? "متصل" : "غير متصل"}
+        </span>
+      </div>
+
+      {snapshot.phase === "QUESTION_COUNTDOWN" ? (
+        <div className="team-countdown">
+          {countdownValue}
+        </div>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_READY" ? (
+        <div className="team-waiting-card">
+          السؤال {snapshot.question?.position ?? "—"} جاهز
+          <strong>بانتظار START من الأوبريتر</strong>
+        </div>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_ACTIVE" ||
+      snapshot.phase === "QUESTION_CLOSED" ||
+      snapshot.phase === "QUESTION_REVEAL" ? (
+        <>
+          <div className="team-question-meta">
+            <span>سؤال {snapshot.question?.position ?? "—"} / 10</span>
+            <span>{snapshot.question?.categoryName ?? ""}</span>
+            {remainingSeconds !== null ? (
+              <strong>{remainingSeconds} ثانية</strong>
+            ) : (
+              <strong>{phaseLabel(snapshot.phase)}</strong>
+            )}
+          </div>
+
+          <h3 className="team-question">
+            {snapshot.question?.prompt ?? ""}
+          </h3>
+
+          <div className="team-options">
+            {(["A", "B", "C", "D"] as const).map((option) => {
+              const value = snapshot.question?.options?.[option] ?? "";
+              const selected = teamState?.selectedOption === option;
+              const correct =
+                snapshot.phase === "QUESTION_REVEAL" &&
+                snapshot.question?.correctOption === option;
+
+              return (
+                <button
+                  key={option}
+                  className={[
+                    "team-option",
+                    selected ? "selected" : "",
+                    correct ? "correct" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  disabled={
+                    snapshot.phase !== "QUESTION_ACTIVE" ||
+                    Boolean(teamState?.locked) ||
+                    busyOption !== null
+                  }
+                  onClick={() => void submit(option)}
+                >
+                  <b>{option}</b>
+                  <span>{value}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {teamState?.locked ? (
+            <div className="answer-locked">
+              تم تثبيت الإجابة: {teamState.selectedOption}
+              {teamState.responseTimeMs !== null
+                ? ` — ${(teamState.responseTimeMs / 1000).toFixed(3)} ثانية`
+                : ""}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_CLOSED" && !teamState?.locked ? (
+        <div className="team-waiting-card">
+          انتهى استقبال الإجابات
+        </div>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_REVEAL" ? (
+        <div className="reveal-answer">
+          الإجابة الصحيحة: {snapshot.question?.correctOption ?? "—"}
+        </div>
+      ) : null}
+
+      {![
+        "QUESTION_READY",
+        "QUESTION_COUNTDOWN",
+        "QUESTION_ACTIVE",
+        "QUESTION_CLOSED",
+        "QUESTION_REVEAL",
+      ].includes(snapshot.phase) ? (
+        <div className="team-waiting-card">
+          <strong>{phaseLabel(snapshot.phase)}</strong>
+          <span>سيظهر السؤال تلقائيًا عند بدء الأوبريتر.</span>
+        </div>
+      ) : null}
+
+      {submitError ? (
+        <div className="status-message error">{submitError}</div>
+      ) : null}
+    </section>
+  );
+}
+
 export function App() {
   const surface = useMemo(() => surfaceFromPath(window.location.pathname), []);
   const role = useMemo(() => roleForSurface(surface), [surface]);
@@ -1154,11 +1645,18 @@ export function App() {
     useState<QuestionAllocationSummary | null>(null);
   const [drawPresentation, setDrawPresentation] =
     useState<DrawPresentationEvent | null>(null);
+  const [liveSnapshot, setLiveSnapshot] =
+    useState<LiveSnapshot | null>(null);
+  const [teamSubmission, setTeamSubmission] =
+    useState<LiveTeamSubmissionState | null>(null);
+  const [liveSocket, setLiveSocket] =
+    useState<ReturnType<typeof io> | null>(null);
 
   useEffect(() => {
     const socket = io({
       auth: { role },
     });
+    setLiveSocket(socket);
 
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
@@ -1184,6 +1682,18 @@ export function App() {
       },
     );
     socket.on(
+      "live:snapshot",
+      (snapshot: LiveSnapshot) => {
+        setLiveSnapshot(snapshot);
+      },
+    );
+    socket.on(
+      "live:team-submission",
+      (state: LiveTeamSubmissionState) => {
+        setTeamSubmission(state);
+      },
+    );
+    socket.on(
       "draw:presentation:start",
       (event: DrawPresentationEvent) => {
         setDrawPresentation(event);
@@ -1198,11 +1708,39 @@ export function App() {
     );
 
     return () => {
+      setLiveSocket(null);
       socket.disconnect();
     };
   }, [role]);
 
   const showPresence = surface === "operator";
+
+  const submitTeamAnswer = async (
+    option: "A" | "B" | "C" | "D",
+  ) => {
+    if (!liveSocket?.connected) {
+      throw new Error("الاتصال بالسيرفر غير متوفر.");
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      liveSocket.emit(
+        "team:submit-answer",
+        { option },
+        (result: { ok?: boolean; error?: string }) => {
+          if (result?.ok) {
+            resolve();
+            return;
+          }
+
+          reject(
+            new Error(
+              result?.error ?? "ANSWER_SUBMISSION_FAILED",
+            ),
+          );
+        },
+      );
+    });
+  };
 
   return (
     <main className="shell">
@@ -1239,6 +1777,19 @@ export function App() {
         />
       ) : null}
 
+      {surface === "operator" ? (
+        <OperatorLivePanel snapshot={liveSnapshot} />
+      ) : null}
+
+      {surface === "team-a" || surface === "team-b" ? (
+        <TeamLivePanel
+          snapshot={liveSnapshot}
+          teamState={teamSubmission}
+          connected={connected}
+          onSubmit={submitTeamAnswer}
+        />
+      ) : null}
+
       {showPresence ? (
         <section className="panel">
           <h2>حالة المحطات</h2>
@@ -1253,7 +1804,9 @@ export function App() {
       {surface !== "setup" &&
       surface !== "draw" &&
       surface !== "operator" &&
-      surface !== "display" ? (
+      surface !== "display" &&
+      surface !== "team-a" &&
+      surface !== "team-b" ? (
         <section className="panel">
           <h2>جاهز للمرحلة التالية</h2>
           <p>

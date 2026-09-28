@@ -92,6 +92,11 @@ const liveSession = registerLiveSessionRoutes(app, database, io);
 io.on("connection", (socket) => {
   const role = normalizeRole(socket.handshake.auth?.role);
   roles.set(socket.id, role);
+
+  if (role === "team-a" || role === "team-b") {
+    void socket.join(role);
+  }
+
   publishPresence();
 
   socket.emit("server:hello", {

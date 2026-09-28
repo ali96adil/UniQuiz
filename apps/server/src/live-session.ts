@@ -263,6 +263,22 @@ export class LiveSessionManager {
   publish(): LiveSnapshot {
     const snapshot = this.getSnapshot();
     this.io.emit("live:snapshot", snapshot);
+
+    const teamAState = this.getTeamSubmissionState("team-a");
+    const teamBState = this.getTeamSubmissionState("team-b");
+
+    if (teamAState) {
+      this.io
+        .to("team-a")
+        .emit("live:team-submission", teamAState);
+    }
+
+    if (teamBState) {
+      this.io
+        .to("team-b")
+        .emit("live:team-submission", teamBState);
+    }
+
     return snapshot;
   }
 
