@@ -20,6 +20,12 @@ PR #11 — M3: Question Bank, Bulk Import & Scoring
 - Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
 - CI Run #24 PASS: CSV/XLSX parser and validation tests.
 - CI Run #25 PASS: import UI, typecheck, tests, build and runtime smoke.
+- Full Excel export added for current Colleges / Categories / Questions; blank `source_ref` is explicitly tested and supported.
+- Locked question allocation implemented: 10 questions per round, exactly 2 per category, no cross-round reuse.
+- Exact official scoring core implemented using integer micro-points with millisecond response timing.
+- CI Run #27 PASS: export and optional `source_ref`.
+- CI Run #28 PASS: allocation invariants.
+- CI Run #29 PASS: allocation UI and scoring boundary tests.
 - M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
 - Repository foundation merged to `main`.
 - Public visibility intentionally retained during development.
@@ -46,14 +52,14 @@ PR #11 — M3: Question Bank, Bulk Import & Scoring
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M3 question-bank allocation, no-repeat rules, timer and scoring foundation.
-- Bulk CSV/XLSX import is implemented and awaiting real Mac workflow verification.
+- M3 authoritative question timer, question-use audit and VOID/replacement flow.
+- Bulk CSV/XLSX import is operationally verified on the Mac.
 
 ## Next action
-Pull the latest M3 branch on the Mac and verify the `/setup` bulk-import flow using the generated Excel template. After import verification, continue with 10-question round allocation, exactly 2 per category, no-repeat enforcement, timer and scoring.
+Implement authoritative 45-second question timing, question-use/audit persistence, and same-category VOID replacement while preserving locked round composition.
 
 ## Blockers
-No code blocker. Bulk import needs one real Mac verification before it is considered operationally verified.
+No current code blocker.
 
 ## Do not repeat
 - Do not recreate the repository.
