@@ -39,7 +39,8 @@ PR #10 — M2: Participants & Draw
 - Clean restart verified under Node 24.21.0 after stopping stale processes: Vite `172.20.10.4:5173`, Fastify/Socket.IO `172.20.10.4:8787`, SQLite reused successfully.
 
 ## In progress
-- M2 implementation starting.
+- M2 participant/draw real-device verification and audience draw presentation.
+- Odd-count rule updated: the randomly selected solo qualification round is always the final round.
 
 ## Next action
 Implement the college master list, participant selection/lock, server-side draw, ordered rounds, and odd-count solo round handling. Keep round order persistent and allow later operator selection without modifying the official draw.
