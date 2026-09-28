@@ -32,17 +32,17 @@ PR #9 — M1: Foundation & Local Runtime
 - CI Run #4 passed on commit `2a1fbc43e49cb9813e071f92deaeeaba8d7a66db`.
 - Local/LAN verification instructions added in `docs/LOCAL-DEVELOPMENT.md`.
 - Real Mac startup verified on 2026-09-28: Vite `192.168.3.114:5173`, Fastify/Socket.IO `192.168.3.114:8787`, SQLite created at `data/uniquiz.db`.
-- Real realtime presence verified: Operator connected, Display connected, Team B connected, and state reflected live in Operator without refresh.
+- Real realtime presence verified: Operator connected, Display connected, Team A and Team B both verified over LAN, and disconnect/reconnect state reflected live in Operator without refresh.
 - Vite development proxy emitted `ECONNRESET` WebSocket logs during client disconnect/reconnect activity; no functional failure has been observed. Reclassify as a bug only if presence flaps while clients remain continuously open.
 
 ## In progress
-- M1 real-device verification: Team A and reconnect behavior remain.
+- M1 runtime version alignment remains.
 
 ## Next action
-Operator, Display and Team B realtime presence are verified on real devices. Next connect Team A, then verify disconnect/reconnect presence for at least one team without refreshing Operator. After that, align the Mac runtime from Node 23.11.0 to project Node 24.21.0.
+Real-device LAN verification is complete for Operator, Display, Team A and Team B, including disconnect/reconnect presence without refreshing Operator. Next align the Mac runtime from Node 23.11.0 to project Node 24.21.0, then close M1.
 
 ## Blockers
-Operator, Display and Team B are verified over the real LAN with live presence updates. Team A and disconnect/reconnect verification remain. The Mac currently runs Node 23.11.0 while the project requires Node >=24.21.0; development still started successfully, but runtime version alignment is required before M1 closure.
+Real-device LAN verification is complete. The only remaining M1 hygiene item is aligning the Mac from Node 23.11.0 to project Node 24.21.0.
 
 ## Do not repeat
 - Do not recreate the repository.
