@@ -9,14 +9,15 @@ Issue #2 — M1 Foundation & Local Runtime
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`foundation/project-bootstrap`
+`feature/m1-local-runtime`
 
 ## Active pull request
-PR #1 — Bootstrap UniQuiz monorepo foundation
+Pending creation for M1 implementation.
 
 ## Completed
 - Repository created.
 - Public visibility intentionally retained during development.
+- Foundation PR #1 merged to `main` as squash commit `ad5990353c36d555fe8decfd0fc0defa200652f5`.
 - Qualification rules documented.
 - Initial architecture documented.
 - pnpm monorepo workspace configured.
@@ -27,10 +28,10 @@ PR #1 — Bootstrap UniQuiz monorepo foundation
 - Repository map, workflow, decisions and project plan documented.
 
 ## In progress
-- M1 implementation preparation.
+- M1 implementation.
 
 ## Next action
-Finish PR #1, then start the M1 implementation by scaffolding `apps/server`, `apps/web`, and `packages/shared`. The first target is a locally runnable server/web pair with a health endpoint and realtime client connection.
+Scaffold `apps/server`, `apps/web`, and `packages/shared`. First verified checkpoint: one local command starts server + web, exposes a health endpoint, and establishes realtime browser connectivity.
 
 ## Blockers
 None.
