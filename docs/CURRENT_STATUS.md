@@ -12,10 +12,14 @@ Issue #8 — UniQuiz Roadmap & Current Work
 `feature/m3-question-bank-import`
 
 ## Active pull request
-Pending creation for M3 implementation
+PR #11 — M3: Question Bank, Bulk Import & Scoring
 
 ## Completed
 - M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
+- M3 bulk import implemented for CSV/XLSX with Preview → Validation → Apply, plus downloadable Excel template.
+- Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
+- CI Run #24 PASS: CSV/XLSX parser and validation tests.
+- CI Run #25 PASS: import UI, typecheck, tests, build and runtime smoke.
 - M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
 - Repository foundation merged to `main`.
 - Public visibility intentionally retained during development.
@@ -42,13 +46,14 @@ Pending creation for M3 implementation
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M3 question bank, categories, bulk import and scoring foundation.
+- M3 question-bank allocation, no-repeat rules, timer and scoring foundation.
+- Bulk CSV/XLSX import is implemented and awaiting real Mac workflow verification.
 
 ## Next action
-Implement CSV/XLSX bulk import with server-side validation for colleges, categories and questions. Define the question-bank schema with exactly four options and one official correct option.
+Pull the latest M3 branch on the Mac and verify the `/setup` bulk-import flow using the generated Excel template. After import verification, continue with 10-question round allocation, exactly 2 per category, no-repeat enforcement, timer and scoring.
 
 ## Blockers
-No code blocker. M2 only needs final visual verification of the audience draw presentation on the real display.
+No code blocker. Bulk import needs one real Mac verification before it is considered operationally verified.
 
 ## Do not repeat
 - Do not recreate the repository.
