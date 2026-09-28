@@ -23,6 +23,11 @@ PR #12 — M4: Live Session & Team Stations
 - CI Run #38 PASS: submission locking and solo/paired closure.
 - CI Run #39 PASS: live web interfaces.
 - CI Run #40 PASS: pre-question station-state correction.
+- Fail-safe OSC show-control output implemented for countdown 3/2/1, question start, answered, timeout, close, reveal, intermission and round completion.
+- Persistent Station A/B access tokens implemented; authenticated presence is required by Station Ready Check.
+- CI Run #42 PASS: OSC output.
+- CI Run #44 PASS: station token binding and readiness.
+- CI Run #45 PASS: full 10-question paired-round integration with 20 locked submissions, manual Reveal, persisted completion, OSC events and OSC-failure isolation.
 - M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
 - M3 bulk import implemented for CSV/XLSX with Preview → Validation → Apply, plus downloadable Excel template.
 - Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
@@ -63,10 +68,10 @@ PR #12 — M4: Live Session & Team Stations
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M4 station access binding, OSC show-control output, live real-device verification and end-to-end 10-question round.
+- M4 real-device rehearsal on the Mac plus authenticated Team A/B browsers.
 
 ## Next action
-Add configurable OSC show-control output for Ableton, then add station access binding and perform real Mac + Team A/B live-flow verification.
+Pull the latest M4 branch on the Mac, open the tokenized Team A/B links on two browsers/devices, verify authenticated Station Ready Check, then run one complete live question through 3-2-1 → answer lock → early close/timeout → Reveal. If accepted, run the 10-question rehearsal and merge M4.
 
 ## Blockers
 No current blocker.
