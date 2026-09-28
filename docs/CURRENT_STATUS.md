@@ -3,18 +3,19 @@
 Updated: 2026-09-28
 
 ## Active milestone
-Issue #3 — M2 Participants & Draw
+Issue #4 — M3 Question Bank & Scoring
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m2-participants-draw`
+`feature/m3-question-bank-import`
 
 ## Active pull request
-PR #10 — M2: Participants & Draw
+Pending creation for M3 implementation
 
 ## Completed
+- M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
 - M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
 - Repository foundation merged to `main`.
 - Public visibility intentionally retained during development.
@@ -41,11 +42,10 @@ PR #10 — M2: Participants & Draw
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M2 audience visual verification on the real display.
-- Odd-count rule is verified: the randomly selected solo qualification round is always the final round.
+- M3 question bank, categories, bulk import and scoring foundation.
 
 ## Next action
-Pull the latest M2 branch on the Mac, open `/display` and `/draw`, then replay the official draw presentation. Verify staged audience reveal, final ordered rounds, and solo-last presentation visually. If accepted, close M2 and move to M3.
+Implement CSV/XLSX bulk import with server-side validation for colleges, categories and questions. Define the question-bank schema with exactly four options and one official correct option.
 
 ## Blockers
 No code blocker. M2 only needs final visual verification of the audience draw presentation on the real display.
