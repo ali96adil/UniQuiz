@@ -5,7 +5,10 @@ import type { ClientRole, PresenceSnapshot } from "@uniquiz/shared";
 import { registerCompetitionRoutes, getCompetitionSnapshot } from "./competition.js";
 import { config } from "./config.js";
 import { openDatabase } from "./database.js";
-import { registerImportRoutes } from "./importer.js";
+import {
+  getQuestionBankSummary,
+  registerImportRoutes,
+} from "./importer.js";
 
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
@@ -93,6 +96,11 @@ io.on("connection", (socket) => {
   socket.emit(
     "competition:snapshot",
     getCompetitionSnapshot(database),
+  );
+
+  socket.emit(
+    "question-bank:snapshot",
+    getQuestionBankSummary(database),
   );
 
   socket.on("disconnect", () => {
