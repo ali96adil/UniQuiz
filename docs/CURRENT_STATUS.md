@@ -37,16 +37,18 @@ PR #10 — M2: Participants & Draw
 - Vite development proxy emitted `ECONNRESET` WebSocket logs during client disconnect/reconnect activity; no functional failure has been observed. Reclassify as a bug only if presence flaps while clients remain continuously open.
 - Node 24.21.0 verified on the Mac after installing Homebrew `node@24` and updating PATH.
 - Clean restart verified under Node 24.21.0 after stopping stale processes: Vite `172.20.10.4:5173`, Fastify/Socket.IO `172.20.10.4:8787`, SQLite reused successfully.
+- M2 core implemented and CI verified: participant setup/lock, persistent official draw, manual next-round selection, solo-last rule, audience draw presentation, and replay.
+- CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M2 participant/draw real-device verification and audience draw presentation.
-- Odd-count rule updated: the randomly selected solo qualification round is always the final round.
+- M2 audience visual verification on the real display.
+- Odd-count rule is verified: the randomly selected solo qualification round is always the final round.
 
 ## Next action
-Implement the college master list, participant selection/lock, server-side draw, ordered rounds, and odd-count solo round handling. Keep round order persistent and allow later operator selection without modifying the official draw.
+Pull the latest M2 branch on the Mac, open `/display` and `/draw`, then replay the official draw presentation. Verify staged audience reveal, final ordered rounds, and solo-last presentation visually. If accepted, close M2 and move to M3.
 
 ## Blockers
-No remaining M1 blocker. Clean restart under Node 24.21.0 is verified.
+No code blocker. M2 only needs final visual verification of the audience draw presentation on the real display.
 
 ## Do not repeat
 - Do not recreate the repository.
