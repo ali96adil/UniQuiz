@@ -9,6 +9,10 @@ import {
   getQuestionBankSummary,
   registerImportRoutes,
 } from "./importer.js";
+import {
+  getQuestionAllocationSummary,
+  registerQuestionBankRoutes,
+} from "./question-bank.js";
 
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
@@ -81,6 +85,7 @@ app.get("/api/presence", async () => presenceSnapshot());
 
 registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
+registerQuestionBankRoutes(app, database, io);
 
 io.on("connection", (socket) => {
   const role = normalizeRole(socket.handshake.auth?.role);
@@ -101,6 +106,11 @@ io.on("connection", (socket) => {
   socket.emit(
     "question-bank:snapshot",
     getQuestionBankSummary(database),
+  );
+
+  socket.emit(
+    "question-allocation:snapshot",
+    getQuestionAllocationSummary(database),
   );
 
   socket.on("disconnect", () => {

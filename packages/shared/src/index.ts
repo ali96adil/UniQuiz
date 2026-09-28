@@ -114,3 +114,27 @@ export interface QuestionBankSummary {
     questionCount: number;
   }>;
 }
+
+export interface QuestionAllocationCategorySummary {
+  key: string;
+  name: string;
+  availableQuestions: number;
+  requiredQuestions: number;
+}
+
+export interface RoundQuestionSetSummary {
+  roundId: number;
+  roundOrder: number;
+  locked: boolean;
+  questionCount: number;
+  categoryCounts: Record<string, number>;
+}
+
+export interface QuestionAllocationSummary {
+  roundCount: number;
+  questionsPerRound: number;
+  requiredPerCategory: number;
+  ready: boolean;
+  categories: QuestionAllocationCategorySummary[];
+  rounds: RoundQuestionSetSummary[];
+}

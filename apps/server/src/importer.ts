@@ -831,6 +831,23 @@ export function registerImportRoutes(
       });
     }
 
+    const lockedQuestionSetCount = (
+      db.prepare(
+        "SELECT COUNT(*) AS count FROM qualification_round_question_sets",
+      ).get() as { count: number }
+    ).count;
+
+    if (
+      lockedQuestionSetCount > 0 &&
+      (staged.parsed.categories || staged.parsed.questions)
+    ) {
+      return reply.code(409).send({
+        error: "QUESTION_SETS_LOCKED",
+        message:
+          "Question/category import is blocked after round question sets are locked.",
+      });
+    }
+
     const existingQuestionCount = (
       db.prepare("SELECT COUNT(*) AS count FROM questions").get() as {
         count: number;

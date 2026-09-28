@@ -87,8 +87,35 @@ export function openDatabase(databasePath: string) {
     CREATE INDEX IF NOT EXISTS idx_questions_category_id
       ON questions(category_id);
 
+    CREATE TABLE IF NOT EXISTS qualification_round_question_sets (
+      round_id INTEGER PRIMARY KEY,
+      locked_at TEXT NOT NULL,
+      FOREIGN KEY (round_id)
+        REFERENCES qualification_rounds(id)
+        ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS qualification_round_questions (
+      round_id INTEGER NOT NULL,
+      position INTEGER NOT NULL
+        CHECK (position BETWEEN 1 AND 10),
+      question_id INTEGER NOT NULL UNIQUE,
+      category_id INTEGER NOT NULL,
+      PRIMARY KEY (round_id, position),
+      FOREIGN KEY (round_id)
+        REFERENCES qualification_round_question_sets(round_id)
+        ON DELETE CASCADE,
+      FOREIGN KEY (question_id)
+        REFERENCES questions(id),
+      FOREIGN KEY (category_id)
+        REFERENCES categories(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_round_questions_category
+      ON qualification_round_questions(round_id, category_id);
+
     UPDATE app_meta
-    SET value = '3'
+    SET value = '4'
     WHERE key = 'schema_version';
   `);
 
