@@ -33,6 +33,7 @@ PR #9 — M1: Foundation & Local Runtime
 - Local/LAN verification instructions added in `docs/LOCAL-DEVELOPMENT.md`.
 - Real Mac startup verified on 2026-09-28: Vite `192.168.3.114:5173`, Fastify/Socket.IO `192.168.3.114:8787`, SQLite created at `data/uniquiz.db`.
 - Real realtime presence verified: Operator connected, Display connected, Team B connected, and state reflected live in Operator without refresh.
+- Vite development proxy emitted `ECONNRESET` WebSocket logs during client disconnect/reconnect activity; no functional failure has been observed. Reclassify as a bug only if presence flaps while clients remain continuously open.
 
 ## In progress
 - M1 real-device verification: Team A and reconnect behavior remain.
