@@ -69,3 +69,20 @@ Initial cue set:
 OSC is best-effort show control only. Failure to deliver an OSC packet must never change official competition state, timing, scoring or results.
 
 The target host/port and OSC enable state are configurable. No fixed port is part of the competition protocol.
+
+## D-014 — Configurable audience-facing terminology
+Decision: Internal domain/API terms remain stable in English, while audience-facing and operator-facing Arabic labels are configurable.
+
+Default presentation terminology:
+- session → جولة
+- next session → الجولة القادمة
+- current session → الجولة الحالية
+- ranking → الترتيب العام
+- question → السؤال
+- correct answer → الإجابة الصحيحة
+- intermission → استراحة قصيرة
+- final results → النتائج النهائية
+
+The operator can edit visible titles, labels, subtitles, announcements, event name, venue text, season/year text, footer text, and stage messages from competition settings without changing code.
+
+Reason: Event wording may change between editions, organizers or presentation styles. Presentation text must not be coupled to internal state-machine names.
