@@ -1,4 +1,3 @@
-import { createServer } from "node:http";
 import Fastify from "fastify";
 import { Server as SocketIOServer } from "socket.io";
 import type { ClientRole, PresenceSnapshot } from "@uniquiz/shared";
@@ -8,11 +7,7 @@ import { openDatabase } from "./database.js";
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
 
-const httpServer = createServer((request, response) => {
-  app.routing(request, response);
-});
-
-const io = new SocketIOServer(httpServer, {
+const io = new SocketIOServer(app.server, {
   cors: {
     origin: true,
     credentials: false,
@@ -91,21 +86,22 @@ const shutdown = async (signal: string) => {
   io.close();
   database.close();
   await app.close();
-  httpServer.close(() => process.exit(0));
+  process.exit(0);
 };
 
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
-await app.ready();
-
-httpServer.listen(config.port, config.host, () => {
-  app.log.info(
-    {
-      host: config.host,
-      port: config.port,
-      databasePath: config.databasePath,
-    },
-    "UniQuiz server ready",
-  );
+await app.listen({
+  host: config.host,
+  port: config.port,
 });
+
+app.log.info(
+  {
+    host: config.host,
+    port: config.port,
+    databasePath: config.databasePath,
+  },
+  "UniQuiz server ready",
+);
