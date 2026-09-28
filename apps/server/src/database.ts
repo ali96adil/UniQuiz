@@ -153,10 +153,7 @@ export function openDatabase(databasePath: string) {
       position INTEGER,
       reason TEXT,
       payload_json TEXT,
-      occurred_at TEXT NOT NULL,
-      FOREIGN KEY (round_id) REFERENCES qualification_rounds(id),
-      FOREIGN KEY (question_id) REFERENCES questions(id),
-      FOREIGN KEY (related_question_id) REFERENCES questions(id)
+      occurred_at TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_audit_events_round

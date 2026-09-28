@@ -454,6 +454,19 @@ export function registerCompetitionRoutes(
       return sendValidationError(reply, parsed.error.issues);
     }
 
+    const lockedQuestionSets = db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM qualification_round_question_sets
+    `).get() as { count: number };
+
+    if (lockedQuestionSets.count > 0) {
+      return sendConflict(
+        reply,
+        "QUESTION_SETS_MUST_BE_RESET",
+        "Reset locked question sets before resetting the official draw.",
+      );
+    }
+
     const nonPending = db.prepare(`
       SELECT COUNT(*) AS count
       FROM qualification_rounds

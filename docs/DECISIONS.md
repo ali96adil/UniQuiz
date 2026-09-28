@@ -147,3 +147,13 @@ Rules:
 - Wrong, unanswered, or later than 45,000 ms: 0
 
 Reason: This implements the agreed linear formula exactly at millisecond precision without floating-point accumulation affecting ranking.
+
+## D-020 — Audit history is append-only and reference-tolerant
+Decision: Audit rows preserve numeric round/question references and event payloads without foreign-key coupling to mutable setup tables.
+
+Reason: Resetting a draw or replacing/importing a question bank must not erase historical audit evidence or be blocked by audit-table foreign keys.
+
+## D-021 — Question timing uses the server monotonic clock
+Decision: The authoritative 45-second question window is measured from the server's monotonic clock. Wall-clock timestamps are stored/published only for display and audit correlation.
+
+Reason: Browser clocks and wall-clock adjustments must not change official elapsed response time.
