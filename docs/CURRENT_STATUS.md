@@ -32,15 +32,16 @@ PR #9 — M1: Foundation & Local Runtime
 - CI Run #4 passed on commit `2a1fbc43e49cb9813e071f92deaeeaba8d7a66db`.
 - Local/LAN verification instructions added in `docs/LOCAL-DEVELOPMENT.md`.
 - Real Mac startup verified on 2026-09-28: Vite `192.168.3.114:5173`, Fastify/Socket.IO `192.168.3.114:8787`, SQLite created at `data/uniquiz.db`.
+- Real realtime presence verified: Operator connected, Display connected, Team B connected, and state reflected live in Operator without refresh.
 
 ## In progress
-- M1 real-device verification on the two Windows browsers and audience display.
+- M1 real-device verification: Team A and reconnect behavior remain.
 
 ## Next action
-Mac startup is verified. Next verify Operator + Display on the Mac, then Team A and Team B from the two Windows PCs over LAN using `http://192.168.3.114:5173/...`. Confirm live disconnect/reconnect presence without refresh. After that, align the Mac runtime from Node 23.11.0 to the project Node 24.21.0.
+Operator, Display and Team B realtime presence are verified on real devices. Next connect Team A, then verify disconnect/reconnect presence for at least one team without refreshing Operator. After that, align the Mac runtime from Node 23.11.0 to project Node 24.21.0.
 
 ## Blockers
-Mac runtime is verified. Windows LAN/reconnect verification is pending. The Mac currently runs Node 23.11.0 while the project requires Node >=24.21.0; development still started successfully, but runtime version alignment is required before M1 closure.
+Operator, Display and Team B are verified over the real LAN with live presence updates. Team A and disconnect/reconnect verification remain. The Mac currently runs Node 23.11.0 while the project requires Node >=24.21.0; development still started successfully, but runtime version alignment is required before M1 closure.
 
 ## Do not repeat
 - Do not recreate the repository.
