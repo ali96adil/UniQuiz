@@ -12,7 +12,7 @@ Issue #8 — UniQuiz Roadmap & Current Work
 `feature/m1-local-runtime`
 
 ## Active pull request
-Pending creation for M1 implementation.
+PR #9 — M1: Foundation & Local Runtime
 
 ## Completed
 - Repository created.
@@ -26,6 +26,7 @@ Pending creation for M1 implementation.
 - Master project tracker created (#8).
 - Pull-request and issue templates added.
 - Repository map, workflow, decisions and project plan documented.
+- Dedicated M1 branch and Draft PR #9 created.
 
 ## In progress
 - M1 implementation.
