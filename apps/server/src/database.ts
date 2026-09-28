@@ -206,8 +206,16 @@ export function openDatabase(databasePath: string) {
     CREATE INDEX IF NOT EXISTS idx_live_submissions_round_question
       ON live_submissions(round_id, question_position);
 
+    CREATE TABLE IF NOT EXISTS station_credentials (
+      station TEXT PRIMARY KEY
+        CHECK (station IN ('A', 'B')),
+      access_token TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      rotated_at TEXT
+    );
+
     UPDATE app_meta
-    SET value = '7'
+    SET value = '8'
     WHERE key = 'schema_version';
   `);
 

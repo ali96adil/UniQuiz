@@ -97,6 +97,9 @@ export class LiveSessionManager {
     private readonly countdownMs = 3_000,
     private readonly questionDurationMs = QUESTION_DURATION_MS,
     private readonly showControl: ShowControlOutput = NOOP_SHOW_CONTROL,
+    private readonly isStationConnected: (
+      role: "team-a" | "team-b",
+    ) => boolean = () => true,
   ) {}
 
   private sendShowControl(
@@ -317,6 +320,12 @@ export class LiveSessionManager {
           : state.questionStartedAtEpochMs + QUESTION_DURATION_MS,
       questionClosedAtEpochMs: state.questionClosedAtEpochMs,
       closeReason: state.closeReason,
+      stationReadiness: {
+        teamARequired: round !== null,
+        teamAConnected: this.isStationConnected("team-a"),
+        teamBRequired: round?.teamB !== null,
+        teamBConnected: this.isStationConnected("team-b"),
+      },
       answerStatus: {
         teamARequired: round !== null,
         teamAReceived: receivedStations.has("A"),
@@ -473,6 +482,22 @@ export class LiveSessionManager {
     const state = this.stateRow();
     if (state.phase !== "ROUND_READY" || state.roundId === null) {
       throw new Error("ROUND_NOT_READY");
+    }
+
+    const round = this.roundRow(state.roundId);
+    if (!round) {
+      throw new Error("ROUND_NOT_FOUND");
+    }
+
+    if (!this.isStationConnected("team-a")) {
+      throw new Error("TEAM_A_NOT_READY");
+    }
+
+    if (
+      round.bId !== null &&
+      !this.isStationConnected("team-b")
+    ) {
+      throw new Error("TEAM_B_NOT_READY");
     }
 
     this.updateState({
@@ -1046,6 +1071,9 @@ export function registerLiveSessionRoutes(
   db: AppDatabase,
   io: SocketIOServer,
   showControl: ShowControlOutput = NOOP_SHOW_CONTROL,
+  isStationConnected: (
+    role: "team-a" | "team-b",
+  ) => boolean = () => true,
 ): LiveSessionManager {
   const manager = new LiveSessionManager(
     db,
@@ -1053,6 +1081,7 @@ export function registerLiveSessionRoutes(
     3_000,
     QUESTION_DURATION_MS,
     showControl,
+    isStationConnected,
   );
 
   app.get("/api/live", async () => manager.getSnapshot());

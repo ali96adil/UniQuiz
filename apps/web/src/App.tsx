@@ -1161,6 +1161,79 @@ function phaseLabel(phase: LiveSnapshot["phase"]): string {
   return labels[phase];
 }
 
+
+interface StationCredentialResponse {
+  teamA: { station: "A"; token: string } | null;
+  teamB: { station: "B"; token: string } | null;
+}
+
+function StationAccessPanel() {
+  const [credentials, setCredentials] =
+    useState<StationCredentialResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void apiRequest<StationCredentialResponse>(
+      "/api/stations/credentials",
+    )
+      .then(setCredentials)
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "تعذر تحميل روابط المحطات",
+        );
+      });
+  }, []);
+
+  const urlFor = (station: "a" | "b", token: string) =>
+    `${window.location.origin}/team/${station}?token=${encodeURIComponent(token)}`;
+
+  return (
+    <section className="panel station-access-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Station Access</p>
+          <h2>روابط محطات المتسابقين</h2>
+        </div>
+      </div>
+
+      <p className="muted">
+        افتح كل رابط على جهاز الفريق المقابل. التوكن يثبت هوية المحطة
+        ويُحفظ في المتصفح بعد أول فتح.
+      </p>
+
+      {credentials ? (
+        <div className="station-links">
+          {credentials.teamA ? (
+            <div>
+              <strong>Team A</strong>
+              <code>
+                {urlFor("a", credentials.teamA.token)}
+              </code>
+            </div>
+          ) : null}
+          {credentials.teamB ? (
+            <div>
+              <strong>Team B</strong>
+              <code>
+                {urlFor("b", credentials.teamB.token)}
+              </code>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <p className="muted station-link-note">
+        إذا لوحة التحكم مفتوحة على localhost، استبدل localhost بعنوان
+        IP الماك على شبكة المسابقة قبل فتح الرابط على أجهزة Windows.
+      </p>
+
+      <StatusMessage error={error} message={null} />
+    </section>
+  );
+}
+
 function OperatorLivePanel({
   snapshot,
 }: {
@@ -1651,15 +1724,47 @@ export function App() {
     useState<LiveTeamSubmissionState | null>(null);
   const [liveSocket, setLiveSocket] =
     useState<ReturnType<typeof io> | null>(null);
+  const [effectiveRole, setEffectiveRole] =
+    useState<ClientRole>("unknown");
+
+  const stationToken = useMemo(() => {
+    if (role !== "team-a" && role !== "team-b") {
+      return null;
+    }
+
+    const key = `uniquiz:${role}:token`;
+    const queryToken = new URLSearchParams(
+      window.location.search,
+    ).get("token");
+
+    if (queryToken) {
+      window.localStorage.setItem(key, queryToken);
+      return queryToken;
+    }
+
+    return window.localStorage.getItem(key);
+  }, [role, stationToken]);
 
   useEffect(() => {
     const socket = io({
-      auth: { role },
+      auth: {
+        role,
+        token: stationToken,
+      },
     });
     setLiveSocket(socket);
 
     socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => setConnected(false));
+    socket.on("disconnect", () => {
+      setConnected(false);
+      setEffectiveRole("unknown");
+    });
+    socket.on(
+      "server:hello",
+      (payload: { role: ClientRole }) => {
+        setEffectiveRole(payload.role);
+      },
+    );
     socket.on("presence:snapshot", (snapshot: PresenceSnapshot) => {
       setPresence(snapshot);
     });
@@ -1722,6 +1827,12 @@ export function App() {
       throw new Error("الاتصال بالسيرفر غير متوفر.");
     }
 
+    if (effectiveRole !== role) {
+      throw new Error(
+        "رمز دخول المحطة غير موجود أو غير صحيح.",
+      );
+    }
+
     await new Promise<void>((resolve, reject) => {
       liveSocket.emit(
         "team:submit-answer",
@@ -1778,14 +1889,19 @@ export function App() {
       ) : null}
 
       {surface === "operator" ? (
-        <OperatorLivePanel snapshot={liveSnapshot} />
+        <>
+          <OperatorLivePanel snapshot={liveSnapshot} />
+          <StationAccessPanel />
+        </>
       ) : null}
 
       {surface === "team-a" || surface === "team-b" ? (
         <TeamLivePanel
           snapshot={liveSnapshot}
           teamState={teamSubmission}
-          connected={connected}
+          connected={
+            connected && effectiveRole === role
+          }
           onSubmit={submitTeamAnswer}
         />
       ) : null}

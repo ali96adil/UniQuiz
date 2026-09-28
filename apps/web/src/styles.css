@@ -842,3 +842,28 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.station-links {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.station-links > div {
+  display: grid;
+  gap: 7px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.56);
+}
+
+.station-links code {
+  direction: ltr;
+  overflow-wrap: anywhere;
+  color: #bfdbfe;
+  user-select: all;
+}
+
+.station-link-note {
+  margin-top: 14px;
+}

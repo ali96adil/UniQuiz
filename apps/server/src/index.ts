@@ -15,9 +15,15 @@ import {
 } from "./question-bank.js";
 import { registerLiveSessionRoutes } from "./live-session.js";
 import { OscOutput } from "./osc-output.js";
+import {
+  ensureStationCredentials,
+  registerStationAuthRoutes,
+  validateStationToken,
+} from "./station-auth.js";
 
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
+ensureStationCredentials(database);
 
 await app.register(multipart, {
   limits: {
@@ -37,13 +43,22 @@ const io = new SocketIOServer(app.server, {
 
 const roles = new Map<string, ClientRole>();
 
-function normalizeRole(value: unknown): ClientRole {
+function normalizeRole(
+  value: unknown,
+  token: unknown,
+): ClientRole {
   switch (value) {
     case "operator":
     case "display":
-    case "team-a":
-    case "team-b":
       return value;
+    case "team-a":
+      return validateStationToken(database, "A", token)
+        ? "team-a"
+        : "unknown";
+    case "team-b":
+      return validateStationToken(database, "B", token)
+        ? "team-b"
+        : "unknown";
     default:
       return "unknown";
   }
@@ -88,6 +103,7 @@ app.get("/api/presence", async () => presenceSnapshot());
 registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
 registerQuestionBankRoutes(app, database, io);
+registerStationAuthRoutes(app, database);
 
 const oscOutput = new OscOutput(
   config.osc,
@@ -108,10 +124,17 @@ const liveSession = registerLiveSessionRoutes(
   database,
   io,
   oscOutput,
+  (role) =>
+    [...roles.values()].some(
+      (connectedRole) => connectedRole === role,
+    ),
 );
 
 io.on("connection", (socket) => {
-  const role = normalizeRole(socket.handshake.auth?.role);
+  const role = normalizeRole(
+    socket.handshake.auth?.role,
+    socket.handshake.auth?.token,
+  );
   roles.set(socket.id, role);
 
   if (role === "team-a" || role === "team-b") {
@@ -119,6 +142,7 @@ io.on("connection", (socket) => {
   }
 
   publishPresence();
+  io.emit("live:snapshot", liveSession.getSnapshot());
 
   socket.emit("server:hello", {
     socketId: socket.id,
@@ -196,6 +220,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     roles.delete(socket.id);
     publishPresence();
+    io.emit("live:snapshot", liveSession.getSnapshot());
   });
 });
 

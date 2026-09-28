@@ -183,6 +183,7 @@ export interface LiveSnapshot {
   questionDeadlineEpochMs: number | null;
   questionClosedAtEpochMs: number | null;
   closeReason: string | null;
+  stationReadiness: LiveStationReadiness;
   answerStatus: LiveAnswerStatus;
 }
 
@@ -207,4 +208,11 @@ export interface LiveSubmissionReceipt {
   selectedOption: "A" | "B" | "C" | "D";
   submittedAtEpochMs: number;
   responseTimeMs: number;
+}
+
+export interface LiveStationReadiness {
+  teamARequired: boolean;
+  teamAConnected: boolean;
+  teamBRequired: boolean;
+  teamBConnected: boolean;
 }
