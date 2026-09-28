@@ -18,6 +18,11 @@ import {
   ServerQuestionClock,
 } from "./question-clock.js";
 import { calculateScoreMicros } from "./scoring.js";
+import {
+  NOOP_SHOW_CONTROL,
+  type OscArgument,
+  type ShowControlOutput,
+} from "./osc-output.js";
 
 const prepareRoundSchema = z.object({
   roundId: z.number().int().positive().optional(),
@@ -83,6 +88,7 @@ function college(
 export class LiveSessionManager {
   private readonly questionClock = new ServerQuestionClock();
   private countdownTimer: NodeJS.Timeout | null = null;
+  private countdownCueTimers: NodeJS.Timeout[] = [];
   private questionTimer: NodeJS.Timeout | null = null;
 
   constructor(
@@ -90,7 +96,67 @@ export class LiveSessionManager {
     private readonly io: SocketIOServer,
     private readonly countdownMs = 3_000,
     private readonly questionDurationMs = QUESTION_DURATION_MS,
+    private readonly showControl: ShowControlOutput = NOOP_SHOW_CONTROL,
   ) {}
+
+  private sendShowControl(
+    address: string,
+    args: readonly OscArgument[] = [],
+  ): void {
+    try {
+      this.showControl.send(address, args);
+    } catch {
+      // Show-control failures must never affect official competition state.
+    }
+  }
+
+  private roundOrder(roundId: number): number {
+    return this.roundRow(roundId)?.roundOrder ?? 0;
+  }
+
+  private clearCountdownCueTimers(): void {
+    for (const timer of this.countdownCueTimers) {
+      clearTimeout(timer);
+    }
+    this.countdownCueTimers = [];
+  }
+
+  private scheduleCountdownCues(
+    roundId: number,
+    position: number,
+  ): void {
+    this.clearCountdownCueTimers();
+
+    const roundOrder = this.roundOrder(roundId);
+    const values = [3, 2, 1] as const;
+
+    values.forEach((value, index) => {
+      const emit = () => {
+        const current = this.stateRow();
+        if (
+          current.phase !== "QUESTION_COUNTDOWN" ||
+          current.roundId !== roundId ||
+          current.questionPosition !== position
+        ) {
+          return;
+        }
+
+        this.sendShowControl(
+          "/uniquiz/question/countdown",
+          [roundOrder, position, value],
+        );
+      };
+
+      if (index === 0) {
+        emit();
+        return;
+      }
+
+      this.countdownCueTimers.push(
+        setTimeout(emit, index * 1000),
+      );
+    });
+  }
 
   private stateRow(): LiveStateRow {
     return this.db.prepare(`
@@ -449,6 +515,11 @@ export class LiveSessionManager {
       roundId: state.roundId,
     });
 
+    this.sendShowControl(
+      "/uniquiz/round/start",
+      [this.roundOrder(state.roundId)],
+    );
+
     return this.publish();
   }
 
@@ -526,6 +597,8 @@ export class LiveSessionManager {
     const roundId = state.roundId;
     const position = state.questionPosition;
 
+    this.scheduleCountdownCues(roundId, position);
+
     if (this.countdownTimer) clearTimeout(this.countdownTimer);
     this.countdownTimer = setTimeout(() => {
       this.activateQuestion(roundId, position);
@@ -569,6 +642,16 @@ export class LiveSessionManager {
         durationMs: QUESTION_DURATION_MS,
       },
     });
+
+    this.clearCountdownCueTimers();
+    this.sendShowControl(
+      "/uniquiz/question/start",
+      [
+        this.roundOrder(roundId),
+        position,
+        this.questionDurationMs,
+      ],
+    );
 
     this.publish();
 
@@ -617,6 +700,29 @@ export class LiveSessionManager {
       occurredAt: new Date(closedAt).toISOString(),
     });
 
+    const roundOrder = this.roundOrder(state.roundId);
+    this.sendShowControl(
+      "/uniquiz/question/closed",
+      [roundOrder, state.questionPosition, reason],
+    );
+
+    if (reason === "TIMEOUT") {
+      this.sendShowControl(
+        "/uniquiz/question/timeout",
+        [roundOrder, state.questionPosition],
+      );
+    }
+
+    if (
+      reason === "ALL_TEAMS_ANSWERED" ||
+      reason === "SOLO_ANSWERED"
+    ) {
+      this.sendShowControl(
+        "/uniquiz/question/answered",
+        [roundOrder, state.questionPosition, reason],
+      );
+    }
+
     return this.publish();
   }
 
@@ -641,6 +747,14 @@ export class LiveSessionManager {
       position: state.questionPosition,
     });
 
+    this.sendShowControl(
+      "/uniquiz/question/reveal",
+      [
+        this.roundOrder(state.roundId),
+        state.questionPosition,
+      ],
+    );
+
     return this.publish();
   }
 
@@ -656,6 +770,17 @@ export class LiveSessionManager {
     }
 
     this.updateState({ phase: "INTERMISSION" });
+
+    if (state.roundId !== null) {
+      this.sendShowControl(
+        "/uniquiz/intermission",
+        [
+          this.roundOrder(state.roundId),
+          state.questionPosition ?? 0,
+        ],
+      );
+    }
+
     return this.publish();
   }
 
@@ -907,6 +1032,11 @@ export class LiveSessionManager {
       roundId: state.roundId,
     });
 
+    this.sendShowControl(
+      "/uniquiz/round/complete",
+      [this.roundOrder(state.roundId)],
+    );
+
     return this.publish();
   }
 }
@@ -915,8 +1045,15 @@ export function registerLiveSessionRoutes(
   app: FastifyInstance,
   db: AppDatabase,
   io: SocketIOServer,
+  showControl: ShowControlOutput = NOOP_SHOW_CONTROL,
 ): LiveSessionManager {
-  const manager = new LiveSessionManager(db, io);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    3_000,
+    QUESTION_DURATION_MS,
+    showControl,
+  );
 
   app.get("/api/live", async () => manager.getSnapshot());
 

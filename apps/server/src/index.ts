@@ -14,6 +14,7 @@ import {
   registerQuestionBankRoutes,
 } from "./question-bank.js";
 import { registerLiveSessionRoutes } from "./live-session.js";
+import { OscOutput } from "./osc-output.js";
 
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
@@ -87,7 +88,27 @@ app.get("/api/presence", async () => presenceSnapshot());
 registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
 registerQuestionBankRoutes(app, database, io);
-const liveSession = registerLiveSessionRoutes(app, database, io);
+
+const oscOutput = new OscOutput(
+  config.osc,
+  (error) => {
+    app.log.warn(
+      {
+        err: error,
+        host: config.osc.host,
+        port: config.osc.port,
+      },
+      "OSC show-control delivery failed",
+    );
+  },
+);
+
+const liveSession = registerLiveSessionRoutes(
+  app,
+  database,
+  io,
+  oscOutput,
+);
 
 io.on("connection", (socket) => {
   const role = normalizeRole(socket.handshake.auth?.role);
@@ -199,6 +220,9 @@ app.log.info(
     host: config.host,
     port: config.port,
     databasePath: config.databasePath,
+    oscEnabled: config.osc.enabled,
+    oscHost: config.osc.host,
+    oscPort: config.osc.port,
   },
   "UniQuiz server ready",
 );
