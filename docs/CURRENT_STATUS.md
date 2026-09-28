@@ -12,10 +12,17 @@ Issue #8 — UniQuiz Roadmap & Current Work
 `feature/m4-live-session-stations`
 
 ## Active pull request
-Pending creation for M4 implementation
+PR #12 — M4: Live Session & Team Stations
 
 ## Completed
 - M3 PR #11 merged to `main` as squash commit `3a29003c0c50d83d0f54adf41e77862e1495e971`.
+- M4 persistent operator-paced live state machine implemented.
+- Team A/B answer submissions are locked once, persisted, and restored after reconnect; paired questions auto-close when both answer and solo questions close after Team A answers.
+- Operator and Team A/B live interfaces implemented, including 3-2-1, question/options, countdown and answer lock feedback.
+- CI Run #37 PASS: live runtime.
+- CI Run #38 PASS: submission locking and solo/paired closure.
+- CI Run #39 PASS: live web interfaces.
+- CI Run #40 PASS: pre-question station-state correction.
 - M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
 - M3 bulk import implemented for CSV/XLSX with Preview → Validation → Apply, plus downloadable Excel template.
 - Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
@@ -56,10 +63,10 @@ Pending creation for M4 implementation
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M4 operator-paced live-session runtime and Team A/B station flow.
+- M4 station access binding, OSC show-control output, live real-device verification and end-to-end 10-question round.
 
 ## Next action
-Implement persistent live-session state, round preparation/station confirmation, explicit round/question starts, 3-2-1 countdown, authoritative 45-second activation/timeout, and realtime live snapshots.
+Add configurable OSC show-control output for Ableton, then add station access binding and perform real Mac + Team A/B live-flow verification.
 
 ## Blockers
 No current blocker.
