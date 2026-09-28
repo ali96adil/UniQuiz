@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.17.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Server and realtime smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pnpm --filter @uniquiz/server start > /tmp/uniquiz-server.log 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+            cat /tmp/uniquiz-server.log || true
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8787/health > /tmp/health.json; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          curl --fail --show-error --silent http://127.0.0.1:8787/health
+          echo
+
+          pnpm --filter @uniquiz/web exec node --input-type=module -e '
+            import { io } from "socket.io-client";
+
+            const socket = io("http://127.0.0.1:8787", {
+              auth: { role: "operator" },
+              transports: ["websocket"],
+            });
+
+            const fail = (error) => {
+              console.error(error);
+              socket.close();
+              process.exit(1);
+            };
+
+            const timer = setTimeout(
+              () => fail(new Error("Timed out waiting for server:hello")),
+              5000,
+            );
+
+            socket.on("connect_error", fail);
+            socket.on("server:hello", (payload) => {
+              clearTimeout(timer);
+
+              if (payload.role !== "operator") {
+                fail(new Error("Unexpected realtime role"));
+                return;
+              }
+
+              console.log("Realtime hello:", payload.role);
+              socket.close();
+              process.exit(0);
+            });
+          '
+
+          kill "$SERVER_PID"
+          wait "$SERVER_PID" || true
+          trap - EXIT
+          cat /tmp/uniquiz-server.log

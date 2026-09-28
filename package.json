@@ -4,10 +4,13 @@
   "private": true,
   "description": "Realtime university knowledge competition platform",
   "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": ">=24.21.0"
+  },
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "pnpm --filter @uniquiz/shared build && pnpm --parallel --filter @uniquiz/server --filter @uniquiz/web dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r typecheck"
   }
 }

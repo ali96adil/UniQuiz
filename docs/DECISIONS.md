@@ -39,3 +39,62 @@ Reason: Transparency without leaking correctness while another team can still an
 
 ## D-010 — Real question data stays out of Git
 Decision: Git contains schemas and samples only. Real competition questions and answers remain local runtime data.
+
+## D-011 — Operator controls progression
+Decision: Sessions and questions never advance automatically. The operator explicitly prepares/starts every session and every question. The 45-second countdown is the only automatic progression inside an active question.
+
+Reason: Live events may require pauses, announcements, technical checks or unscheduled breaks.
+
+## D-012 — Next session can follow draw order or be manually selected
+Decision: The default next session is the next unplayed session in the official draw order. The operator may instead manually select any unplayed session.
+
+Reason: The draw determines the official session list/order, but live-event operations may require a different running order. Manual selection does not alter the saved draw result.
+
+## D-013 — Server-originated OSC cues
+Decision: UniQuiz emits optional OSC/UDP cues directly from the authoritative server for show-control integration such as Ableton Live.
+
+Initial cue set:
+- `/uniquiz/session/ready`
+- `/uniquiz/session/start`
+- `/uniquiz/question/ready`
+- `/uniquiz/question/start`
+- `/uniquiz/team/a/answered`
+- `/uniquiz/team/b/answered`
+- `/uniquiz/question/all_answered`
+- `/uniquiz/question/timeout`
+- `/uniquiz/question/closed`
+- `/uniquiz/question/reveal`
+- `/uniquiz/session/complete`
+
+OSC is best-effort show control only. Failure to deliver an OSC packet must never change official competition state, timing, scoring or results.
+
+The target host/port and OSC enable state are configurable. No fixed port is part of the competition protocol.
+
+## D-014 — Configurable audience-facing terminology
+Decision: Internal domain/API terms remain stable in English, while audience-facing and operator-facing Arabic labels are configurable.
+
+Default presentation terminology:
+- session → جولة
+- next session → الجولة القادمة
+- current session → الجولة الحالية
+- ranking → الترتيب العام
+- question → السؤال
+- correct answer → الإجابة الصحيحة
+- intermission → استراحة قصيرة
+- final results → النتائج النهائية
+
+The operator can edit visible titles, labels, subtitles, announcements, event name, venue text, season/year text, footer text, and stage messages from competition settings without changing code.
+
+Reason: Event wording may change between editions, organizers or presentation styles. Presentation text must not be coupled to internal state-machine names.
+
+## D-015 — Qualification questions use four options
+Decision: Every qualification question is multiple-choice with exactly four visible options: A, B, C and D.
+
+Reason: This keeps answer submission, automatic scoring, audience transparency and station UX consistent.
+
+## D-016 — Three-second pre-question countdown
+Decision: Pressing Start Question first enters a server-controlled 3-2-1 presentation countdown. The question text and options remain hidden until the countdown completes. The authoritative 45-second answer timer begins only when the question becomes active after the countdown.
+
+The operator remains the only actor that initiates a question. The countdown itself runs automatically once started.
+
+OSC may emit prestart cues for 3, 2 and 1, followed by the normal question-start cue.
