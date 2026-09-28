@@ -34,16 +34,17 @@ PR #9 — M1: Foundation & Local Runtime
 - Real Mac startup verified on 2026-09-28: Vite `192.168.3.114:5173`, Fastify/Socket.IO `192.168.3.114:8787`, SQLite created at `data/uniquiz.db`.
 - Real realtime presence verified: Operator connected, Display connected, Team A and Team B both verified over LAN, and disconnect/reconnect state reflected live in Operator without refresh.
 - Vite development proxy emitted `ECONNRESET` WebSocket logs during client disconnect/reconnect activity; no functional failure has been observed. Reclassify as a bug only if presence flaps while clients remain continuously open.
-- Node 24.21.0 verified on the Mac after installing Homebrew `node@24` and updating PATH. A subsequent `pnpm dev` attempt hit `Port 5173 is already in use`, indicating the previous Vite dev process was still running.
+- Node 24.21.0 verified on the Mac after installing Homebrew `node@24` and updating PATH.
+- Clean restart verified under Node 24.21.0 after stopping stale processes: Vite `172.20.10.4:5173`, Fastify/Socket.IO `172.20.10.4:8787`, SQLite reused successfully.
 
 ## In progress
-- M1 final clean restart verification remains.
+- M1 complete; ready to close and move to M2.
 
 ## Next action
-Real-device LAN verification is complete and the Mac runtime is aligned to Node 24.21.0. A final clean restart is pending because an older Vite process was still holding port 5173.
+M1 verification is complete. After terminating stale processes, UniQuiz restarted cleanly under Node 24.21.0 with Vite on port 5173 and the Fastify/Socket.IO server on port 8787.
 
 ## Blockers
-Real-device LAN verification is complete and Node 24.21.0 is active. Final M1 closure only needs a clean restart after terminating the older process that still holds port 5173.
+No remaining M1 blocker. Clean restart under Node 24.21.0 is verified.
 
 ## Do not repeat
 - Do not recreate the repository.
