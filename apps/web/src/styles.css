@@ -616,3 +616,42 @@ h2 {
   border-radius: 14px;
   background: rgba(30, 41, 59, 0.5);
 }
+
+.allocation-categories,
+.round-allocation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.allocation-category,
+.round-allocation {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.52);
+}
+
+.allocation-category span,
+.round-allocation span,
+.round-allocation small {
+  color: #94a3b8;
+}
+
+.allocation-category.enough,
+.round-allocation.locked {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.allocation-category.shortage {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.compact-actions {
+  margin-top: 0;
+}

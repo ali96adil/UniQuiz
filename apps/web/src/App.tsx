@@ -7,6 +7,7 @@ import type {
   DrawPresentationEvent,
   PresenceSnapshot,
   QualificationRound,
+  QuestionAllocationSummary,
   QuestionBankSummary,
   StationPresence,
 } from "@uniquiz/shared";
@@ -375,6 +376,193 @@ function BulkImportPanel({
             ))}
           </div>
         </div>
+      ) : null}
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
+
+function QuestionAllocationPanel({
+  allocation,
+}: {
+  allocation: QuestionAllocationSummary | null;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  if (!allocation) return null;
+
+  const inventoryReady =
+    allocation.roundCount > 0 &&
+    allocation.categories.length === 5 &&
+    allocation.categories.every(
+      (category) =>
+        category.availableQuestions >= category.requiredQuestions,
+    );
+
+  const hasLockedSets = allocation.rounds.some((round) => round.locked);
+
+  const run = async (
+    path: string,
+    confirm: string,
+    successMessage: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest(path, {
+        method: "POST",
+        body: JSON.stringify({ confirm }),
+      });
+      setMessage(successMessage);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "حدث خطأ غير متوقع",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const allocate = () => {
+    if (
+      !window.confirm(
+        "توزيع وقفل 10 أسئلة لكل جولة الآن؟ سيتم استخدام سؤالين من كل محور ولن يتكرر أي سؤال بين الجولات.",
+      )
+    ) {
+      return;
+    }
+
+    void run(
+      "/api/question-bank/allocate",
+      "ALLOCATE_QUESTIONS",
+      "تم توزيع وقفل الأسئلة لكل الجولات.",
+    );
+  };
+
+  const reset = () => {
+    if (
+      !window.confirm(
+        "إلغاء جميع مجموعات الأسئلة المقفلة وإعادة فتح التوزيع؟ هذا متاح فقط قبل بدء أي جولة.",
+      )
+    ) {
+      return;
+    }
+
+    void run(
+      "/api/question-bank/allocation/reset",
+      "RESET_QUESTION_SETS",
+      "تمت إعادة ضبط توزيع الأسئلة.",
+    );
+  };
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">M3</p>
+          <h2>توزيع أسئلة الجولات</h2>
+        </div>
+        <span
+          className={
+            allocation.ready
+              ? "preview-state valid"
+              : "preview-state invalid"
+          }
+        >
+          {allocation.ready ? "READY" : "NOT READY"}
+        </span>
+      </div>
+
+      <p className="muted">
+        لكل جولة 10 أسئلة: سؤالان من كل واحد من المحاور الخمسة، ومن دون
+        تكرار أي سؤال في جولة أخرى.
+      </p>
+
+      <div className="allocation-categories">
+        {allocation.categories.map((category) => {
+          const enough =
+            category.availableQuestions >= category.requiredQuestions;
+
+          return (
+            <div
+              className={
+                enough
+                  ? "allocation-category enough"
+                  : "allocation-category shortage"
+              }
+              key={category.key}
+            >
+              <strong>{category.name}</strong>
+              <span>
+                المتوفر {category.availableQuestions} / المطلوب{" "}
+                {category.requiredQuestions}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {allocation.roundCount === 0 ? (
+        <div className="empty-state">
+          أنشئ القرعة الرسمية أولاً حتى يعرف النظام عدد الجولات.
+        </div>
+      ) : null}
+
+      <div className="round-allocation-grid">
+        {allocation.rounds.map((round) => (
+          <div
+            className={
+              round.locked
+                ? "round-allocation locked"
+                : "round-allocation"
+            }
+            key={round.roundId}
+          >
+            <strong>جولة {round.roundOrder}</strong>
+            <span>{round.questionCount} / 10 سؤال</span>
+            <small>
+              {round.locked ? "مقفلة" : "غير موزعة"}
+            </small>
+          </div>
+        ))}
+      </div>
+
+      <div className="actions">
+        <button
+          className="primary"
+          disabled={
+            busy ||
+            !inventoryReady ||
+            hasLockedSets ||
+            allocation.ready
+          }
+          onClick={allocate}
+        >
+          توزيع وقفل الأسئلة
+        </button>
+
+        {hasLockedSets ? (
+          <button
+            className="danger-outline"
+            disabled={busy}
+            onClick={reset}
+          >
+            Reset توزيع الأسئلة
+          </button>
+        ) : null}
+      </div>
+
+      {!inventoryReady && allocation.roundCount > 0 ? (
+        <p className="status-message error">
+          بنك الأسئلة غير كافٍ لتوزيع سؤالين من كل محور على كل الجولات
+          بدون تكرار.
+        </p>
       ) : null}
 
       <StatusMessage error={error} message={message} />
@@ -962,6 +1150,8 @@ export function App() {
     useState<CompetitionSetupSnapshot | null>(null);
   const [questionBank, setQuestionBank] =
     useState<QuestionBankSummary | null>(null);
+  const [questionAllocation, setQuestionAllocation] =
+    useState<QuestionAllocationSummary | null>(null);
   const [drawPresentation, setDrawPresentation] =
     useState<DrawPresentationEvent | null>(null);
 
@@ -985,6 +1175,12 @@ export function App() {
       "question-bank:snapshot",
       (snapshot: QuestionBankSummary) => {
         setQuestionBank(snapshot);
+      },
+    );
+    socket.on(
+      "question-allocation:snapshot",
+      (snapshot: QuestionAllocationSummary) => {
+        setQuestionAllocation(snapshot);
       },
     );
     socket.on(
@@ -1027,6 +1223,7 @@ export function App() {
       {surface === "setup" && competition ? (
         <>
           <BulkImportPanel questionBank={questionBank} />
+          <QuestionAllocationPanel allocation={questionAllocation} />
           <SetupSurface snapshot={competition} />
         </>
       ) : null}

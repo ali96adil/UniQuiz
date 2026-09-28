@@ -136,3 +136,14 @@ Question columns:
 No difficulty column is accepted.
 
 Importing a file never bypasses competition locks or question-bank validation. Real competition data remains runtime SQLite data and is never committed to Git.
+
+## D-019 — Official scoring uses integer micro-points
+Decision: Official scoring is calculated server-side using integer micro-points (1 point = 1,000,000 micro-points), while the UI converts them to normal decimal points for presentation.
+
+Rules:
+- Correct at or before 5,000 ms: 10,000,000 micro-points = 10 points
+- From 5,001 ms through 45,000 ms: subtract 225 micro-points per elapsed millisecond after 5,000 ms
+- Correct at exactly 45,000 ms: 1,000,000 micro-points = 1 point
+- Wrong, unanswered, or later than 45,000 ms: 0
+
+Reason: This implements the agreed linear formula exactly at millisecond precision without floating-point accumulation affecting ranking.
