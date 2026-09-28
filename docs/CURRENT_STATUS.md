@@ -3,18 +3,19 @@
 Updated: 2026-09-28
 
 ## Active milestone
-Issue #4 — M3 Question Bank & Scoring
+Issue #5 — M4 Live Session & Team Stations
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m3-question-bank-import`
+`feature/m4-live-session-stations`
 
 ## Active pull request
-PR #11 — M3: Question Bank, Bulk Import & Scoring
+Pending creation for M4 implementation
 
 ## Completed
+- M3 PR #11 merged to `main` as squash commit `3a29003c0c50d83d0f54adf41e77862e1495e971`.
 - M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
 - M3 bulk import implemented for CSV/XLSX with Preview → Validation → Apply, plus downloadable Excel template.
 - Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
@@ -55,10 +56,10 @@ PR #11 — M3: Question Bank, Bulk Import & Scoring
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M3 complete; preparing M4 Live Session & Team Stations.
+- M4 operator-paced live-session runtime and Team A/B station flow.
 
 ## Next action
-Merge M3, then start M4 operator-paced live-session state machine and Team A/B station assignment.
+Implement persistent live-session state, round preparation/station confirmation, explicit round/question starts, 3-2-1 countdown, authoritative 45-second activation/timeout, and realtime live snapshots.
 
 ## Blockers
 No current blocker.
