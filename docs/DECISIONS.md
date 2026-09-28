@@ -103,3 +103,36 @@ OSC may emit prestart cues for 3, 2 and 1, followed by the normal question-start
 Decision: When the qualification participant count is odd, the draw still randomly determines which college receives the solo round, but that solo round is always placed as the final round in the official draw order.
 
 Reason: This keeps live-event staging and audience communication predictable while preserving random selection of the solo college.
+
+## D-018 — Bulk data import from CSV/XLSX
+Decision: Administrative setup supports bulk import from CSV and Excel `.xlsx` files. Import is always validated and previewed before data is committed.
+
+Excel workbook sheet names:
+- `Colleges`
+- `Categories`
+- `Questions`
+
+CSV imports represent one data type per file and are detected from their headers.
+
+College columns:
+- `name` — required
+- `short_name` — optional
+- `participating` — optional boolean; when supplied, it may preselect participating colleges before participant lock
+
+Category columns:
+- `key` — required stable identifier
+- `name` — required display name
+
+Question columns:
+- `category_key` — required and must reference an imported/existing category
+- `question` — required
+- `option_a` — required
+- `option_b` — required
+- `option_c` — required
+- `option_d` — required
+- `correct_option` — required, exactly `A`, `B`, `C`, or `D`
+- `source_ref` — optional external reference for administration/audit
+
+No difficulty column is accepted.
+
+Importing a file never bypasses competition locks or question-bank validation. Real competition data remains runtime SQLite data and is never committed to Git.
