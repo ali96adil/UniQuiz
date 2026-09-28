@@ -3,6 +3,7 @@ import { io } from "socket.io-client";
 import type {
   ClientRole,
   CompetitionSetupSnapshot,
+  DrawPresentationEvent,
   PresenceSnapshot,
   QualificationRound,
   StationPresence,
@@ -562,6 +563,22 @@ function DrawSurface({
             ) : null}
 
             <button
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () =>
+                    apiRequest("/api/draw/present", {
+                      method: "POST",
+                      body: "{}",
+                    }),
+                  "تم إرسال عرض القرعة إلى شاشة الجمهور.",
+                )
+              }
+            >
+              عرض القرعة على شاشة الجمهور
+            </button>
+
+            <button
               className="danger-outline"
               disabled={busy}
               onClick={resetDraw}
@@ -577,6 +594,101 @@ function DrawSurface({
   );
 }
 
+
+function AudienceDrawSurface({
+  snapshot,
+  presentation,
+}: {
+  snapshot: CompetitionSetupSnapshot;
+  presentation: DrawPresentationEvent | null;
+}) {
+  const participantNames = snapshot.colleges
+    .filter((college) => snapshot.participantCollegeIds.includes(college.id))
+    .map((college) => college.name);
+
+  if (!snapshot.participantsLocked) {
+    return (
+      <section className="audience-stage">
+        <div className="audience-kicker">مسابقة بنك المعلومات</div>
+        <h2 className="audience-title">أهلاً بكم</h2>
+        <p className="audience-copy">بانتظار تثبيت الكليات المشاركة</p>
+      </section>
+    );
+  }
+
+  if (snapshot.rounds.length === 0) {
+    return (
+      <section className="audience-stage">
+        <div className="audience-kicker">مرحلة القرعة</div>
+        <h2 className="audience-title">القرعة الرسمية</h2>
+        <p className="audience-copy">
+          {participantNames.length} كلية مشاركة
+        </p>
+        <div className="audience-participants">
+          {participantNames.map((name) => (
+            <span key={name}>{name}</span>
+          ))}
+        </div>
+        <div className="draw-waiting">بانتظار إجراء القرعة</div>
+      </section>
+    );
+  }
+
+  const activePresentation = presentation?.rounds.length === snapshot.rounds.length;
+
+  return (
+    <section className="audience-stage">
+      <div className="audience-kicker">
+        {activePresentation ? "جاري إعلان القرعة" : "نتائج القرعة"}
+      </div>
+      <h2 className="audience-title">
+        {activePresentation ? "الجولات" : "القرعة الرسمية"}
+      </h2>
+
+      <div
+        className={
+          activePresentation
+            ? "audience-rounds presenting"
+            : "audience-rounds"
+        }
+      >
+        {snapshot.rounds.map((round, index) => (
+          <article
+            className={
+              round.collegeB === null
+                ? "audience-round solo"
+                : "audience-round"
+            }
+            key={round.id}
+            style={
+              activePresentation
+                ? { animationDelay: `${700 + index * 850}ms` }
+                : undefined
+            }
+          >
+            <span className="audience-round-number">
+              جولة {round.order}
+            </span>
+            <div className="audience-matchup">
+              <strong>{round.collegeA.name}</strong>
+              <b>{round.collegeB ? "VS" : "SOLO"}</b>
+              <strong>
+                {round.collegeB?.name ?? "جولة فردية"}
+              </strong>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="audience-footer-message">
+        {activePresentation
+          ? "يتم إعلان الجولات حسب ترتيب القرعة"
+          : "تم اعتماد ترتيب الجولات"}
+      </div>
+    </section>
+  );
+}
+
 export function App() {
   const surface = useMemo(() => surfaceFromPath(window.location.pathname), []);
   const role = useMemo(() => roleForSurface(surface), [surface]);
@@ -584,6 +696,8 @@ export function App() {
   const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
   const [competition, setCompetition] =
     useState<CompetitionSetupSnapshot | null>(null);
+  const [drawPresentation, setDrawPresentation] =
+    useState<DrawPresentationEvent | null>(null);
 
   useEffect(() => {
     const socket = io({
@@ -599,6 +713,19 @@ export function App() {
       "competition:snapshot",
       (snapshot: CompetitionSetupSnapshot) => {
         setCompetition(snapshot);
+      },
+    );
+    socket.on(
+      "draw:presentation:start",
+      (event: DrawPresentationEvent) => {
+        setDrawPresentation(event);
+
+        const duration = 1600 + event.rounds.length * 850;
+        window.setTimeout(() => {
+          setDrawPresentation((current) =>
+            current?.startedAt === event.startedAt ? null : current,
+          );
+        }, duration);
       },
     );
 
@@ -633,6 +760,13 @@ export function App() {
         <DrawSurface snapshot={competition} />
       ) : null}
 
+      {surface === "display" && competition ? (
+        <AudienceDrawSurface
+          snapshot={competition}
+          presentation={drawPresentation}
+        />
+      ) : null}
+
       {showPresence ? (
         <section className="panel">
           <h2>حالة المحطات</h2>
@@ -646,7 +780,8 @@ export function App() {
 
       {surface !== "setup" &&
       surface !== "draw" &&
-      surface !== "operator" ? (
+      surface !== "operator" &&
+      surface !== "display" ? (
         <section className="panel">
           <h2>جاهز للمرحلة التالية</h2>
           <p>

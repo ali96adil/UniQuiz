@@ -70,3 +70,8 @@ export interface CompetitionSetupSnapshot {
   nextRoundId: number | null;
   nextRoundSelectionMode: NextRoundSelectionMode;
 }
+
+export interface DrawPresentationEvent {
+  startedAt: string;
+  rounds: QualificationRound[];
+}

@@ -358,3 +358,120 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.audience-stage {
+  position: relative;
+  min-height: 68vh;
+  margin-top: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 28px;
+  padding: clamp(28px, 4vw, 56px);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.18), transparent 38%),
+    rgba(8, 15, 31, 0.94);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.34);
+}
+
+.audience-kicker {
+  margin-bottom: 10px;
+  color: #93c5fd;
+  font-size: clamp(0.9rem, 1.4vw, 1.2rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.audience-title {
+  margin: 0;
+  font-size: clamp(2.5rem, 6vw, 5.5rem);
+  line-height: 1.05;
+}
+
+.audience-copy {
+  margin-top: 18px;
+  color: #cbd5e1;
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
+}
+
+.audience-participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.audience-participants span {
+  padding: 11px 16px;
+  border: 1px solid rgba(147, 197, 253, 0.2);
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.draw-waiting,
+.audience-footer-message {
+  margin-top: 34px;
+  color: #94a3b8;
+  font-size: 1.05rem;
+}
+
+.audience-rounds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 34px;
+}
+
+.audience-round {
+  padding: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 20px;
+  background: rgba(30, 41, 59, 0.68);
+}
+
+.audience-round.solo {
+  border-color: rgba(250, 204, 21, 0.38);
+  background: rgba(113, 63, 18, 0.16);
+}
+
+.audience-round-number {
+  color: #93c5fd;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.audience-matchup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.audience-matchup strong {
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
+}
+
+.audience-matchup b {
+  color: #60a5fa;
+  font-size: 0.8rem;
+}
+
+.audience-rounds.presenting .audience-round {
+  opacity: 0;
+  transform: translateY(28px) scale(0.97);
+  animation: draw-round-reveal 560ms ease forwards;
+}
+
+@keyframes draw-round-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .audience-matchup {
+    grid-template-columns: 1fr;
+  }
+}

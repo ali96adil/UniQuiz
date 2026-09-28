@@ -355,6 +355,16 @@ export function registerCompetitionRoutes(
     return publishSnapshot();
   });
 
+  const emitDrawPresentation = (snapshot: CompetitionSetupSnapshot) => {
+    const event = {
+      startedAt: new Date().toISOString(),
+      rounds: snapshot.rounds,
+    };
+
+    io.emit("draw:presentation:start", event);
+    return event;
+  };
+
   app.post("/api/draw", async (_request, reply) => {
     const snapshot = getCompetitionSnapshot(db);
 
@@ -411,7 +421,30 @@ export function registerCompetitionRoutes(
     persist();
     const next = publishSnapshot();
     io.emit("draw:complete", next);
+    emitDrawPresentation(next);
     return next;
+  });
+
+  app.post("/api/draw/present", async (_request, reply) => {
+    const snapshot = getCompetitionSnapshot(db);
+
+    if (snapshot.rounds.length === 0 || snapshot.drawCreatedAt === null) {
+      return sendConflict(
+        reply,
+        "DRAW_NOT_CREATED",
+        "Create the official draw before presenting it.",
+      );
+    }
+
+    if (snapshot.rounds.some((round) => round.status !== "PENDING")) {
+      return sendConflict(
+        reply,
+        "DRAW_ALREADY_IN_USE",
+        "Draw presentation replay is only available before a round starts.",
+      );
+    }
+
+    return emitDrawPresentation(snapshot);
   });
 
   app.post("/api/draw/reset", async (request, reply) => {
