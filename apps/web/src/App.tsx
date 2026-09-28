@@ -212,13 +212,22 @@ function BulkImportPanel({
           <p className="step-label">إدخال جماعي</p>
           <h2>استيراد Excel / CSV</h2>
         </div>
-        <a
-          className="button-link"
-          href="/api/import/template.xlsx"
-          download
-        >
-          تحميل قالب Excel
-        </a>
+        <div className="actions compact-actions">
+          <a
+            className="button-link"
+            href="/api/import/template.xlsx"
+            download
+          >
+            تحميل قالب Excel
+          </a>
+          <a
+            className="button-link"
+            href="/api/export/data.xlsx"
+            download
+          >
+            تصدير البيانات الحالية
+          </a>
+        </div>
       </div>
 
       <p className="muted">

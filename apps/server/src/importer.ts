@@ -638,6 +638,122 @@ async function sendTemplate(reply: FastifyReply) {
   return reply.send(buffer);
 }
 
+
+async function sendExport(
+  db: AppDatabase,
+  reply: FastifyReply,
+) {
+  const workbook = new ExcelJS.Workbook();
+
+  const colleges = workbook.addWorksheet("Colleges");
+  colleges.addRow(["name", "short_name", "participating"]);
+
+  const collegeRows = db.prepare(`
+    SELECT
+      c.name,
+      c.short_name AS shortName,
+      CASE WHEN p.college_id IS NULL THEN 0 ELSE 1 END AS participating
+    FROM colleges c
+    LEFT JOIN participants p ON p.college_id = c.id
+    ORDER BY c.sort_order, c.id
+  `).all() as Array<{
+    name: string;
+    shortName: string | null;
+    participating: number;
+  }>;
+
+  for (const college of collegeRows) {
+    colleges.addRow([
+      college.name,
+      college.shortName ?? "",
+      college.participating === 1 ? "yes" : "no",
+    ]);
+  }
+
+  const categories = workbook.addWorksheet("Categories");
+  categories.addRow(["key", "name"]);
+
+  const categoryRows = db.prepare(`
+    SELECT
+      category_key AS categoryKey,
+      name
+    FROM categories
+    ORDER BY sort_order, id
+  `).all() as Array<{
+    categoryKey: string;
+    name: string;
+  }>;
+
+  for (const category of categoryRows) {
+    categories.addRow([category.categoryKey, category.name]);
+  }
+
+  const questions = workbook.addWorksheet("Questions");
+  questions.addRow([
+    "category_key",
+    "question",
+    "option_a",
+    "option_b",
+    "option_c",
+    "option_d",
+    "correct_option",
+    "source_ref",
+  ]);
+
+  const questionRows = db.prepare(`
+    SELECT
+      c.category_key AS categoryKey,
+      q.prompt AS question,
+      q.option_a AS optionA,
+      q.option_b AS optionB,
+      q.option_c AS optionC,
+      q.option_d AS optionD,
+      q.correct_option AS correctOption,
+      q.source_ref AS sourceRef
+    FROM questions q
+    JOIN categories c ON c.id = q.category_id
+    WHERE q.active = 1
+    ORDER BY c.sort_order, q.id
+  `).all() as Array<{
+    categoryKey: string;
+    question: string;
+    optionA: string;
+    optionB: string;
+    optionC: string;
+    optionD: string;
+    correctOption: string;
+    sourceRef: string | null;
+  }>;
+
+  for (const question of questionRows) {
+    questions.addRow([
+      question.categoryKey,
+      question.question,
+      question.optionA,
+      question.optionB,
+      question.optionC,
+      question.optionD,
+      question.correctOption,
+      question.sourceRef ?? "",
+    ]);
+  }
+
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  const stamp = new Date().toISOString().slice(0, 10);
+
+  reply
+    .header(
+      "content-type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    .header(
+      "content-disposition",
+      `attachment; filename="UniQuiz-export-${stamp}.xlsx"`,
+    );
+
+  return reply.send(buffer);
+}
+
 export function registerImportRoutes(
   app: FastifyInstance,
   db: AppDatabase,
@@ -646,6 +762,10 @@ export function registerImportRoutes(
   app.get("/api/question-bank", async () => getQuestionBankSummary(db));
   app.get("/api/import/template.xlsx", async (_request, reply) =>
     sendTemplate(reply),
+  );
+
+  app.get("/api/export/data.xlsx", async (_request, reply) =>
+    sendExport(db, reply),
   );
 
   app.post("/api/import/preview", async (request, reply) => {

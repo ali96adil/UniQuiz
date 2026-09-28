@@ -140,3 +140,38 @@ test("XLSX workbook reads Colleges, Categories and Questions sheets", async () =
 
   db.close();
 });
+
+
+test("source_ref may stay blank without validation errors", async () => {
+  const db = testDatabase();
+  db.exec(`
+    INSERT INTO categories (category_key, name, sort_order) VALUES
+    ('sports', 'Sports', 1),
+    ('history', 'History', 2),
+    ('science', 'Science', 3),
+    ('arts', 'Arts', 4),
+    ('general', 'General', 5);
+  `);
+
+  const csv = [
+    "category_key,question,option_a,option_b,option_c,option_d,correct_option,source_ref",
+    "sports,Question without source,A1,B1,C1,D1,A,",
+    "history,Another question,A2,B2,C2,D2,D,",
+  ].join("\n");
+
+  const parsed = await parseImportBuffer(
+    db as never,
+    "questions.csv",
+    Buffer.from(csv),
+  );
+
+  assert.equal(parsed.questions?.length, 2);
+  assert.equal(parsed.questions?.[0]?.sourceRef, null);
+  assert.equal(parsed.questions?.[1]?.sourceRef, null);
+  assert.equal(
+    parsed.issues.filter((entry) => entry.level === "error").length,
+    0,
+  );
+
+  db.close();
+});
