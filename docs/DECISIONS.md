@@ -86,3 +86,15 @@ Default presentation terminology:
 The operator can edit visible titles, labels, subtitles, announcements, event name, venue text, season/year text, footer text, and stage messages from competition settings without changing code.
 
 Reason: Event wording may change between editions, organizers or presentation styles. Presentation text must not be coupled to internal state-machine names.
+
+## D-015 — Qualification questions use four options
+Decision: Every qualification question is multiple-choice with exactly four visible options: A, B, C and D.
+
+Reason: This keeps answer submission, automatic scoring, audience transparency and station UX consistent.
+
+## D-016 — Three-second pre-question countdown
+Decision: Pressing Start Question first enters a server-controlled 3-2-1 presentation countdown. The question text and options remain hidden until the countdown completes. The authoritative 45-second answer timer begins only when the question becomes active after the countdown.
+
+The operator remains the only actor that initiates a question. The countdown itself runs automatically once started.
+
+OSC may emit prestart cues for 3, 2 and 1, followed by the normal question-start cue.
