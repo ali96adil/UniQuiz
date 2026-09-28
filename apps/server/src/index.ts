@@ -13,6 +13,7 @@ import {
   getQuestionAllocationSummary,
   registerQuestionBankRoutes,
 } from "./question-bank.js";
+import { registerLiveSessionRoutes } from "./live-session.js";
 
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
@@ -86,6 +87,7 @@ app.get("/api/presence", async () => presenceSnapshot());
 registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
 registerQuestionBankRoutes(app, database, io);
+const liveSession = registerLiveSessionRoutes(app, database, io);
 
 io.on("connection", (socket) => {
   const role = normalizeRole(socket.handshake.auth?.role);
@@ -111,6 +113,11 @@ io.on("connection", (socket) => {
   socket.emit(
     "question-allocation:snapshot",
     getQuestionAllocationSummary(database),
+  );
+
+  socket.emit(
+    "live:snapshot",
+    liveSession.getSnapshot(),
   );
 
   socket.on("disconnect", () => {

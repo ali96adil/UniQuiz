@@ -159,8 +159,33 @@ export function openDatabase(databasePath: string) {
     CREATE INDEX IF NOT EXISTS idx_audit_events_round
       ON audit_events(round_id, occurred_at);
 
+    CREATE TABLE IF NOT EXISTS live_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      phase TEXT NOT NULL DEFAULT 'IDLE',
+      round_id INTEGER,
+      question_position INTEGER,
+      stations_confirmed INTEGER NOT NULL DEFAULT 0
+        CHECK (stations_confirmed IN (0, 1)),
+      countdown_started_at_epoch_ms INTEGER,
+      question_started_at_epoch_ms INTEGER,
+      question_closed_at_epoch_ms INTEGER,
+      close_reason TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT INTO live_state (
+      id,
+      phase,
+      round_id,
+      question_position,
+      stations_confirmed,
+      updated_at
+    )
+    VALUES (1, 'IDLE', NULL, NULL, 0, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING;
+
     UPDATE app_meta
-    SET value = '5'
+    SET value = '6'
     WHERE key = 'schema_version';
   `);
 

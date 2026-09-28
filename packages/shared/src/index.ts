@@ -138,3 +138,49 @@ export interface QuestionAllocationSummary {
   categories: QuestionAllocationCategorySummary[];
   rounds: RoundQuestionSetSummary[];
 }
+
+export type LivePhase =
+  | "IDLE"
+  | "ROUND_READY"
+  | "ROUND_ACTIVE"
+  | "QUESTION_READY"
+  | "QUESTION_COUNTDOWN"
+  | "QUESTION_ACTIVE"
+  | "QUESTION_CLOSED"
+  | "QUESTION_REVEAL"
+  | "INTERMISSION"
+  | "ROUND_COMPLETE";
+
+export interface LiveQuestionView {
+  position: number;
+  categoryKey: string;
+  categoryName: string;
+  prompt: string | null;
+  options: {
+    A: string;
+    B: string;
+    C: string;
+    D: string;
+  } | null;
+  correctOption: "A" | "B" | "C" | "D" | null;
+}
+
+export interface LiveRoundView {
+  id: number;
+  order: number;
+  teamA: College;
+  teamB: College | null;
+}
+
+export interface LiveSnapshot {
+  phase: LivePhase;
+  serverNowEpochMs: number;
+  round: LiveRoundView | null;
+  stationsConfirmed: boolean;
+  question: LiveQuestionView | null;
+  countdownStartedAtEpochMs: number | null;
+  questionStartedAtEpochMs: number | null;
+  questionDeadlineEpochMs: number | null;
+  questionClosedAtEpochMs: number | null;
+  closeReason: string | null;
+}
