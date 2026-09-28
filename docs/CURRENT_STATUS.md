@@ -12,7 +12,7 @@ Issue #8 — UniQuiz Roadmap & Current Work
 `feature/m2-participants-draw`
 
 ## Active pull request
-Pending creation for M2 implementation
+PR #10 — M2: Participants & Draw
 
 ## Completed
 - M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
