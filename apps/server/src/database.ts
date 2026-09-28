@@ -114,8 +114,56 @@ export function openDatabase(databasePath: string) {
     CREATE INDEX IF NOT EXISTS idx_round_questions_category
       ON qualification_round_questions(round_id, category_id);
 
+    CREATE TABLE IF NOT EXISTS qualification_question_reservations (
+      question_id INTEGER PRIMARY KEY,
+      round_id INTEGER NOT NULL,
+      position INTEGER NOT NULL
+        CHECK (position BETWEEN 1 AND 10),
+      disposition TEXT NOT NULL
+        CHECK (disposition IN ('ALLOCATED', 'VOIDED', 'REPLACEMENT')),
+      reserved_at TEXT NOT NULL,
+      voided_at TEXT,
+      FOREIGN KEY (question_id) REFERENCES questions(id),
+      FOREIGN KEY (round_id) REFERENCES qualification_rounds(id)
+    );
+
+    INSERT OR IGNORE INTO qualification_question_reservations (
+      question_id,
+      round_id,
+      position,
+      disposition,
+      reserved_at
+    )
+    SELECT
+      rqq.question_id,
+      rqq.round_id,
+      rqq.position,
+      'ALLOCATED',
+      COALESCE(rqs.locked_at, CURRENT_TIMESTAMP)
+    FROM qualification_round_questions rqq
+    JOIN qualification_round_question_sets rqs
+      ON rqs.round_id = rqq.round_id;
+
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT NOT NULL,
+      round_id INTEGER,
+      question_id INTEGER,
+      related_question_id INTEGER,
+      position INTEGER,
+      reason TEXT,
+      payload_json TEXT,
+      occurred_at TEXT NOT NULL,
+      FOREIGN KEY (round_id) REFERENCES qualification_rounds(id),
+      FOREIGN KEY (question_id) REFERENCES questions(id),
+      FOREIGN KEY (related_question_id) REFERENCES questions(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_events_round
+      ON audit_events(round_id, occurred_at);
+
     UPDATE app_meta
-    SET value = '4'
+    SET value = '5'
     WHERE key = 'schema_version';
   `);
 

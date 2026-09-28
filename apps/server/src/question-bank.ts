@@ -10,6 +10,7 @@ import {
   allocateQualificationQuestions,
   type CategoryQuestionPool,
 } from "./allocation.js";
+import { appendAuditEvent } from "./audit.js";
 import type { AppDatabase } from "./database.js";
 
 const allocateSchema = z.object({
@@ -18,6 +19,13 @@ const allocateSchema = z.object({
 
 const resetSchema = z.object({
   confirm: z.literal("RESET_QUESTION_SETS"),
+});
+
+const voidReplaceSchema = z.object({
+  roundId: z.number().int().positive(),
+  position: z.number().int().min(1).max(10),
+  reason: z.string().trim().min(3).max(500),
+  confirm: z.literal("VOID_AND_REPLACE"),
 });
 
 interface CategoryRow {
@@ -265,6 +273,17 @@ export function registerQuestionBankRoutes(
         VALUES (?, ?, ?, ?)
       `);
 
+      const reserveQuestion = db.prepare(`
+        INSERT INTO qualification_question_reservations (
+          question_id,
+          round_id,
+          position,
+          disposition,
+          reserved_at
+        )
+        VALUES (?, ?, ?, 'ALLOCATED', ?)
+      `);
+
       for (const round of allocation) {
         insertSet.run(round.roundId, lockedAt);
 
@@ -275,7 +294,23 @@ export function registerQuestionBankRoutes(
             question.questionId,
             question.categoryId,
           );
+
+          reserveQuestion.run(
+            question.questionId,
+            round.roundId,
+            question.position,
+            lockedAt,
+          );
         }
+
+        appendAuditEvent(db, {
+          eventType: "QUESTION_SET_LOCKED",
+          roundId: round.roundId,
+          payload: {
+            questionCount: round.questions.length,
+          },
+          occurredAt: lockedAt,
+        });
       }
     });
 
@@ -309,7 +344,161 @@ export function registerQuestionBankRoutes(
       );
     }
 
-    db.prepare("DELETE FROM qualification_round_question_sets").run();
+    const resetAt = new Date().toISOString();
+
+    const reset = db.transaction(() => {
+      db.prepare("DELETE FROM qualification_question_reservations").run();
+      db.prepare("DELETE FROM qualification_round_question_sets").run();
+
+      appendAuditEvent(db, {
+        eventType: "QUESTION_SETS_RESET",
+        payload: {
+          reason: "explicit operator reset before any round started",
+        },
+        occurredAt: resetAt,
+      });
+    });
+
+    reset();
     return publish();
+  });
+
+  app.post("/api/question-bank/void-replace", async (request, reply) => {
+    const body = voidReplaceSchema.safeParse(request.body);
+
+    if (!body.success) {
+      return reply.code(400).send({
+        error: "INVALID_REQUEST",
+        issues: body.error.issues,
+      });
+    }
+
+    const current = db.prepare(`
+      SELECT
+        rqq.question_id AS questionId,
+        rqq.category_id AS categoryId,
+        c.category_key AS categoryKey,
+        r.status AS roundStatus
+      FROM qualification_round_questions rqq
+      JOIN qualification_rounds r ON r.id = rqq.round_id
+      JOIN categories c ON c.id = rqq.category_id
+      WHERE rqq.round_id = ?
+        AND rqq.position = ?
+    `).get(
+      body.data.roundId,
+      body.data.position,
+    ) as
+      | {
+          questionId: number;
+          categoryId: number;
+          categoryKey: string;
+          roundStatus: "PENDING" | "ACTIVE" | "COMPLETED";
+        }
+      | undefined;
+
+    if (!current) {
+      return conflict(
+        reply,
+        "QUESTION_SLOT_NOT_FOUND",
+        "The requested round question slot does not exist.",
+      );
+    }
+
+    if (current.roundStatus === "COMPLETED") {
+      return conflict(
+        reply,
+        "ROUND_ALREADY_COMPLETED",
+        "A completed round cannot receive a replacement question.",
+      );
+    }
+
+    const candidates = db.prepare(`
+      SELECT q.id
+      FROM questions q
+      WHERE q.category_id = ?
+        AND q.active = 1
+        AND NOT EXISTS (
+          SELECT 1
+          FROM qualification_question_reservations r
+          WHERE r.question_id = q.id
+        )
+      ORDER BY q.id
+    `).all(current.categoryId) as Array<{ id: number }>;
+
+    if (candidates.length === 0) {
+      return conflict(
+        reply,
+        "NO_REPLACEMENT_AVAILABLE",
+        "No unused replacement question is available in the same category.",
+        {
+          categoryKey: current.categoryKey,
+        },
+      );
+    }
+
+    const replacementQuestionId =
+      candidates[randomInt(candidates.length)].id;
+    const changedAt = new Date().toISOString();
+
+    const replace = db.transaction(() => {
+      db.prepare(`
+        UPDATE qualification_question_reservations
+        SET disposition = 'VOIDED',
+            voided_at = ?
+        WHERE question_id = ?
+      `).run(changedAt, current.questionId);
+
+      db.prepare(`
+        INSERT INTO qualification_question_reservations (
+          question_id,
+          round_id,
+          position,
+          disposition,
+          reserved_at
+        )
+        VALUES (?, ?, ?, 'REPLACEMENT', ?)
+      `).run(
+        replacementQuestionId,
+        body.data.roundId,
+        body.data.position,
+        changedAt,
+      );
+
+      db.prepare(`
+        UPDATE qualification_round_questions
+        SET question_id = ?
+        WHERE round_id = ?
+          AND position = ?
+      `).run(
+        replacementQuestionId,
+        body.data.roundId,
+        body.data.position,
+      );
+
+      appendAuditEvent(db, {
+        eventType: "QUESTION_VOID_REPLACED",
+        roundId: body.data.roundId,
+        questionId: current.questionId,
+        relatedQuestionId: replacementQuestionId,
+        position: body.data.position,
+        reason: body.data.reason,
+        payload: {
+          categoryKey: current.categoryKey,
+        },
+        occurredAt: changedAt,
+      });
+    });
+
+    replace();
+
+    return {
+      ok: true,
+      roundId: body.data.roundId,
+      position: body.data.position,
+      categoryKey: current.categoryKey,
+      voidedQuestionId: current.questionId,
+      replacementQuestionId,
+      allocation: publish(),
+    };
   });
 }
