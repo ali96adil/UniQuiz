@@ -60,8 +60,35 @@ export function openDatabase(databasePath: string) {
       FOREIGN KEY (college_b_id) REFERENCES colleges(id)
     );
 
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_key TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL UNIQUE,
+      sort_order INTEGER NOT NULL UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS questions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL,
+      prompt TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option TEXT NOT NULL
+        CHECK (correct_option IN ('A', 'B', 'C', 'D')),
+      source_ref TEXT UNIQUE,
+      active INTEGER NOT NULL DEFAULT 1
+        CHECK (active IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (category_id) REFERENCES categories(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_questions_category_id
+      ON questions(category_id);
+
     UPDATE app_meta
-    SET value = '2'
+    SET value = '3'
     WHERE key = 'schema_version';
   `);
 

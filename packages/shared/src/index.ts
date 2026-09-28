@@ -75,3 +75,42 @@ export interface DrawPresentationEvent {
   startedAt: string;
   rounds: QualificationRound[];
 }
+
+export type ImportDataKind = "colleges" | "categories" | "questions";
+
+export interface ImportIssue {
+  level: "error" | "warning";
+  sheet: string;
+  row: number | null;
+  message: string;
+}
+
+export interface BulkImportPreview {
+  previewId: string;
+  fileName: string;
+  valid: boolean;
+  kinds: ImportDataKind[];
+  counts: {
+    colleges: number;
+    categories: number;
+    questions: number;
+    participatingColleges: number;
+  };
+  categoryQuestionCounts: Record<string, number>;
+  issues: ImportIssue[];
+  samples: {
+    colleges: string[];
+    categories: string[];
+    questions: string[];
+  };
+}
+
+export interface QuestionBankSummary {
+  totalQuestions: number;
+  categories: Array<{
+    key: string;
+    name: string;
+    sortOrder: number;
+    questionCount: number;
+  }>;
+}

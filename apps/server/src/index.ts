@@ -1,12 +1,23 @@
 import Fastify from "fastify";
+import multipart from "@fastify/multipart";
 import { Server as SocketIOServer } from "socket.io";
 import type { ClientRole, PresenceSnapshot } from "@uniquiz/shared";
 import { registerCompetitionRoutes, getCompetitionSnapshot } from "./competition.js";
 import { config } from "./config.js";
 import { openDatabase } from "./database.js";
+import { registerImportRoutes } from "./importer.js";
 
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
+
+await app.register(multipart, {
+  limits: {
+    files: 1,
+    fields: 4,
+    parts: 5,
+    fileSize: 20 * 1024 * 1024,
+  },
+});
 
 const io = new SocketIOServer(app.server, {
   cors: {
@@ -66,6 +77,7 @@ app.get("/health", async () => ({
 app.get("/api/presence", async () => presenceSnapshot());
 
 registerCompetitionRoutes(app, database, io);
+registerImportRoutes(app, database, io);
 
 io.on("connection", (socket) => {
   const role = normalizeRole(socket.handshake.auth?.role);
