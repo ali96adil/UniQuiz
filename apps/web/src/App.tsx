@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
 import type {
+  BulkImportPreview,
   ClientRole,
   CompetitionSetupSnapshot,
   DrawPresentationEvent,
   PresenceSnapshot,
   QualificationRound,
+  QuestionAllocationSummary,
+  QuestionBankSummary,
   StationPresence,
 } from "@uniquiz/shared";
 
@@ -115,6 +118,455 @@ function StatusMessage({
     <div className={error ? "status-message error" : "status-message success"}>
       {error ?? message}
     </div>
+  );
+}
+
+
+function BulkImportPanel({
+  questionBank,
+}: {
+  questionBank: QuestionBankSummary | null;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<BulkImportPreview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const previewFile = async () => {
+    if (!file) return;
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const response = await fetch("/api/import/preview", {
+        method: "POST",
+        body: form,
+      });
+
+      const payload = (await response.json()) as
+        | BulkImportPreview
+        | { error?: string; message?: string };
+
+      if (!response.ok) {
+        const problem = payload as {
+          error?: string;
+          message?: string;
+        };
+        throw new Error(
+          problem.message ?? problem.error ?? `HTTP ${response.status}`,
+        );
+      }
+
+      setPreview(payload as BulkImportPreview);
+    } catch (caught) {
+      setPreview(null);
+      setError(
+        caught instanceof Error ? caught.message : "تعذر قراءة الملف",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyImport = async () => {
+    if (!preview?.valid) return;
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/import/apply", {
+        method: "POST",
+        body: JSON.stringify({
+          previewId: preview.previewId,
+        }),
+      });
+
+      setMessage("تم اعتماد البيانات وحفظها في قاعدة UniQuiz.");
+      setPreview(null);
+      setFile(null);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "تعذر اعتماد الاستيراد",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const errors =
+    preview?.issues.filter((entry) => entry.level === "error") ?? [];
+  const warnings =
+    preview?.issues.filter((entry) => entry.level === "warning") ?? [];
+
+  return (
+    <section className="panel import-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">إدخال جماعي</p>
+          <h2>استيراد Excel / CSV</h2>
+        </div>
+        <div className="actions compact-actions">
+          <a
+            className="button-link"
+            href="/api/import/template.xlsx"
+            download
+          >
+            تحميل قالب Excel
+          </a>
+          <a
+            className="button-link"
+            href="/api/export/data.xlsx"
+            download
+          >
+            تصدير البيانات الحالية
+          </a>
+        </div>
+      </div>
+
+      <p className="muted">
+        ملف Excel يمكن أن يحتوي Sheets باسم Colleges وCategories وQuestions.
+        ملف CSV يمثل نوع بيانات واحد في كل مرة.
+      </p>
+
+      <div className="import-schema">
+        <div>
+          <strong>Questions</strong>
+          <code>
+            category_key · question · option_a · option_b · option_c ·
+            option_d · correct_option · source_ref
+          </code>
+        </div>
+        <div>
+          <strong>Categories</strong>
+          <code>key · name</code>
+        </div>
+        <div>
+          <strong>Colleges</strong>
+          <code>name · short_name · participating</code>
+        </div>
+      </div>
+
+      <div className="import-upload">
+        <input
+          type="file"
+          accept=".csv,.xlsx"
+          disabled={busy}
+          onChange={(event) => {
+            setFile(event.target.files?.[0] ?? null);
+            setPreview(null);
+            setError(null);
+            setMessage(null);
+          }}
+        />
+        <button
+          className="primary"
+          disabled={!file || busy}
+          onClick={() => void previewFile()}
+        >
+          فحص الملف
+        </button>
+      </div>
+
+      {preview ? (
+        <div className="import-preview">
+          <div className="section-heading">
+            <div>
+              <p className="step-label">Preview</p>
+              <h3>{preview.fileName}</h3>
+            </div>
+            <span
+              className={
+                preview.valid ? "preview-state valid" : "preview-state invalid"
+              }
+            >
+              {preview.valid ? "VALID" : "HAS ERRORS"}
+            </span>
+          </div>
+
+          <div className="import-counts">
+            <span>كليات: {preview.counts.colleges}</span>
+            <span>مشاركة: {preview.counts.participatingColleges}</span>
+            <span>محاور: {preview.counts.categories}</span>
+            <span>أسئلة: {preview.counts.questions}</span>
+          </div>
+
+          {Object.keys(preview.categoryQuestionCounts).length > 0 ? (
+            <div className="category-counts">
+              {Object.entries(preview.categoryQuestionCounts).map(
+                ([key, count]) => (
+                  <span key={key}>
+                    {key}: {count}
+                  </span>
+                ),
+              )}
+            </div>
+          ) : null}
+
+          {errors.length > 0 ? (
+            <div className="import-issues error-list">
+              <strong>أخطاء يجب إصلاحها</strong>
+              {errors.map((entry, index) => (
+                <p key={index}>
+                  {entry.sheet}
+                  {entry.row ? ` — row ${entry.row}` : ""}: {entry.message}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
+          {warnings.length > 0 ? (
+            <div className="import-issues warning-list">
+              <strong>تنبيهات</strong>
+              {warnings.map((entry, index) => (
+                <p key={index}>
+                  {entry.sheet}
+                  {entry.row ? ` — row ${entry.row}` : ""}: {entry.message}
+                </p>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="import-samples">
+            {preview.samples.colleges.length > 0 ? (
+              <div>
+                <strong>نماذج الكليات</strong>
+                <p>{preview.samples.colleges.join(" · ")}</p>
+              </div>
+            ) : null}
+            {preview.samples.categories.length > 0 ? (
+              <div>
+                <strong>المحاور</strong>
+                <p>{preview.samples.categories.join(" · ")}</p>
+              </div>
+            ) : null}
+            {preview.samples.questions.length > 0 ? (
+              <div>
+                <strong>نماذج الأسئلة</strong>
+                <p>{preview.samples.questions.join(" · ")}</p>
+              </div>
+            ) : null}
+          </div>
+
+          <button
+            className="primary large-button"
+            disabled={!preview.valid || busy}
+            onClick={() => void applyImport()}
+          >
+            اعتماد الاستيراد
+          </button>
+        </div>
+      ) : null}
+
+      {questionBank ? (
+        <div className="question-bank-summary">
+          <strong>بنك الأسئلة الحالي: {questionBank.totalQuestions} سؤال</strong>
+          <div>
+            {questionBank.categories.map((category) => (
+              <span key={category.key}>
+                {category.name}: {category.questionCount}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
+
+function QuestionAllocationPanel({
+  allocation,
+}: {
+  allocation: QuestionAllocationSummary | null;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  if (!allocation) return null;
+
+  const inventoryReady =
+    allocation.roundCount > 0 &&
+    allocation.categories.length === 5 &&
+    allocation.categories.every(
+      (category) =>
+        category.availableQuestions >= category.requiredQuestions,
+    );
+
+  const hasLockedSets = allocation.rounds.some((round) => round.locked);
+
+  const run = async (
+    path: string,
+    confirm: string,
+    successMessage: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest(path, {
+        method: "POST",
+        body: JSON.stringify({ confirm }),
+      });
+      setMessage(successMessage);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "حدث خطأ غير متوقع",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const allocate = () => {
+    if (
+      !window.confirm(
+        "توزيع وقفل 10 أسئلة لكل جولة الآن؟ سيتم استخدام سؤالين من كل محور ولن يتكرر أي سؤال بين الجولات.",
+      )
+    ) {
+      return;
+    }
+
+    void run(
+      "/api/question-bank/allocate",
+      "ALLOCATE_QUESTIONS",
+      "تم توزيع وقفل الأسئلة لكل الجولات.",
+    );
+  };
+
+  const reset = () => {
+    if (
+      !window.confirm(
+        "إلغاء جميع مجموعات الأسئلة المقفلة وإعادة فتح التوزيع؟ هذا متاح فقط قبل بدء أي جولة.",
+      )
+    ) {
+      return;
+    }
+
+    void run(
+      "/api/question-bank/allocation/reset",
+      "RESET_QUESTION_SETS",
+      "تمت إعادة ضبط توزيع الأسئلة.",
+    );
+  };
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">M3</p>
+          <h2>توزيع أسئلة الجولات</h2>
+        </div>
+        <span
+          className={
+            allocation.ready
+              ? "preview-state valid"
+              : "preview-state invalid"
+          }
+        >
+          {allocation.ready ? "READY" : "NOT READY"}
+        </span>
+      </div>
+
+      <p className="muted">
+        لكل جولة 10 أسئلة: سؤالان من كل واحد من المحاور الخمسة، ومن دون
+        تكرار أي سؤال في جولة أخرى.
+      </p>
+
+      <div className="allocation-categories">
+        {allocation.categories.map((category) => {
+          const enough =
+            category.availableQuestions >= category.requiredQuestions;
+
+          return (
+            <div
+              className={
+                enough
+                  ? "allocation-category enough"
+                  : "allocation-category shortage"
+              }
+              key={category.key}
+            >
+              <strong>{category.name}</strong>
+              <span>
+                المتوفر {category.availableQuestions} / المطلوب{" "}
+                {category.requiredQuestions}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {allocation.roundCount === 0 ? (
+        <div className="empty-state">
+          أنشئ القرعة الرسمية أولاً حتى يعرف النظام عدد الجولات.
+        </div>
+      ) : null}
+
+      <div className="round-allocation-grid">
+        {allocation.rounds.map((round) => (
+          <div
+            className={
+              round.locked
+                ? "round-allocation locked"
+                : "round-allocation"
+            }
+            key={round.roundId}
+          >
+            <strong>جولة {round.roundOrder}</strong>
+            <span>{round.questionCount} / 10 سؤال</span>
+            <small>
+              {round.locked ? "مقفلة" : "غير موزعة"}
+            </small>
+          </div>
+        ))}
+      </div>
+
+      <div className="actions">
+        <button
+          className="primary"
+          disabled={
+            busy ||
+            !inventoryReady ||
+            hasLockedSets ||
+            allocation.ready
+          }
+          onClick={allocate}
+        >
+          توزيع وقفل الأسئلة
+        </button>
+
+        {hasLockedSets ? (
+          <button
+            className="danger-outline"
+            disabled={busy}
+            onClick={reset}
+          >
+            Reset توزيع الأسئلة
+          </button>
+        ) : null}
+      </div>
+
+      {!inventoryReady && allocation.roundCount > 0 ? (
+        <p className="status-message error">
+          بنك الأسئلة غير كافٍ لتوزيع سؤالين من كل محور على كل الجولات
+          بدون تكرار.
+        </p>
+      ) : null}
+
+      <StatusMessage error={error} message={message} />
+    </section>
   );
 }
 
@@ -696,6 +1148,10 @@ export function App() {
   const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
   const [competition, setCompetition] =
     useState<CompetitionSetupSnapshot | null>(null);
+  const [questionBank, setQuestionBank] =
+    useState<QuestionBankSummary | null>(null);
+  const [questionAllocation, setQuestionAllocation] =
+    useState<QuestionAllocationSummary | null>(null);
   const [drawPresentation, setDrawPresentation] =
     useState<DrawPresentationEvent | null>(null);
 
@@ -713,6 +1169,18 @@ export function App() {
       "competition:snapshot",
       (snapshot: CompetitionSetupSnapshot) => {
         setCompetition(snapshot);
+      },
+    );
+    socket.on(
+      "question-bank:snapshot",
+      (snapshot: QuestionBankSummary) => {
+        setQuestionBank(snapshot);
+      },
+    );
+    socket.on(
+      "question-allocation:snapshot",
+      (snapshot: QuestionAllocationSummary) => {
+        setQuestionAllocation(snapshot);
       },
     );
     socket.on(
@@ -753,7 +1221,11 @@ export function App() {
       </section>
 
       {surface === "setup" && competition ? (
-        <SetupSurface snapshot={competition} />
+        <>
+          <BulkImportPanel questionBank={questionBank} />
+          <QuestionAllocationPanel allocation={questionAllocation} />
+          <SetupSurface snapshot={competition} />
+        </>
       ) : null}
 
       {surface === "draw" && competition ? (

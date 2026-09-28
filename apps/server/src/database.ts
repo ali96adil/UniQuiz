@@ -60,8 +60,107 @@ export function openDatabase(databasePath: string) {
       FOREIGN KEY (college_b_id) REFERENCES colleges(id)
     );
 
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_key TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL UNIQUE,
+      sort_order INTEGER NOT NULL UNIQUE
+    );
+
+    CREATE TABLE IF NOT EXISTS questions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL,
+      prompt TEXT NOT NULL,
+      option_a TEXT NOT NULL,
+      option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL,
+      option_d TEXT NOT NULL,
+      correct_option TEXT NOT NULL
+        CHECK (correct_option IN ('A', 'B', 'C', 'D')),
+      source_ref TEXT UNIQUE,
+      active INTEGER NOT NULL DEFAULT 1
+        CHECK (active IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (category_id) REFERENCES categories(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_questions_category_id
+      ON questions(category_id);
+
+    CREATE TABLE IF NOT EXISTS qualification_round_question_sets (
+      round_id INTEGER PRIMARY KEY,
+      locked_at TEXT NOT NULL,
+      FOREIGN KEY (round_id)
+        REFERENCES qualification_rounds(id)
+        ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS qualification_round_questions (
+      round_id INTEGER NOT NULL,
+      position INTEGER NOT NULL
+        CHECK (position BETWEEN 1 AND 10),
+      question_id INTEGER NOT NULL UNIQUE,
+      category_id INTEGER NOT NULL,
+      PRIMARY KEY (round_id, position),
+      FOREIGN KEY (round_id)
+        REFERENCES qualification_round_question_sets(round_id)
+        ON DELETE CASCADE,
+      FOREIGN KEY (question_id)
+        REFERENCES questions(id),
+      FOREIGN KEY (category_id)
+        REFERENCES categories(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_round_questions_category
+      ON qualification_round_questions(round_id, category_id);
+
+    CREATE TABLE IF NOT EXISTS qualification_question_reservations (
+      question_id INTEGER PRIMARY KEY,
+      round_id INTEGER NOT NULL,
+      position INTEGER NOT NULL
+        CHECK (position BETWEEN 1 AND 10),
+      disposition TEXT NOT NULL
+        CHECK (disposition IN ('ALLOCATED', 'VOIDED', 'REPLACEMENT')),
+      reserved_at TEXT NOT NULL,
+      voided_at TEXT,
+      FOREIGN KEY (question_id) REFERENCES questions(id),
+      FOREIGN KEY (round_id) REFERENCES qualification_rounds(id)
+    );
+
+    INSERT OR IGNORE INTO qualification_question_reservations (
+      question_id,
+      round_id,
+      position,
+      disposition,
+      reserved_at
+    )
+    SELECT
+      rqq.question_id,
+      rqq.round_id,
+      rqq.position,
+      'ALLOCATED',
+      COALESCE(rqs.locked_at, CURRENT_TIMESTAMP)
+    FROM qualification_round_questions rqq
+    JOIN qualification_round_question_sets rqs
+      ON rqs.round_id = rqq.round_id;
+
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT NOT NULL,
+      round_id INTEGER,
+      question_id INTEGER,
+      related_question_id INTEGER,
+      position INTEGER,
+      reason TEXT,
+      payload_json TEXT,
+      occurred_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_events_round
+      ON audit_events(round_id, occurred_at);
+
     UPDATE app_meta
-    SET value = '2'
+    SET value = '5'
     WHERE key = 'schema_version';
   `);
 

@@ -3,18 +3,32 @@
 Updated: 2026-09-28
 
 ## Active milestone
-Issue #3 — M2 Participants & Draw
+Issue #4 — M3 Question Bank & Scoring
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m2-participants-draw`
+`feature/m3-question-bank-import`
 
 ## Active pull request
-PR #10 — M2: Participants & Draw
+PR #11 — M3: Question Bank, Bulk Import & Scoring
 
 ## Completed
+- M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
+- M3 bulk import implemented for CSV/XLSX with Preview → Validation → Apply, plus downloadable Excel template.
+- Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
+- CI Run #24 PASS: CSV/XLSX parser and validation tests.
+- CI Run #25 PASS: import UI, typecheck, tests, build and runtime smoke.
+- Full Excel export added for current Colleges / Categories / Questions; blank `source_ref` is explicitly tested and supported.
+- Locked question allocation implemented: 10 questions per round, exactly 2 per category, no cross-round reuse.
+- Exact official scoring core implemented using integer micro-points with millisecond response timing.
+- CI Run #27 PASS: export and optional `source_ref`.
+- CI Run #28 PASS: allocation invariants.
+- CI Run #29 PASS: allocation UI and scoring boundary tests.
+- CI Run #31 PASS: monotonic question clock, audit and VOID/replacement core.
+- CI Run #33 PASS: integration test for same-category replacement and persistent audit.
+- CI Run #34 PASS: Excel export structure and blank `source_ref` verified.
 - M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
 - Repository foundation merged to `main`.
 - Public visibility intentionally retained during development.
@@ -41,14 +55,13 @@ PR #10 — M2: Participants & Draw
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M2 audience visual verification on the real display.
-- Odd-count rule is verified: the randomly selected solo qualification round is always the final round.
+- M3 complete; preparing M4 Live Session & Team Stations.
 
 ## Next action
-Pull the latest M2 branch on the Mac, open `/display` and `/draw`, then replay the official draw presentation. Verify staged audience reveal, final ordered rounds, and solo-last presentation visually. If accepted, close M2 and move to M3.
+Merge M3, then start M4 operator-paced live-session state machine and Team A/B station assignment.
 
 ## Blockers
-No code blocker. M2 only needs final visual verification of the audience draw presentation on the real display.
+No current blocker.
 
 ## Do not repeat
 - Do not recreate the repository.

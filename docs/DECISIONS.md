@@ -103,3 +103,57 @@ OSC may emit prestart cues for 3, 2 and 1, followed by the normal question-start
 Decision: When the qualification participant count is odd, the draw still randomly determines which college receives the solo round, but that solo round is always placed as the final round in the official draw order.
 
 Reason: This keeps live-event staging and audience communication predictable while preserving random selection of the solo college.
+
+## D-018 — Bulk data import from CSV/XLSX
+Decision: Administrative setup supports bulk import from CSV and Excel `.xlsx` files. Import is always validated and previewed before data is committed.
+
+Excel workbook sheet names:
+- `Colleges`
+- `Categories`
+- `Questions`
+
+CSV imports represent one data type per file and are detected from their headers.
+
+College columns:
+- `name` — required
+- `short_name` — optional
+- `participating` — optional boolean; when supplied, it may preselect participating colleges before participant lock
+
+Category columns:
+- `key` — required stable identifier
+- `name` — required display name
+
+Question columns:
+- `category_key` — required and must reference an imported/existing category
+- `question` — required
+- `option_a` — required
+- `option_b` — required
+- `option_c` — required
+- `option_d` — required
+- `correct_option` — required, exactly `A`, `B`, `C`, or `D`
+- `source_ref` — optional external reference for administration/audit
+
+No difficulty column is accepted.
+
+Importing a file never bypasses competition locks or question-bank validation. Real competition data remains runtime SQLite data and is never committed to Git.
+
+## D-019 — Official scoring uses integer micro-points
+Decision: Official scoring is calculated server-side using integer micro-points (1 point = 1,000,000 micro-points), while the UI converts them to normal decimal points for presentation.
+
+Rules:
+- Correct at or before 5,000 ms: 10,000,000 micro-points = 10 points
+- From 5,001 ms through 45,000 ms: subtract 225 micro-points per elapsed millisecond after 5,000 ms
+- Correct at exactly 45,000 ms: 1,000,000 micro-points = 1 point
+- Wrong, unanswered, or later than 45,000 ms: 0
+
+Reason: This implements the agreed linear formula exactly at millisecond precision without floating-point accumulation affecting ranking.
+
+## D-020 — Audit history is append-only and reference-tolerant
+Decision: Audit rows preserve numeric round/question references and event payloads without foreign-key coupling to mutable setup tables.
+
+Reason: Resetting a draw or replacing/importing a question bank must not erase historical audit evidence or be blocked by audit-table foreign keys.
+
+## D-021 — Question timing uses the server monotonic clock
+Decision: The authoritative 45-second question window is measured from the server's monotonic clock. Wall-clock timestamps are stored/published only for display and audit correlation.
+
+Reason: Browser clocks and wall-clock adjustments must not change official elapsed response time.
