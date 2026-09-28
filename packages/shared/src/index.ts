@@ -38,3 +38,40 @@ export interface PresenceSnapshot {
   generatedAt: string;
   stations: StationPresence[];
 }
+
+export interface College {
+  id: number;
+  name: string;
+  shortName: string | null;
+  sortOrder: number;
+}
+
+export type QualificationRoundStatus =
+  | "PENDING"
+  | "ACTIVE"
+  | "COMPLETED";
+
+export interface QualificationRound {
+  id: number;
+  order: number;
+  status: QualificationRoundStatus;
+  collegeA: College;
+  collegeB: College | null;
+}
+
+export type NextRoundSelectionMode = "DRAW_ORDER" | "MANUAL";
+
+export interface CompetitionSetupSnapshot {
+  colleges: College[];
+  participantCollegeIds: number[];
+  participantsLocked: boolean;
+  drawCreatedAt: string | null;
+  rounds: QualificationRound[];
+  nextRoundId: number | null;
+  nextRoundSelectionMode: NextRoundSelectionMode;
+}
+
+export interface DrawPresentationEvent {
+  startedAt: string;
+  rounds: QualificationRound[];
+}

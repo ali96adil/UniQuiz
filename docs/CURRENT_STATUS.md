@@ -3,18 +3,19 @@
 Updated: 2026-09-28
 
 ## Active milestone
-Issue #2 — M1 Foundation & Local Runtime
+Issue #3 — M2 Participants & Draw
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m1-local-runtime`
+`feature/m2-participants-draw`
 
 ## Active pull request
-PR #9 — M1: Foundation & Local Runtime
+PR #10 — M2: Participants & Draw
 
 ## Completed
+- M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
 - Repository foundation merged to `main`.
 - Public visibility intentionally retained during development.
 - Qualification rules and architecture decisions documented.
@@ -36,15 +37,18 @@ PR #9 — M1: Foundation & Local Runtime
 - Vite development proxy emitted `ECONNRESET` WebSocket logs during client disconnect/reconnect activity; no functional failure has been observed. Reclassify as a bug only if presence flaps while clients remain continuously open.
 - Node 24.21.0 verified on the Mac after installing Homebrew `node@24` and updating PATH.
 - Clean restart verified under Node 24.21.0 after stopping stale processes: Vite `172.20.10.4:5173`, Fastify/Socket.IO `172.20.10.4:8787`, SQLite reused successfully.
+- M2 core implemented and CI verified: participant setup/lock, persistent official draw, manual next-round selection, solo-last rule, audience draw presentation, and replay.
+- CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M1 complete; ready to close and move to M2.
+- M2 audience visual verification on the real display.
+- Odd-count rule is verified: the randomly selected solo qualification round is always the final round.
 
 ## Next action
-M1 verification is complete. After terminating stale processes, UniQuiz restarted cleanly under Node 24.21.0 with Vite on port 5173 and the Fastify/Socket.IO server on port 8787.
+Pull the latest M2 branch on the Mac, open `/display` and `/draw`, then replay the official draw presentation. Verify staged audience reveal, final ordered rounds, and solo-last presentation visually. If accepted, close M2 and move to M3.
 
 ## Blockers
-No remaining M1 blocker. Clean restart under Node 24.21.0 is verified.
+No code blocker. M2 only needs final visual verification of the audience draw presentation on the real display.
 
 ## Do not repeat
 - Do not recreate the repository.

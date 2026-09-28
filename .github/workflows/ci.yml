@@ -38,16 +38,37 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Test
+        run: pnpm test
+
       - name: Build
         run: pnpm build
 
-      - name: Server and realtime smoke test
+      - name: Server, realtime and M2 persistence smoke test
         shell: bash
+        env:
+          UNIQUIZ_DB_PATH: /tmp/uniquiz-ci.db
         run: |
           set -euo pipefail
 
-          pnpm --filter @uniquiz/server start > /tmp/uniquiz-server.log 2>&1 &
-          SERVER_PID=$!
+          rm -f /tmp/uniquiz-ci.db /tmp/uniquiz-ci.db-shm /tmp/uniquiz-ci.db-wal
+          rm -f /tmp/uniquiz-draw-before.json
+
+          start_server() {
+            pnpm --filter @uniquiz/server start > /tmp/uniquiz-server.log 2>&1 &
+            SERVER_PID=$!
+
+            for attempt in {1..20}; do
+              if curl --fail --silent http://127.0.0.1:8787/health > /tmp/health.json; then
+                return 0
+              fi
+              sleep 0.5
+            done
+
+            echo "Server failed to become healthy"
+            cat /tmp/uniquiz-server.log || true
+            return 1
+          }
 
           cleanup() {
             kill "$SERVER_PID" 2>/dev/null || true
@@ -56,12 +77,7 @@ jobs:
           }
           trap cleanup EXIT
 
-          for attempt in {1..20}; do
-            if curl --fail --silent http://127.0.0.1:8787/health > /tmp/health.json; then
-              break
-            fi
-            sleep 0.5
-          done
+          start_server
 
           curl --fail --show-error --silent http://127.0.0.1:8787/health
           echo
@@ -99,6 +115,15 @@ jobs:
               process.exit(0);
             });
           '
+
+          node scripts/ci/m2-persistence-smoke.mjs create
+
+          kill "$SERVER_PID"
+          wait "$SERVER_PID" || true
+
+          start_server
+
+          node scripts/ci/m2-persistence-smoke.mjs verify
 
           kill "$SERVER_PID"
           wait "$SERVER_PID" || true

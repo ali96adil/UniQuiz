@@ -98,3 +98,8 @@ Decision: Pressing Start Question first enters a server-controlled 3-2-1 present
 The operator remains the only actor that initiates a question. The countdown itself runs automatically once started.
 
 OSC may emit prestart cues for 3, 2 and 1, followed by the normal question-start cue.
+
+## D-017 — Solo qualification round is always last
+Decision: When the qualification participant count is odd, the draw still randomly determines which college receives the solo round, but that solo round is always placed as the final round in the official draw order.
+
+Reason: This keeps live-event staging and audience communication predictable while preserving random selection of the solo college.

@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
 import type {
   ClientRole,
+  CompetitionSetupSnapshot,
+  DrawPresentationEvent,
   PresenceSnapshot,
+  QualificationRound,
   StationPresence,
 } from "@uniquiz/shared";
 
@@ -60,6 +63,34 @@ function roleForSurface(surface: Surface): ClientRole {
   }
 }
 
+async function apiRequest<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  const payload = (await response.json()) as
+    | T
+    | { error?: string; message?: string };
+
+  if (!response.ok) {
+    const problem = payload as { error?: string; message?: string };
+    throw new Error(
+      problem.message ??
+        problem.error ??
+        `HTTP ${response.status}`,
+    );
+  }
+
+  return payload as T;
+}
+
 function PresenceCard({ station }: { station: StationPresence }) {
   return (
     <div className="presence-card">
@@ -71,11 +102,602 @@ function PresenceCard({ station }: { station: StationPresence }) {
   );
 }
 
+function StatusMessage({
+  error,
+  message,
+}: {
+  error: string | null;
+  message: string | null;
+}) {
+  if (!error && !message) return null;
+
+  return (
+    <div className={error ? "status-message error" : "status-message success"}>
+      {error ?? message}
+    </div>
+  );
+}
+
+function SetupSurface({
+  snapshot,
+}: {
+  snapshot: CompetitionSetupSnapshot;
+}) {
+  const [collegeDrafts, setCollegeDrafts] = useState<string[]>(() =>
+    Array.from({ length: 20 }, (_, index) =>
+      snapshot.colleges[index]?.name ?? "",
+    ),
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(
+    () => new Set(snapshot.participantCollegeIds),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCollegeDrafts(
+      Array.from({ length: 20 }, (_, index) =>
+        snapshot.colleges[index]?.name ?? "",
+      ),
+    );
+    setSelectedIds(new Set(snapshot.participantCollegeIds));
+  }, [
+    snapshot.colleges,
+    snapshot.participantCollegeIds,
+  ]);
+
+  const locked = snapshot.participantsLocked || snapshot.drawCreatedAt !== null;
+
+  const run = async (
+    action: () => Promise<unknown>,
+    successMessage: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await action();
+      setMessage(successMessage);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "حدث خطأ غير متوقع",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveColleges = () =>
+    run(
+      () =>
+        apiRequest("/api/setup/colleges", {
+          method: "PUT",
+          body: JSON.stringify({
+            colleges: collegeDrafts
+              .map((name) => name.trim())
+              .filter(Boolean)
+              .map((name) => ({ name })),
+          }),
+        }),
+      "تم حفظ قائمة الكليات.",
+    );
+
+  const saveParticipants = () =>
+    run(
+      () =>
+        apiRequest("/api/setup/participants", {
+          method: "PUT",
+          body: JSON.stringify({
+            collegeIds: [...selectedIds],
+          }),
+        }),
+      "تم حفظ الكليات المشاركة.",
+    );
+
+  const lockParticipants = () =>
+    run(
+      () =>
+        apiRequest("/api/setup/participants/lock", {
+          method: "POST",
+          body: "{}",
+        }),
+      "تم تثبيت المشاركين. أصبحت القرعة جاهزة.",
+    );
+
+  const unlockParticipants = () => {
+    if (
+      !window.confirm(
+        "إلغاء تثبيت المشاركين؟ هذا متاح فقط قبل إنشاء القرعة.",
+      )
+    ) {
+      return;
+    }
+
+    void run(
+      () =>
+        apiRequest("/api/setup/participants/unlock", {
+          method: "POST",
+          body: JSON.stringify({
+            confirm: "UNLOCK_PARTICIPANTS",
+          }),
+        }),
+      "تم إلغاء التثبيت ويمكن تعديل المشاركين.",
+    );
+  };
+
+  const toggleParticipant = (collegeId: number) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(collegeId)) next.delete(collegeId);
+      else next.add(collegeId);
+      return next;
+    });
+  };
+
+  return (
+    <>
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="step-label">الخطوة 1</p>
+            <h2>قائمة الكليات</h2>
+          </div>
+          <span className="counter">
+            {snapshot.colleges.length} / 20
+          </span>
+        </div>
+
+        <p className="muted">
+          اكتب أسماء الكليات المستخدمة في هذه النسخة من المسابقة. يمكن
+          استخدام أقل من 20 كلية وترك بقية الخانات فارغة.
+        </p>
+
+        <div className="college-input-grid">
+          {collegeDrafts.map((value, index) => (
+            <label className="college-input" key={index}>
+              <span>{index + 1}</span>
+              <input
+                value={value}
+                disabled={locked || busy}
+                placeholder={`اسم الكلية ${index + 1}`}
+                onChange={(event) => {
+                  const next = [...collegeDrafts];
+                  next[index] = event.target.value;
+                  setCollegeDrafts(next);
+                }}
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="actions">
+          <button
+            className="primary"
+            disabled={locked || busy}
+            onClick={() => void saveColleges()}
+          >
+            حفظ قائمة الكليات
+          </button>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="step-label">الخطوة 2</p>
+            <h2>اختيار المشاركين</h2>
+          </div>
+          <span className="counter">{selectedIds.size} مختارة</span>
+        </div>
+
+        {snapshot.colleges.length === 0 ? (
+          <p className="empty-state">
+            احفظ قائمة الكليات أولاً.
+          </p>
+        ) : (
+          <div className="participant-grid">
+            {snapshot.colleges.map((college) => (
+              <label
+                className={
+                  selectedIds.has(college.id)
+                    ? "participant selected"
+                    : "participant"
+                }
+                key={college.id}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(college.id)}
+                  disabled={snapshot.participantsLocked || busy}
+                  onChange={() => toggleParticipant(college.id)}
+                />
+                <span>{college.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div className="actions">
+          <button
+            disabled={
+              snapshot.participantsLocked ||
+              snapshot.colleges.length === 0 ||
+              busy
+            }
+            onClick={() => void saveParticipants()}
+          >
+            حفظ المشاركين
+          </button>
+
+          {!snapshot.participantsLocked ? (
+            <button
+              className="primary"
+              disabled={
+                snapshot.participantCollegeIds.length < 2 || busy
+              }
+              onClick={() => void lockParticipants()}
+            >
+              تثبيت المشاركين
+            </button>
+          ) : (
+            <button
+              className="danger-outline"
+              disabled={snapshot.drawCreatedAt !== null || busy}
+              onClick={unlockParticipants}
+            >
+              إلغاء التثبيت
+            </button>
+          )}
+        </div>
+
+        {snapshot.participantsLocked ? (
+          <p className="locked-note">
+            ✓ تم تثبيت المشاركين. أي تعديل يتطلب إلغاء التثبيت قبل
+            إنشاء القرعة.
+          </p>
+        ) : null}
+
+        <StatusMessage error={error} message={message} />
+      </section>
+    </>
+  );
+}
+
+function RoundCard({
+  round,
+  isNext,
+  selectionMode,
+  onSelect,
+  busy,
+}: {
+  round: QualificationRound;
+  isNext: boolean;
+  selectionMode: CompetitionSetupSnapshot["nextRoundSelectionMode"];
+  onSelect: (roundId: number) => void;
+  busy: boolean;
+}) {
+  return (
+    <article className={isNext ? "round-card next-round" : "round-card"}>
+      <div className="round-card-header">
+        <strong>جولة {round.order}</strong>
+        {isNext ? (
+          <span className="badge">
+            {selectionMode === "MANUAL" ? "مختارة يدويًا" : "القادمة"}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="versus">
+        <span>{round.collegeA.name}</span>
+        <b>{round.collegeB ? "VS" : "SOLO"}</b>
+        <span>{round.collegeB?.name ?? "جولة فردية"}</span>
+      </div>
+
+      <button
+        className="small-button"
+        disabled={busy || round.status !== "PENDING" || isNext}
+        onClick={() => onSelect(round.id)}
+      >
+        اختيار هذه الجولة كالقادمة
+      </button>
+    </article>
+  );
+}
+
+function DrawSurface({
+  snapshot,
+}: {
+  snapshot: CompetitionSetupSnapshot;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const run = async (
+    action: () => Promise<unknown>,
+    successMessage: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await action();
+      setMessage(successMessage);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "حدث خطأ غير متوقع",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createDraw = () => {
+    if (
+      !window.confirm(
+        "إنشاء القرعة الرسمية الآن؟ ستُحفظ الجولات ولن يعاد السحب إلا بإجراء Reset صريح.",
+      )
+    ) {
+      return;
+    }
+
+    void run(
+      () =>
+        apiRequest("/api/draw", {
+          method: "POST",
+          body: "{}",
+        }),
+      "تم إنشاء القرعة الرسمية.",
+    );
+  };
+
+  const resetDraw = () => {
+    if (
+      !window.confirm(
+        "تأكيد Reset للقرعة؟ ترتيب الجولات الحالي سيُحذف، لكن قائمة المشاركين ستبقى مثبتة.",
+      )
+    ) {
+      return;
+    }
+
+    void run(
+      () =>
+        apiRequest("/api/draw/reset", {
+          method: "POST",
+          body: JSON.stringify({ confirm: "RESET_DRAW" }),
+        }),
+      "تمت إعادة ضبط القرعة.",
+    );
+  };
+
+  const selectNextRound = (roundId: number) => {
+    void run(
+      () =>
+        apiRequest("/api/draw/next-round", {
+          method: "POST",
+          body: JSON.stringify({ roundId }),
+        }),
+      "تم اختيار الجولة القادمة يدويًا بدون تغيير ترتيب القرعة.",
+    );
+  };
+
+  const restoreDrawOrder = () => {
+    void run(
+      () =>
+        apiRequest("/api/draw/next-round", {
+          method: "POST",
+          body: JSON.stringify({ roundId: null }),
+        }),
+      "رجع اختيار الجولة القادمة حسب ترتيب القرعة.",
+    );
+  };
+
+  return (
+    <section className="panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">M2</p>
+          <h2>القرعة الرسمية</h2>
+        </div>
+        <span className="counter">
+          {snapshot.participantCollegeIds.length} مشارك
+        </span>
+      </div>
+
+      {!snapshot.participantsLocked ? (
+        <div className="empty-state">
+          يجب اختيار الكليات المشاركة وتثبيتها من صفحة الإعداد أولاً.
+        </div>
+      ) : snapshot.rounds.length === 0 ? (
+        <div className="draw-ready">
+          <p>
+            المشاركون مثبتون. النظام سيخلط الكليات على السيرفر وينشئ
+            جولات ثنائية، ومع العدد الفردي ينشئ جولة فردية واحدة فقط.
+          </p>
+          <button
+            className="primary large-button"
+            disabled={busy}
+            onClick={createDraw}
+          >
+            إجراء القرعة الرسمية
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="draw-summary">
+            <span>
+              {snapshot.rounds.length} جولات
+            </span>
+            <span>
+              {snapshot.rounds.filter((round) => round.collegeB === null).length}
+              {" "}جولة فردية
+            </span>
+            <span>
+              {snapshot.nextRoundSelectionMode === "MANUAL"
+                ? "اختيار الجولة القادمة: يدوي"
+                : "اختيار الجولة القادمة: حسب القرعة"}
+            </span>
+          </div>
+
+          <div className="round-grid">
+            {snapshot.rounds.map((round) => (
+              <RoundCard
+                key={round.id}
+                round={round}
+                isNext={snapshot.nextRoundId === round.id}
+                selectionMode={snapshot.nextRoundSelectionMode}
+                onSelect={selectNextRound}
+                busy={busy}
+              />
+            ))}
+          </div>
+
+          <div className="actions">
+            {snapshot.nextRoundSelectionMode === "MANUAL" ? (
+              <button disabled={busy} onClick={restoreDrawOrder}>
+                الرجوع إلى ترتيب القرعة
+              </button>
+            ) : null}
+
+            <button
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () =>
+                    apiRequest("/api/draw/present", {
+                      method: "POST",
+                      body: "{}",
+                    }),
+                  "تم إرسال عرض القرعة إلى شاشة الجمهور.",
+                )
+              }
+            >
+              عرض القرعة على شاشة الجمهور
+            </button>
+
+            <button
+              className="danger-outline"
+              disabled={busy}
+              onClick={resetDraw}
+            >
+              Reset القرعة
+            </button>
+          </div>
+        </>
+      )}
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
+
+function AudienceDrawSurface({
+  snapshot,
+  presentation,
+}: {
+  snapshot: CompetitionSetupSnapshot;
+  presentation: DrawPresentationEvent | null;
+}) {
+  const participantNames = snapshot.colleges
+    .filter((college) => snapshot.participantCollegeIds.includes(college.id))
+    .map((college) => college.name);
+
+  if (!snapshot.participantsLocked) {
+    return (
+      <section className="audience-stage">
+        <div className="audience-kicker">مسابقة بنك المعلومات</div>
+        <h2 className="audience-title">أهلاً بكم</h2>
+        <p className="audience-copy">بانتظار تثبيت الكليات المشاركة</p>
+      </section>
+    );
+  }
+
+  if (snapshot.rounds.length === 0) {
+    return (
+      <section className="audience-stage">
+        <div className="audience-kicker">مرحلة القرعة</div>
+        <h2 className="audience-title">القرعة الرسمية</h2>
+        <p className="audience-copy">
+          {participantNames.length} كلية مشاركة
+        </p>
+        <div className="audience-participants">
+          {participantNames.map((name) => (
+            <span key={name}>{name}</span>
+          ))}
+        </div>
+        <div className="draw-waiting">بانتظار إجراء القرعة</div>
+      </section>
+    );
+  }
+
+  const activePresentation = presentation?.rounds.length === snapshot.rounds.length;
+
+  return (
+    <section className="audience-stage">
+      <div className="audience-kicker">
+        {activePresentation ? "جاري إعلان القرعة" : "نتائج القرعة"}
+      </div>
+      <h2 className="audience-title">
+        {activePresentation ? "الجولات" : "القرعة الرسمية"}
+      </h2>
+
+      <div
+        className={
+          activePresentation
+            ? "audience-rounds presenting"
+            : "audience-rounds"
+        }
+      >
+        {snapshot.rounds.map((round, index) => (
+          <article
+            className={
+              round.collegeB === null
+                ? "audience-round solo"
+                : "audience-round"
+            }
+            key={round.id}
+            style={
+              activePresentation
+                ? { animationDelay: `${700 + index * 850}ms` }
+                : undefined
+            }
+          >
+            <span className="audience-round-number">
+              جولة {round.order}
+            </span>
+            <div className="audience-matchup">
+              <strong>{round.collegeA.name}</strong>
+              <b>{round.collegeB ? "VS" : "SOLO"}</b>
+              <strong>
+                {round.collegeB?.name ?? "جولة فردية"}
+              </strong>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="audience-footer-message">
+        {activePresentation
+          ? "يتم إعلان الجولات حسب ترتيب القرعة"
+          : "تم اعتماد ترتيب الجولات"}
+      </div>
+    </section>
+  );
+}
+
 export function App() {
   const surface = useMemo(() => surfaceFromPath(window.location.pathname), []);
   const role = useMemo(() => roleForSurface(surface), [surface]);
   const [connected, setConnected] = useState(false);
   const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
+  const [competition, setCompetition] =
+    useState<CompetitionSetupSnapshot | null>(null);
+  const [drawPresentation, setDrawPresentation] =
+    useState<DrawPresentationEvent | null>(null);
 
   useEffect(() => {
     const socket = io({
@@ -87,14 +709,32 @@ export function App() {
     socket.on("presence:snapshot", (snapshot: PresenceSnapshot) => {
       setPresence(snapshot);
     });
+    socket.on(
+      "competition:snapshot",
+      (snapshot: CompetitionSetupSnapshot) => {
+        setCompetition(snapshot);
+      },
+    );
+    socket.on(
+      "draw:presentation:start",
+      (event: DrawPresentationEvent) => {
+        setDrawPresentation(event);
+
+        const duration = 1600 + event.rounds.length * 850;
+        window.setTimeout(() => {
+          setDrawPresentation((current) =>
+            current?.startedAt === event.startedAt ? null : current,
+          );
+        }, duration);
+      },
+    );
 
     return () => {
       socket.disconnect();
     };
   }, [role]);
 
-  const showPresence =
-    surface === "operator" || surface === "setup" || surface === "draw";
+  const showPresence = surface === "operator";
 
   return (
     <main className="shell">
@@ -102,13 +742,30 @@ export function App() {
         <p className="eyebrow">University Knowledge Competition</p>
         <h1>{surfaceTitles[surface]}</h1>
         <p className="subtitle">
-          M1 — Local Runtime / Realtime Connectivity
+          {surface === "setup" || surface === "draw"
+            ? "M2 — Participants & Draw"
+            : "Realtime Competition Runtime"}
         </p>
         <div className="connection">
           <span className={connected ? "dot online-bg" : "dot offline-bg"} />
           {connected ? "متصل بالسيرفر" : "جاري الاتصال بالسيرفر"}
         </div>
       </section>
+
+      {surface === "setup" && competition ? (
+        <SetupSurface snapshot={competition} />
+      ) : null}
+
+      {surface === "draw" && competition ? (
+        <DrawSurface snapshot={competition} />
+      ) : null}
+
+      {surface === "display" && competition ? (
+        <AudienceDrawSurface
+          snapshot={competition}
+          presentation={drawPresentation}
+        />
+      ) : null}
 
       {showPresence ? (
         <section className="panel">
@@ -119,15 +776,19 @@ export function App() {
             )) ?? <p>بانتظار أول تحديث...</p>}
           </div>
         </section>
-      ) : (
+      ) : null}
+
+      {surface !== "setup" &&
+      surface !== "draw" &&
+      surface !== "operator" &&
+      surface !== "display" ? (
         <section className="panel">
           <h2>جاهز للمرحلة التالية</h2>
           <p>
-            هذه واجهة M1 المؤقتة. ستتبدل تلقائياً بدون Refresh عند إضافة
-            حالات المسابقة.
+            هذه الواجهة ستتبدل تلقائياً بدون Refresh حسب حالة المسابقة.
           </p>
         </section>
-      )}
+      ) : null}
     </main>
   );
 }
