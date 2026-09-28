@@ -1,0 +1,13 @@
+{
+  "name": "uniquiz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Realtime university knowledge competition platform",
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
