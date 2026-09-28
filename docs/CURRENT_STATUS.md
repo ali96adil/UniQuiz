@@ -3,18 +3,19 @@
 Updated: 2026-09-28
 
 ## Active milestone
-Issue #2 — M1 Foundation & Local Runtime
+Issue #3 — M2 Participants & Draw
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m1-local-runtime`
+`feature/m2-participants-draw`
 
 ## Active pull request
-PR #9 — M1: Foundation & Local Runtime
+Pending creation for M2 implementation
 
 ## Completed
+- M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
 - Repository foundation merged to `main`.
 - Public visibility intentionally retained during development.
 - Qualification rules and architecture decisions documented.
@@ -38,10 +39,10 @@ PR #9 — M1: Foundation & Local Runtime
 - Clean restart verified under Node 24.21.0 after stopping stale processes: Vite `172.20.10.4:5173`, Fastify/Socket.IO `172.20.10.4:8787`, SQLite reused successfully.
 
 ## In progress
-- M1 complete; ready to close and move to M2.
+- M2 implementation starting.
 
 ## Next action
-M1 verification is complete. After terminating stale processes, UniQuiz restarted cleanly under Node 24.21.0 with Vite on port 5173 and the Fastify/Socket.IO server on port 8787.
+Implement the college master list, participant selection/lock, server-side draw, ordered rounds, and odd-count solo round handling. Keep round order persistent and allow later operator selection without modifying the official draw.
 
 ## Blockers
 No remaining M1 blocker. Clean restart under Node 24.21.0 is verified.
