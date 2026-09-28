@@ -673,10 +673,8 @@ export class LiveSessionManager {
     if (!station) return null;
 
     const state = this.stateRow();
-    if (
-      state.roundId === null ||
-      state.questionPosition === null
-    ) {
+
+    if (state.roundId === null) {
       return {
         station,
         required: false,
@@ -693,6 +691,17 @@ export class LiveSessionManager {
     const required =
       station === "A" ||
       (station === "B" && round.bId !== null);
+
+    if (state.questionPosition === null) {
+      return {
+        station,
+        required,
+        locked: false,
+        selectedOption: null,
+        submittedAtEpochMs: null,
+        responseTimeMs: null,
+      };
+    }
 
     const submission = this.db.prepare(`
       SELECT
