@@ -120,6 +120,53 @@ io.on("connection", (socket) => {
     liveSession.getSnapshot(),
   );
 
+  const teamState = liveSession.getTeamSubmissionState(role);
+  if (teamState) {
+    socket.emit("live:team-submission", teamState);
+  }
+
+  socket.on(
+    "team:submit-answer",
+    (
+      payload: { option?: unknown },
+      acknowledge?: (result: unknown) => void,
+    ) => {
+      try {
+        const option =
+          payload?.option === "A" ||
+          payload?.option === "B" ||
+          payload?.option === "C" ||
+          payload?.option === "D"
+            ? payload.option
+            : null;
+
+        if (!option) {
+          throw new Error("INVALID_ANSWER_OPTION");
+        }
+
+        const receipt = liveSession.submitAnswer(role, option);
+        acknowledge?.({ ok: true, receipt });
+
+        const latestTeamState =
+          liveSession.getTeamSubmissionState(role);
+        if (latestTeamState) {
+          socket.emit(
+            "live:team-submission",
+            latestTeamState,
+          );
+        }
+      } catch (error) {
+        acknowledge?.({
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "ANSWER_SUBMISSION_FAILED",
+        });
+      }
+    },
+  );
+
   socket.on("disconnect", () => {
     roles.delete(socket.id);
     publishPresence();

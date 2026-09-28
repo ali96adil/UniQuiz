@@ -184,8 +184,30 @@ export function openDatabase(databasePath: string) {
     VALUES (1, 'IDLE', NULL, NULL, 0, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO NOTHING;
 
+    CREATE TABLE IF NOT EXISTS live_submissions (
+      round_id INTEGER NOT NULL,
+      question_position INTEGER NOT NULL
+        CHECK (question_position BETWEEN 1 AND 10),
+      station TEXT NOT NULL
+        CHECK (station IN ('A', 'B')),
+      question_id INTEGER NOT NULL,
+      selected_option TEXT NOT NULL
+        CHECK (selected_option IN ('A', 'B', 'C', 'D')),
+      submitted_at_epoch_ms INTEGER NOT NULL,
+      response_time_ms INTEGER NOT NULL,
+      is_correct INTEGER NOT NULL
+        CHECK (is_correct IN (0, 1)),
+      score_micros INTEGER NOT NULL,
+      PRIMARY KEY (round_id, question_position, station),
+      FOREIGN KEY (round_id) REFERENCES qualification_rounds(id),
+      FOREIGN KEY (question_id) REFERENCES questions(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_live_submissions_round_question
+      ON live_submissions(round_id, question_position);
+
     UPDATE app_meta
-    SET value = '6'
+    SET value = '7'
     WHERE key = 'schema_version';
   `);
 

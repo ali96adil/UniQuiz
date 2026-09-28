@@ -183,4 +183,28 @@ export interface LiveSnapshot {
   questionDeadlineEpochMs: number | null;
   questionClosedAtEpochMs: number | null;
   closeReason: string | null;
+  answerStatus: LiveAnswerStatus;
+}
+
+export interface LiveAnswerStatus {
+  teamARequired: boolean;
+  teamAReceived: boolean;
+  teamBRequired: boolean;
+  teamBReceived: boolean;
+}
+
+export interface LiveTeamSubmissionState {
+  station: "A" | "B";
+  required: boolean;
+  locked: boolean;
+  selectedOption: "A" | "B" | "C" | "D" | null;
+  submittedAtEpochMs: number | null;
+  responseTimeMs: number | null;
+}
+
+export interface LiveSubmissionReceipt {
+  station: "A" | "B";
+  selectedOption: "A" | "B" | "C" | "D";
+  submittedAtEpochMs: number;
+  responseTimeMs: number;
 }

@@ -2,11 +2,14 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Server as SocketIOServer } from "socket.io";
 import { z } from "zod";
 import type {
+  ClientRole,
   College,
   LivePhase,
   LiveQuestionView,
   LiveRoundView,
   LiveSnapshot,
+  LiveSubmissionReceipt,
+  LiveTeamSubmissionState,
 } from "@uniquiz/shared";
 import { appendAuditEvent } from "./audit.js";
 import type { AppDatabase } from "./database.js";
@@ -14,6 +17,7 @@ import {
   QUESTION_DURATION_MS,
   ServerQuestionClock,
 } from "./question-clock.js";
+import { calculateScoreMicros } from "./scoring.js";
 
 const prepareRoundSchema = z.object({
   roundId: z.number().int().positive().optional(),
@@ -47,6 +51,7 @@ interface RoundDbRow {
 }
 
 interface QuestionDbRow {
+  questionId: number;
   position: number;
   categoryKey: string;
   categoryName: string;
@@ -130,6 +135,7 @@ export class LiveSessionManager {
   ): QuestionDbRow | undefined {
     return this.db.prepare(`
       SELECT
+        rqq.question_id AS questionId,
         rqq.position,
         c.category_key AS categoryKey,
         c.name AS categoryName,
@@ -213,6 +219,23 @@ export class LiveSessionManager {
       }
     }
 
+    const submissionRows =
+      state.roundId !== null && state.questionPosition !== null
+        ? (this.db.prepare(`
+            SELECT station
+            FROM live_submissions
+            WHERE round_id = ?
+              AND question_position = ?
+          `).all(
+            state.roundId,
+            state.questionPosition,
+          ) as Array<{ station: "A" | "B" }>)
+        : [];
+
+    const receivedStations = new Set(
+      submissionRows.map((submission) => submission.station),
+    );
+
     return {
       phase: state.phase,
       serverNowEpochMs: Date.now(),
@@ -228,6 +251,12 @@ export class LiveSessionManager {
           : state.questionStartedAtEpochMs + QUESTION_DURATION_MS,
       questionClosedAtEpochMs: state.questionClosedAtEpochMs,
       closeReason: state.closeReason,
+      answerStatus: {
+        teamARequired: round !== null,
+        teamAReceived: receivedStations.has("A"),
+        teamBRequired: round?.teamB !== null,
+        teamBReceived: receivedStations.has("B"),
+      },
     };
   }
 
@@ -529,8 +558,11 @@ export class LiveSessionManager {
 
     if (this.questionTimer) clearTimeout(this.questionTimer);
     this.questionTimer = setTimeout(() => {
-      this.closeActiveQuestion("TIMEOUT");
-    }, this.questionDurationMs);
+      const state = this.stateRow();
+      if (state.phase === "QUESTION_ACTIVE") {
+        this.closeActiveQuestion("TIMEOUT");
+      }
+    }, this.questionDurationMs + 1);
   }
 
   closeActiveQuestion(reason: string): LiveSnapshot {
@@ -609,6 +641,219 @@ export class LiveSessionManager {
 
     this.updateState({ phase: "INTERMISSION" });
     return this.publish();
+  }
+
+
+  private stationFromRole(role: ClientRole): "A" | "B" | null {
+    if (role === "team-a") return "A";
+    if (role === "team-b") return "B";
+    return null;
+  }
+
+  getTeamSubmissionState(
+    role: ClientRole,
+  ): LiveTeamSubmissionState | null {
+    const station = this.stationFromRole(role);
+    if (!station) return null;
+
+    const state = this.stateRow();
+    if (
+      state.roundId === null ||
+      state.questionPosition === null
+    ) {
+      return {
+        station,
+        required: false,
+        locked: false,
+        selectedOption: null,
+        submittedAtEpochMs: null,
+        responseTimeMs: null,
+      };
+    }
+
+    const round = this.roundRow(state.roundId);
+    if (!round) return null;
+
+    const required =
+      station === "A" ||
+      (station === "B" && round.bId !== null);
+
+    const submission = this.db.prepare(`
+      SELECT
+        selected_option AS selectedOption,
+        submitted_at_epoch_ms AS submittedAtEpochMs,
+        response_time_ms AS responseTimeMs
+      FROM live_submissions
+      WHERE round_id = ?
+        AND question_position = ?
+        AND station = ?
+    `).get(
+      state.roundId,
+      state.questionPosition,
+      station,
+    ) as
+      | {
+          selectedOption: "A" | "B" | "C" | "D";
+          submittedAtEpochMs: number;
+          responseTimeMs: number;
+        }
+      | undefined;
+
+    return {
+      station,
+      required,
+      locked: Boolean(submission),
+      selectedOption: submission?.selectedOption ?? null,
+      submittedAtEpochMs: submission?.submittedAtEpochMs ?? null,
+      responseTimeMs: submission?.responseTimeMs ?? null,
+    };
+  }
+
+  submitAnswer(
+    role: ClientRole,
+    selectedOption: "A" | "B" | "C" | "D",
+  ): LiveSubmissionReceipt {
+    const station = this.stationFromRole(role);
+    if (!station) {
+      throw new Error("TEAM_STATION_REQUIRED");
+    }
+
+    const state = this.stateRow();
+    if (
+      state.phase !== "QUESTION_ACTIVE" ||
+      state.roundId === null ||
+      state.questionPosition === null
+    ) {
+      throw new Error("QUESTION_NOT_ACTIVE");
+    }
+
+    const round = this.roundRow(state.roundId);
+    if (!round) {
+      throw new Error("ROUND_NOT_FOUND");
+    }
+
+    if (station === "B" && round.bId === null) {
+      throw new Error("TEAM_B_NOT_USED_IN_SOLO_ROUND");
+    }
+
+    const question = this.questionRow(
+      state.roundId,
+      state.questionPosition,
+    );
+    if (!question) {
+      throw new Error("QUESTION_SLOT_NOT_FOUND");
+    }
+
+    const existing = this.db.prepare(`
+      SELECT 1 AS existsRow
+      FROM live_submissions
+      WHERE round_id = ?
+        AND question_position = ?
+        AND station = ?
+    `).get(
+      state.roundId,
+      state.questionPosition,
+      station,
+    );
+
+    if (existing) {
+      throw new Error("ANSWER_ALREADY_LOCKED");
+    }
+
+    if (!this.questionClock.isActive()) {
+      throw new Error("QUESTION_CLOCK_NOT_ACTIVE");
+    }
+
+    const clock = this.questionClock.snapshot();
+    if (clock.elapsedMs > QUESTION_DURATION_MS) {
+      const current = this.stateRow();
+      if (current.phase === "QUESTION_ACTIVE") {
+        this.closeActiveQuestion("TIMEOUT");
+      }
+      throw new Error("ANSWER_TOO_LATE");
+    }
+
+    const submittedAtEpochMs = Date.now();
+    const isCorrect = selectedOption === question.correctOption;
+    const scoreMicros = calculateScoreMicros(
+      isCorrect,
+      clock.elapsedMs,
+    );
+
+    this.db.prepare(`
+      INSERT INTO live_submissions (
+        round_id,
+        question_position,
+        station,
+        question_id,
+        selected_option,
+        submitted_at_epoch_ms,
+        response_time_ms,
+        is_correct,
+        score_micros
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      state.roundId,
+      state.questionPosition,
+      station,
+      question.questionId,
+      selectedOption,
+      submittedAtEpochMs,
+      clock.elapsedMs,
+      isCorrect ? 1 : 0,
+      scoreMicros,
+    );
+
+    appendAuditEvent(this.db, {
+      eventType: "TEAM_ANSWER_LOCKED",
+      roundId: state.roundId,
+      questionId: question.questionId,
+      position: state.questionPosition,
+      payload: {
+        station,
+        selectedOption,
+        responseTimeMs: clock.elapsedMs,
+        scoreMicros,
+      },
+      occurredAt: new Date(submittedAtEpochMs).toISOString(),
+    });
+
+    const requiredStations: Array<"A" | "B"> =
+      round.bId === null ? ["A"] : ["A", "B"];
+
+    const answered = this.db.prepare(`
+      SELECT station
+      FROM live_submissions
+      WHERE round_id = ?
+        AND question_position = ?
+    `).all(
+      state.roundId,
+      state.questionPosition,
+    ) as Array<{ station: "A" | "B" }>;
+
+    const answeredSet = new Set(
+      answered.map((entry) => entry.station),
+    );
+
+    if (
+      requiredStations.every((requiredStation) =>
+        answeredSet.has(requiredStation),
+      )
+    ) {
+      this.closeActiveQuestion(
+        round.bId === null ? "SOLO_ANSWERED" : "ALL_TEAMS_ANSWERED",
+      );
+    } else {
+      this.publish();
+    }
+
+    return {
+      station,
+      selectedOption,
+      submittedAtEpochMs,
+      responseTimeMs: clock.elapsedMs,
+    };
   }
 
   completeRound(): LiveSnapshot {
