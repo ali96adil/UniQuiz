@@ -6,26 +6,64 @@ import type {
   StationPresence,
 } from "@uniquiz/shared";
 
-const routeTitles: Record<ClientRole, string> = {
+type Surface =
+  | "home"
+  | "setup"
+  | "draw"
+  | "operator"
+  | "display"
+  | "team-a"
+  | "team-b";
+
+const surfaceTitles: Record<Surface, string> = {
+  home: "مسابقة بنك المعلومات",
+  setup: "إعداد المسابقة",
+  draw: "القرعة",
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
   "team-a": "محطة المتسابق A",
   "team-b": "محطة المتسابق B",
-  unknown: "UniQuiz",
 };
 
-function roleFromPath(pathname: string): ClientRole {
+const roleTitles: Record<ClientRole, string> = {
+  operator: "Operator",
+  display: "Display",
+  "team-a": "Team A",
+  "team-b": "Team B",
+  unknown: "Unknown",
+};
+
+function surfaceFromPath(pathname: string): Surface {
+  if (pathname.startsWith("/setup")) return "setup";
+  if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
   if (pathname.startsWith("/display")) return "display";
   if (pathname.startsWith("/team/a")) return "team-a";
   if (pathname.startsWith("/team/b")) return "team-b";
-  return "unknown";
+  return "home";
+}
+
+function roleForSurface(surface: Surface): ClientRole {
+  switch (surface) {
+    case "setup":
+    case "draw":
+    case "operator":
+      return "operator";
+    case "display":
+      return "display";
+    case "team-a":
+      return "team-a";
+    case "team-b":
+      return "team-b";
+    default:
+      return "unknown";
+  }
 }
 
 function PresenceCard({ station }: { station: StationPresence }) {
   return (
     <div className="presence-card">
-      <span>{routeTitles[station.role]}</span>
+      <span>{roleTitles[station.role]}</span>
       <strong className={station.connected ? "online" : "offline"}>
         {station.connected ? `متصل (${station.connections})` : "غير متصل"}
       </strong>
@@ -34,7 +72,8 @@ function PresenceCard({ station }: { station: StationPresence }) {
 }
 
 export function App() {
-  const role = useMemo(() => roleFromPath(window.location.pathname), []);
+  const surface = useMemo(() => surfaceFromPath(window.location.pathname), []);
+  const role = useMemo(() => roleForSurface(surface), [surface]);
   const [connected, setConnected] = useState(false);
   const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
 
@@ -54,11 +93,14 @@ export function App() {
     };
   }, [role]);
 
+  const showPresence =
+    surface === "operator" || surface === "setup" || surface === "draw";
+
   return (
     <main className="shell">
       <section className="hero">
         <p className="eyebrow">University Knowledge Competition</p>
-        <h1>{routeTitles[role]}</h1>
+        <h1>{surfaceTitles[surface]}</h1>
         <p className="subtitle">
           M1 — Local Runtime / Realtime Connectivity
         </p>
@@ -68,7 +110,7 @@ export function App() {
         </div>
       </section>
 
-      {role === "operator" ? (
+      {showPresence ? (
         <section className="panel">
           <h2>حالة المحطات</h2>
           <div className="presence-grid">
