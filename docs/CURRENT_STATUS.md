@@ -26,6 +26,9 @@ PR #11 — M3: Question Bank, Bulk Import & Scoring
 - CI Run #27 PASS: export and optional `source_ref`.
 - CI Run #28 PASS: allocation invariants.
 - CI Run #29 PASS: allocation UI and scoring boundary tests.
+- CI Run #31 PASS: monotonic question clock, audit and VOID/replacement core.
+- CI Run #33 PASS: integration test for same-category replacement and persistent audit.
+- CI Run #34 PASS: Excel export structure and blank `source_ref` verified.
 - M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
 - Repository foundation merged to `main`.
 - Public visibility intentionally retained during development.
@@ -52,14 +55,13 @@ PR #11 — M3: Question Bank, Bulk Import & Scoring
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M3 authoritative question timer, question-use audit and VOID/replacement flow.
-- Bulk CSV/XLSX import is operationally verified on the Mac.
+- M3 complete; preparing M4 Live Session & Team Stations.
 
 ## Next action
-Implement authoritative 45-second question timing, question-use/audit persistence, and same-category VOID replacement while preserving locked round composition.
+Merge M3, then start M4 operator-paced live-session state machine and Team A/B station assignment.
 
 ## Blockers
-No current code blocker.
+No current blocker.
 
 ## Do not repeat
 - Do not recreate the repository.
