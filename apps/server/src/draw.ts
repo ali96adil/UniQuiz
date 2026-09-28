@@ -75,8 +75,7 @@ export function generateQualificationRounds(
   }
 
   if (soloCollegeId !== null) {
-    const soloPosition = checkedIndex(randomIndex, rounds.length + 1);
-    rounds.splice(soloPosition, 0, {
+    rounds.push({
       collegeAId: soloCollegeId,
       collegeBId: null,
     });

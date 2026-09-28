@@ -23,7 +23,7 @@ test("even draw includes every college exactly once with no solo round", () => {
   assert.deepEqual(allCollegeIds, [1, 2, 3, 4, 5, 6]);
 });
 
-test("odd draw includes exactly one randomly positioned solo round", () => {
+test("odd draw includes exactly one solo round and places it last", () => {
   const rounds = generateQualificationRounds(
     [1, 2, 3, 4, 5],
     firstIndex,
@@ -31,6 +31,7 @@ test("odd draw includes exactly one randomly positioned solo round", () => {
 
   assert.equal(rounds.length, 3);
   assert.equal(rounds.filter((round) => round.collegeBId === null).length, 1);
+  assert.equal(rounds.at(-1)?.collegeBId, null);
 
   const allCollegeIds = rounds
     .flatMap((round) => [round.collegeAId, round.collegeBId])
