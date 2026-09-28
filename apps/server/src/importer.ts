@@ -438,7 +438,7 @@ export async function parseImportBuffer(
     }
   } else if (extension === ".xlsx") {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(buffer as any);
 
     const collegesSheet = workbook.getWorksheet("Colleges");
     const categoriesSheet = workbook.getWorksheet("Categories");
