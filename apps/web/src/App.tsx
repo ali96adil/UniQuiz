@@ -1743,7 +1743,7 @@ export function App() {
     }
 
     return window.localStorage.getItem(key);
-  }, [role, stationToken]);
+  }, [role]);
 
   useEffect(() => {
     const socket = io({
@@ -1816,7 +1816,7 @@ export function App() {
       setLiveSocket(null);
       socket.disconnect();
     };
-  }, [role]);
+  }, [role, stationToken]);
 
   const showPresence = surface === "operator";
 
