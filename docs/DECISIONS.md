@@ -39,3 +39,33 @@ Reason: Transparency without leaking correctness while another team can still an
 
 ## D-010 — Real question data stays out of Git
 Decision: Git contains schemas and samples only. Real competition questions and answers remain local runtime data.
+
+## D-011 — Operator controls progression
+Decision: Sessions and questions never advance automatically. The operator explicitly prepares/starts every session and every question. The 45-second countdown is the only automatic progression inside an active question.
+
+Reason: Live events may require pauses, announcements, technical checks or unscheduled breaks.
+
+## D-012 — Next session can follow draw order or be manually selected
+Decision: The default next session is the next unplayed session in the official draw order. The operator may instead manually select any unplayed session.
+
+Reason: The draw determines the official session list/order, but live-event operations may require a different running order. Manual selection does not alter the saved draw result.
+
+## D-013 — Server-originated OSC cues
+Decision: UniQuiz emits optional OSC/UDP cues directly from the authoritative server for show-control integration such as Ableton Live.
+
+Initial cue set:
+- `/uniquiz/session/ready`
+- `/uniquiz/session/start`
+- `/uniquiz/question/ready`
+- `/uniquiz/question/start`
+- `/uniquiz/team/a/answered`
+- `/uniquiz/team/b/answered`
+- `/uniquiz/question/all_answered`
+- `/uniquiz/question/timeout`
+- `/uniquiz/question/closed`
+- `/uniquiz/question/reveal`
+- `/uniquiz/session/complete`
+
+OSC is best-effort show control only. Failure to deliver an OSC packet must never change official competition state, timing, scoring or results.
+
+The target host/port and OSC enable state are configurable. No fixed port is part of the competition protocol.
