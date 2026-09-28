@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { Server as SocketIOServer } from "socket.io";
 import type { ClientRole, PresenceSnapshot } from "@uniquiz/shared";
+import { registerCompetitionRoutes, getCompetitionSnapshot } from "./competition.js";
 import { config } from "./config.js";
 import { openDatabase } from "./database.js";
 
@@ -64,6 +65,8 @@ app.get("/health", async () => ({
 
 app.get("/api/presence", async () => presenceSnapshot());
 
+registerCompetitionRoutes(app, database, io);
+
 io.on("connection", (socket) => {
   const role = normalizeRole(socket.handshake.auth?.role);
   roles.set(socket.id, role);
@@ -74,6 +77,11 @@ io.on("connection", (socket) => {
     role,
     serverTime: new Date().toISOString(),
   });
+
+  socket.emit(
+    "competition:snapshot",
+    getCompetitionSnapshot(database),
+  );
 
   socket.on("disconnect", () => {
     roles.delete(socket.id);
