@@ -438,7 +438,25 @@ export async function parseImportBuffer(
     }
   } else if (extension === ".xlsx") {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer as any);
+
+    try {
+      await workbook.xlsx.load(buffer as any);
+    } catch {
+      issue(
+        issues,
+        "error",
+        "Workbook",
+        null,
+        "INVALID_XLSX_FILE: The Excel workbook could not be parsed. Re-save it as a standard .xlsx file or use the UniQuiz template.",
+      );
+
+      return {
+        colleges: null,
+        categories: null,
+        questions: null,
+        issues,
+      };
+    }
 
     const collegesSheet = workbook.getWorksheet("Colleges");
     const categoriesSheet = workbook.getWorksheet("Categories");
