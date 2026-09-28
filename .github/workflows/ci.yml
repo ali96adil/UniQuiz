@@ -52,6 +52,7 @@ jobs:
           set -euo pipefail
 
           rm -f /tmp/uniquiz-ci.db /tmp/uniquiz-ci.db-shm /tmp/uniquiz-ci.db-wal
+          rm -f /tmp/uniquiz-draw-before.json
 
           start_server() {
             pnpm --filter @uniquiz/server start > /tmp/uniquiz-server.log 2>&1 &
@@ -65,10 +66,9 @@ jobs:
             done
 
             echo "Server failed to become healthy"
+            cat /tmp/uniquiz-server.log || true
             return 1
           }
-
-          start_server
 
           cleanup() {
             kill "$SERVER_PID" 2>/dev/null || true
@@ -76,6 +76,8 @@ jobs:
             cat /tmp/uniquiz-server.log || true
           }
           trap cleanup EXIT
+
+          start_server
 
           curl --fail --show-error --silent http://127.0.0.1:8787/health
           echo
@@ -114,92 +116,14 @@ jobs:
             });
           '
 
-          node --input-type=module <<'NODE'
-          const base = "http://127.0.0.1:8787";
-
-          async function request(path, method = "GET", body) {
-            const response = await fetch(base + path, {
-              method,
-              headers: body ? { "content-type": "application/json" } : undefined,
-              body: body ? JSON.stringify(body) : undefined,
-            });
-
-            const payload = await response.json();
-            if (!response.ok) {
-              throw new Error(`${method} ${path}: ${response.status} ${JSON.stringify(payload)}`);
-            }
-            return payload;
-          }
-
-          const setup = await request("/api/setup/colleges", "PUT", {
-            colleges: [
-              { name: "College 1" },
-              { name: "College 2" },
-              { name: "College 3" },
-              { name: "College 4" },
-              { name: "College 5" },
-            ],
-          });
-
-          const collegeIds = setup.colleges.map((college) => college.id);
-          await request("/api/setup/participants", "PUT", { collegeIds });
-          await request("/api/setup/participants/lock", "POST", {});
-          const draw = await request("/api/draw", "POST", {});
-
-          if (draw.rounds.length !== 3) {
-            throw new Error("Expected exactly three rounds for five colleges");
-          }
-
-          if (draw.rounds.at(-1)?.collegeB !== null) {
-            throw new Error("Expected solo round to be last");
-          }
-
-          const appearances = draw.rounds.flatMap((round) => [
-            round.collegeA.id,
-            ...(round.collegeB ? [round.collegeB.id] : []),
-          ]);
-
-          if (
-            appearances.length !== 5 ||
-            new Set(appearances).size !== 5
-          ) {
-            throw new Error("Every participant must appear exactly once");
-          }
-
-          await import("node:fs").then(({ writeFileSync }) => {
-            writeFileSync(
-              "/tmp/uniquiz-draw-before.json",
-              JSON.stringify(draw.rounds),
-            );
-          });
-
-          console.log("M2 draw created and validated");
-NODE
+          node scripts/ci/m2-persistence-smoke.mjs create
 
           kill "$SERVER_PID"
           wait "$SERVER_PID" || true
 
           start_server
 
-          node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
-
-          const response = await fetch("http://127.0.0.1:8787/api/draw");
-          if (!response.ok) {
-            throw new Error(`GET /api/draw failed: ${response.status}`);
-          }
-
-          const after = await response.json();
-          const before = JSON.parse(
-            readFileSync("/tmp/uniquiz-draw-before.json", "utf8"),
-          );
-
-          if (JSON.stringify(after.rounds) !== JSON.stringify(before)) {
-            throw new Error("Official draw changed after server restart");
-          }
-
-          console.log("M2 draw persistence verified after restart");
-NODE
+          node scripts/ci/m2-persistence-smoke.mjs verify
 
           kill "$SERVER_PID"
           wait "$SERVER_PID" || true
