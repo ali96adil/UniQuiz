@@ -32,6 +32,10 @@ const prepareRoundSchema = z.object({
 
 const emptyObjectSchema = z.object({}).strict();
 
+const reasonSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+
 interface LiveStateRow {
   phase: LivePhase;
   roundId: number | null;
@@ -817,6 +821,64 @@ export class LiveSessionManager {
     return this.publish();
   }
 
+  private stationReadinessOverride(
+    roundId: number,
+  ): { reason: string } | null {
+    const row = this.db.prepare(`
+      SELECT reason
+      FROM audit_events
+      WHERE event_type = 'STATION_READINESS_OVERRIDE'
+        AND round_id = ?
+      ORDER BY id DESC
+      LIMIT 1
+    `).get(roundId) as { reason: string | null } | undefined;
+
+    return row?.reason ? { reason: row.reason } : null;
+  }
+
+  overrideStationReadiness(reason: string): LiveSnapshot {
+    const state = this.stateRow();
+    if (state.phase !== "ROUND_READY" || state.roundId === null) {
+      throw new Error("ROUND_NOT_READY");
+    }
+
+    const round = this.roundRow(state.roundId);
+    if (!round) {
+      throw new Error("ROUND_NOT_FOUND");
+    }
+
+    const missing: string[] = [];
+    if (!this.isStationConnected("team-a")) {
+      missing.push("team-a");
+    }
+    if (
+      round.bId !== null &&
+      !this.isStationConnected("team-b")
+    ) {
+      missing.push("team-b");
+    }
+
+    if (missing.length === 0) {
+      throw new Error("ALL_REQUIRED_STATIONS_READY");
+    }
+
+    this.updateState({
+      phase: "ROUND_READY",
+      stationsConfirmed: true,
+    });
+
+    appendAuditEvent(this.db, {
+      eventType: "STATION_READINESS_OVERRIDE",
+      roundId: state.roundId,
+      reason,
+      payload: {
+        missingStations: missing,
+      },
+    });
+
+    return this.publish();
+  }
+
   confirmStations(): LiveSnapshot {
     const state = this.stateRow();
     if (state.phase !== "ROUND_READY" || state.roundId === null) {
@@ -868,25 +930,44 @@ export class LiveSessionManager {
       throw new Error("ROUND_NOT_FOUND");
     }
 
+    const missingStations: Array<"team-a" | "team-b"> = [];
     if (!this.isStationConnected("team-a")) {
-      this.updateState({
-        phase: "ROUND_READY",
-        stationsConfirmed: false,
-      });
-      this.publish();
-      throw new Error("TEAM_A_NOT_READY");
+      missingStations.push("team-a");
     }
-
     if (
       round.bId !== null &&
       !this.isStationConnected("team-b")
     ) {
+      missingStations.push("team-b");
+    }
+
+    const override =
+      missingStations.length > 0
+        ? this.stationReadinessOverride(state.roundId)
+        : null;
+
+    if (missingStations.length > 0 && !override) {
       this.updateState({
         phase: "ROUND_READY",
         stationsConfirmed: false,
       });
       this.publish();
-      throw new Error("TEAM_B_NOT_READY");
+      throw new Error(
+        missingStations.includes("team-a")
+          ? "TEAM_A_NOT_READY"
+          : "TEAM_B_NOT_READY",
+      );
+    }
+
+    if (override) {
+      appendAuditEvent(this.db, {
+        eventType: "ROUND_STARTED_WITH_READINESS_OVERRIDE",
+        roundId: state.roundId,
+        reason: override.reason,
+        payload: {
+          missingStations,
+        },
+      });
     }
 
     this.db.prepare(`
@@ -1118,6 +1199,83 @@ export class LiveSessionManager {
     return this.publish();
   }
 
+  emergencyHold(reason: string): LiveSnapshot {
+    const state = this.stateRow();
+
+    if (
+      state.roundId === null ||
+      state.questionPosition === null
+    ) {
+      throw new Error("QUESTION_NOT_PREPARED");
+    }
+
+    if (state.phase === "QUESTION_COUNTDOWN") {
+      if (this.countdownTimer) {
+        clearTimeout(this.countdownTimer);
+        this.countdownTimer = null;
+      }
+      this.clearCountdownCueTimers();
+
+      this.updateState({
+        phase: "QUESTION_READY",
+        countdownStartedAtEpochMs: null,
+        questionStartedAtEpochMs: null,
+        questionClosedAtEpochMs: null,
+        closeReason: null,
+      });
+
+      appendAuditEvent(this.db, {
+        eventType: "EMERGENCY_HOLD",
+        roundId: state.roundId,
+        position: state.questionPosition,
+        reason,
+        payload: {
+          fromPhase: "QUESTION_COUNTDOWN",
+          action: "RETURN_TO_QUESTION_READY",
+        },
+      });
+
+      this.sendShowControl(
+        "/uniquiz/question/emergency_hold",
+        [
+          this.roundOrder(state.roundId),
+          state.questionPosition,
+          "COUNTDOWN",
+        ],
+      );
+
+      return this.publish();
+    }
+
+    if (state.phase !== "QUESTION_ACTIVE") {
+      throw new Error("EMERGENCY_HOLD_NOT_ALLOWED");
+    }
+
+    const snapshot = this.closeActiveQuestion("EMERGENCY_HOLD");
+
+    appendAuditEvent(this.db, {
+      eventType: "EMERGENCY_HOLD",
+      roundId: state.roundId,
+      position: state.questionPosition,
+      reason,
+      payload: {
+        fromPhase: "QUESTION_ACTIVE",
+        action: "VOID_REPLACEMENT_REQUIRED",
+      },
+    });
+
+    this.sendShowControl(
+      "/uniquiz/question/emergency_hold",
+      [
+        this.roundOrder(state.roundId),
+        state.questionPosition,
+        "ACTIVE",
+      ],
+    );
+
+    return snapshot;
+  }
+
   revealQuestion(): LiveSnapshot {
     const state = this.stateRow();
 
@@ -1134,8 +1292,11 @@ export class LiveSessionManager {
       throw new Error("QUESTION_NOT_CLOSED");
     }
 
-    if (state.closeReason === "SERVER_RESTART_RECOVERY") {
-      throw new Error("RECOVERY_QUESTION_REQUIRES_VOID");
+    if (
+      state.closeReason === "SERVER_RESTART_RECOVERY" ||
+      state.closeReason === "EMERGENCY_HOLD"
+    ) {
+      throw new Error("QUESTION_REQUIRES_VOID");
     }
 
     this.updateState({
@@ -1528,6 +1689,46 @@ export function registerLiveSessionRoutes(
       }
     });
   };
+
+  app.post("/api/live/override-stations", async (request, reply) => {
+    const body = reasonSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({
+        error: "INVALID_REQUEST",
+        issues: body.error.issues,
+      });
+    }
+
+    try {
+      return manager.overrideStationReadiness(body.data.reason);
+    } catch (error) {
+      return conflict(
+        reply,
+        error instanceof Error ? error.message : "LIVE_ERROR",
+        "Station readiness override is not allowed from the current state.",
+      );
+    }
+  });
+
+  app.post("/api/live/emergency-hold", async (request, reply) => {
+    const body = reasonSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({
+        error: "INVALID_REQUEST",
+        issues: body.error.issues,
+      });
+    }
+
+    try {
+      return manager.emergencyHold(body.data.reason);
+    } catch (error) {
+      return conflict(
+        reply,
+        error instanceof Error ? error.message : "LIVE_ERROR",
+        "Emergency hold is not allowed from the current state.",
+      );
+    }
+  });
 
   simple("/api/live/confirm-stations", () => manager.confirmStations());
   simple("/api/live/start-round", () => manager.startRound());

@@ -2488,6 +2488,62 @@ function OperatorLivePanel({
 
   const questionPosition = snapshot.question?.position ?? null;
 
+  const runReasonAction = async (
+    path: string,
+    promptText: string,
+    confirmText: string,
+    successMessage: string,
+  ) => {
+    const reason = window.prompt(promptText, "");
+    if (!reason || reason.trim().length < 3) {
+      setError("يجب كتابة سبب واضح.");
+      setMessage(null);
+      return;
+    }
+
+    if (!window.confirm(confirmText)) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest(path, {
+        method: "POST",
+        body: JSON.stringify({
+          reason: reason.trim(),
+        }),
+      });
+      setMessage(successMessage);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تنفيذ الإجراء",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const overrideStations = async () =>
+    runReasonAction(
+      "/api/live/override-stations",
+      "اكتب سبب تجاوز Station Ready Check:",
+      "هذا Override طارئ وسيتم تسجيله في Audit. هل تريد المتابعة؟",
+      "تم اعتماد Station Ready Override وتسجيل السبب.",
+    );
+
+  const emergencyHold = async () =>
+    runReasonAction(
+      "/api/live/emergency-hold",
+      "اكتب سبب Emergency Hold:",
+      "سيتم إيقاف التسلسل الحالي بشكل صريح وتسجيل السبب. إذا كان السؤال فعالاً سيحتاج VOID + replacement. متابعة؟",
+      "تم تنفيذ Emergency Hold وتسجيل السبب.",
+    );
+
   const voidAndReplace = async () => {
     if (!snapshot.round || questionPosition === null) {
       return;
@@ -2703,7 +2759,8 @@ function OperatorLivePanel({
         {snapshot.phase === "QUESTION_CLOSED" &&
         snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
         snapshot.closeReason !== "SOLO_ANSWERED" &&
-        snapshot.closeReason !== "SERVER_RESTART_RECOVERY" ? (
+        snapshot.closeReason !== "SERVER_RESTART_RECOVERY" &&
+        snapshot.closeReason !== "EMERGENCY_HOLD" ? (
           <button
             className="primary"
             disabled={busy}
@@ -2750,6 +2807,17 @@ function OperatorLivePanel({
           </button>
         ) : null}
 
+        {(snapshot.phase === "QUESTION_COUNTDOWN" ||
+          snapshot.phase === "QUESTION_ACTIVE") ? (
+          <button
+            className="danger-button"
+            disabled={busy}
+            onClick={() => void emergencyHold()}
+          >
+            Emergency Hold — طارئ
+          </button>
+        ) : null}
+
         {(snapshot.phase === "ROUND_ACTIVE" ||
           snapshot.phase === "QUESTION_REVEAL") ? (
           <button
@@ -2779,12 +2847,17 @@ function OperatorLivePanel({
       ) : null}
 
       {snapshot.phase === "QUESTION_CLOSED" &&
-      snapshot.closeReason === "SERVER_RESTART_RECOVERY" ? (
+      (snapshot.closeReason === "SERVER_RESTART_RECOVERY" ||
+        snapshot.closeReason === "EMERGENCY_HOLD") ? (
         <div className="status-message error recovery-warning">
-          <strong>Recovery مطلوب</strong>
+          <strong>
+            {snapshot.closeReason === "EMERGENCY_HOLD"
+              ? "Emergency Hold مفعل"
+              : "Recovery مطلوب"}
+          </strong>
           <span>
-            السيرفر أعيد تشغيله أثناء سؤال فعال. لا يمكن Reveal لهذا السؤال.
-            استخدم VOID + استبدال بنفس المحور ثم START من جديد.
+            لا يمكن Reveal لهذا السؤال. استخدم VOID + استبدال بنفس المحور
+            ثم START من جديد.
           </span>
         </div>
       ) : null}
