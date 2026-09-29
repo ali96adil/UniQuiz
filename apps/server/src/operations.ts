@@ -17,6 +17,7 @@ import {
 } from "node:os";
 import Database from "better-sqlite3";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import type {
   OperationsBackupRecord,
   OperationsPreflightCheck,
@@ -25,10 +26,15 @@ import type {
   PresenceSnapshot,
   RuntimeMode,
 } from "@uniquiz/shared";
+import { appendAuditEvent } from "./audit.js";
 import { getCompetitionSnapshot } from "./competition.js";
 import type { AppDatabase } from "./database.js";
 import { getQuestionAllocationSummary } from "./question-bank.js";
 import type { OscOutputConfig } from "./osc-output.js";
+
+const oscConfirmSchema = z.object({
+  confirm: z.literal("OSC_TEST_RECEIVED"),
+});
 
 interface BackupMetadata extends OperationsBackupRecord {
   version: 1;
@@ -291,6 +297,81 @@ export async function isLocalServerRunning(
   }
 }
 
+export function getOscTestState(
+  db: AppDatabase,
+): {
+  sentAt: string | null;
+  confirmedAt: string | null;
+} {
+  return db.prepare(`
+    SELECT
+      osc_test_sent_at AS sentAt,
+      osc_test_confirmed_at AS confirmedAt
+    FROM operations_state
+    WHERE id = 1
+  `).get() as {
+    sentAt: string | null;
+    confirmedAt: string | null;
+  };
+}
+
+export function resetOscTestState(
+  db: AppDatabase,
+): void {
+  db.prepare(`
+    UPDATE operations_state
+    SET
+      osc_test_sent_at = NULL,
+      osc_test_confirmed_at = NULL,
+      updated_at = ?
+    WHERE id = 1
+  `).run(new Date().toISOString());
+}
+
+export function markOscTestSent(
+  db: AppDatabase,
+): void {
+  const sentAt = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE operations_state
+    SET
+      osc_test_sent_at = ?,
+      osc_test_confirmed_at = NULL,
+      updated_at = ?
+    WHERE id = 1
+  `).run(sentAt, sentAt);
+
+  appendAuditEvent(db, {
+    eventType: "OSC_TEST_SENT",
+    occurredAt: sentAt,
+  });
+}
+
+export function confirmOscTest(
+  db: AppDatabase,
+): void {
+  const state = getOscTestState(db);
+  if (!state.sentAt) {
+    throw new Error("OSC_TEST_NOT_SENT");
+  }
+
+  const confirmedAt = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE operations_state
+    SET
+      osc_test_confirmed_at = ?,
+      updated_at = ?
+    WHERE id = 1
+  `).run(confirmedAt, confirmedAt);
+
+  appendAuditEvent(db, {
+    eventType: "OSC_TEST_CONFIRMED",
+    occurredAt: confirmedAt,
+  });
+}
+
 function databaseQuickCheck(
   db: AppDatabase,
 ): boolean {
@@ -328,6 +409,14 @@ export function getOperationsPreflight(
   const allocation = getQuestionAllocationSummary(db);
   const latestBackup =
     listDatabaseBackups(databasePath)[0] ?? null;
+  const oscTest = getOscTestState(db);
+  const oscReady =
+    !osc.enabled ||
+    (
+      oscTest.sentAt !== null &&
+      oscTest.confirmedAt !== null &&
+      oscTest.confirmedAt >= oscTest.sentAt
+    );
 
   const nextRound =
     competition.rounds.find(
@@ -419,10 +508,14 @@ export function getOperationsPreflight(
       key: "osc",
       label: "OSC",
       required: osc.enabled,
-      ready: true,
-      detail: osc.enabled
-        ? `UDP target configured: ${osc.host}:${osc.port}. Delivery remains best-effort; confirm downstream reception during rehearsal.`
-        : "OSC is disabled and is not required.",
+      ready: oscReady,
+      detail: !osc.enabled
+        ? "OSC is disabled and is not required."
+        : oscReady
+          ? `OSC test confirmed for ${osc.host}:${osc.port}.`
+          : oscTest.sentAt
+            ? "OSC test was sent but downstream reception has not been confirmed."
+            : `OSC is enabled for ${osc.host}:${osc.port}; send and confirm a test cue.`,
     },
     {
       key: "backup",
@@ -516,8 +609,65 @@ export function registerOperationsRoutes(
     webPort: number;
     osc: OscOutputConfig;
     getPresence: () => PresenceSnapshot;
+    sendOscTest: () => void;
   },
 ): void {
+  resetOscTestState(db);
+
+  app.post("/api/operations/osc-test/send", async (_request, reply) => {
+    if (!options.osc.enabled) {
+      return reply.code(409).send({
+        error: "OSC_DISABLED",
+        message: "OSC is disabled.",
+      });
+    }
+
+    options.sendOscTest();
+    markOscTestSent(db);
+
+    return getOperationsPreflight(
+      db,
+      options.databasePath,
+      options.osc,
+      options.getPresence(),
+    );
+  });
+
+  app.post("/api/operations/osc-test/confirm", async (request, reply) => {
+    const body = oscConfirmSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({
+        error: "INVALID_OSC_CONFIRMATION",
+        issues: body.error.issues,
+      });
+    }
+
+    if (!options.osc.enabled) {
+      return reply.code(409).send({
+        error: "OSC_DISABLED",
+        message: "OSC is disabled.",
+      });
+    }
+
+    try {
+      confirmOscTest(db);
+    } catch (error) {
+      return reply.code(409).send({
+        error:
+          error instanceof Error
+            ? error.message
+            : "OSC_CONFIRMATION_FAILED",
+      });
+    }
+
+    return getOperationsPreflight(
+      db,
+      options.databasePath,
+      options.osc,
+      options.getPresence(),
+    );
+  });
+
   app.get("/api/operations/diagnostics", async () =>
     getOperationsDiagnostics({
       mode: options.mode,
