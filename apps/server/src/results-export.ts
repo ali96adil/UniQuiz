@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import ExcelJS from "exceljs";
 import type { AppDatabase } from "./database.js";
 import { getQualificationRanking } from "./ranking.js";
+import { QUESTION_DURATION_MS } from "./question-clock.js";
 import { getAudienceDisplaySettings } from "./audience-settings.js";
 
 function isCurrentCycleRevealedSql(alias: string): string {
@@ -40,11 +41,11 @@ export async function buildResultsWorkbook(
   summary.addRow(["venue", settings.venue]);
   summary.addRow(["season", settings.season]);
   summary.addRow(["generated_at", new Date().toISOString()]);
-  summary.addRow(["question_duration_seconds", 30]);
+  summary.addRow(["question_duration_seconds", QUESTION_DURATION_MS / 1000]);
   summary.addRow(["maximum_points", 25]);
   summary.addRow([
     "scoring",
-    "30–25 displayed seconds = 25 points; 24–1 = displayed second; wrong/no answer/expiry = 0",
+    "Correct answer = displayed remaining whole second (25–1 points); wrong/no answer/expiry = 0",
   ]);
 
   const rankingSheet = workbook.addWorksheet("Ranking");
@@ -53,6 +54,9 @@ export async function buildResultsWorkbook(
     "college",
     "status",
     "score_points",
+    "total_response_time_ms",
+    "correct_answers",
+    "wrong_answers",
     "revealed_questions",
   ]);
 
@@ -62,6 +66,9 @@ export async function buildResultsWorkbook(
       entry.college.name,
       entry.status,
       entry.status === "NOT_STARTED" ? "" : entry.scorePoints,
+      entry.status === "NOT_STARTED" ? "" : entry.totalResponseTimeMs,
+      entry.correctAnswers,
+      entry.wrongAnswers,
       entry.revealedQuestions,
     ]);
   }

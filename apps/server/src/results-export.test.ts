@@ -37,18 +37,33 @@ test("results workbook contains ranking, submissions and audit", async () => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as any);
 
+  const summary = workbook.getWorksheet("Summary");
   const ranking = workbook.getWorksheet("Ranking");
   const rounds = workbook.getWorksheet("Rounds");
   const submissions = workbook.getWorksheet("Submissions");
   const audit = workbook.getWorksheet("Audit");
 
+  assert.ok(summary);
   assert.ok(ranking);
   assert.ok(rounds);
   assert.ok(submissions);
   assert.ok(audit);
 
+  assert.equal(summary.getRow(7).getCell(2).value, 25);
+  assert.match(
+    summary.getRow(9).getCell(2).text,
+    /displayed remaining whole second/,
+  );
+
+  assert.equal(ranking.getRow(1).getCell(5).text, "total_response_time_ms");
+  assert.equal(ranking.getRow(1).getCell(6).text, "correct_answers");
+  assert.equal(ranking.getRow(1).getCell(7).text, "wrong_answers");
   assert.equal(ranking.getRow(2).getCell(2).text, "College A");
   assert.equal(ranking.getRow(2).getCell(4).value, 25);
+  assert.equal(ranking.getRow(2).getCell(5).value, 1000);
+  assert.equal(ranking.getRow(2).getCell(6).value, 1);
+  assert.equal(ranking.getRow(2).getCell(7).value, 0);
+  assert.equal(ranking.getRow(2).getCell(8).value, 1);
   assert.equal(rounds.getRow(2).getCell(5).value, 25);
   assert.equal(submissions.rowCount, 3);
   assert.equal(submissions.getRow(2).getCell(13).text, "yes");
