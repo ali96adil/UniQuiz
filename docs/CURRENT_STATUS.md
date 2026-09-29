@@ -69,9 +69,10 @@ PR #12 — M4: Live Session & Team Stations
 
 ## In progress
 - M4 real-device rehearsal on the Mac plus authenticated Team A/B browsers.
+- App-generated Excel import sample verified successfully on the isolated rehearsal database.
 
 ## Next action
-Pull the latest M4 branch on the Mac, open the tokenized Team A/B links on two browsers/devices, verify authenticated Station Ready Check, then run one complete live question through 3-2-1 → answer lock → early close/timeout → Reveal. If accepted, run the 10-question rehearsal and merge M4.
+On the isolated rehearsal database, create the 5-college official draw, lock the 30 imported questions into three rounds, verify the solo round is last, then open the tokenized Team A/B links and run the live flow. Station readiness is rechecked again at Start Round so a disconnect after confirmation cannot start a stale round.
 
 ## Blockers
 No current blocker.

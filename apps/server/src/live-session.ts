@@ -524,6 +524,32 @@ export class LiveSessionManager {
       throw new Error("ROUND_NOT_CONFIRMED");
     }
 
+    const round = this.roundRow(state.roundId);
+    if (!round) {
+      throw new Error("ROUND_NOT_FOUND");
+    }
+
+    if (!this.isStationConnected("team-a")) {
+      this.updateState({
+        phase: "ROUND_READY",
+        stationsConfirmed: false,
+      });
+      this.publish();
+      throw new Error("TEAM_A_NOT_READY");
+    }
+
+    if (
+      round.bId !== null &&
+      !this.isStationConnected("team-b")
+    ) {
+      this.updateState({
+        phase: "ROUND_READY",
+        stationsConfirmed: false,
+      });
+      this.publish();
+      throw new Error("TEAM_B_NOT_READY");
+    }
+
     this.db.prepare(`
       UPDATE qualification_rounds
       SET status = 'ACTIVE'

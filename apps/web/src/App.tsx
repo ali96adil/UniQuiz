@@ -1329,22 +1329,34 @@ function OperatorLivePanel({
             <strong>{questionPosition ?? "—"} / 10</strong>
           </div>
           <div>
-            <span>Team A</span>
+            <span>Station A</span>
             <strong>
+              {snapshot.stationReadiness.teamAConnected
+                ? "READY"
+                : "OFFLINE"}
+            </strong>
+            <small>
               {snapshot.answerStatus.teamAReceived
                 ? "تم استلام الإجابة"
                 : "بانتظار الإجابة"}
-            </strong>
+            </small>
           </div>
           <div>
-            <span>Team B</span>
+            <span>Station B</span>
             <strong>
+              {!snapshot.stationReadiness.teamBRequired
+                ? "SOLO — غير مطلوبة"
+                : snapshot.stationReadiness.teamBConnected
+                  ? "READY"
+                  : "OFFLINE"}
+            </strong>
+            <small>
               {!snapshot.answerStatus.teamBRequired
                 ? "غير مطلوبة"
                 : snapshot.answerStatus.teamBReceived
                   ? "تم استلام الإجابة"
                   : "بانتظار الإجابة"}
-            </strong>
+            </small>
           </div>
         </div>
       ) : null}

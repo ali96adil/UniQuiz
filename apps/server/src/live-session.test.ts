@@ -180,3 +180,52 @@ test("solo round requires only Team A and closes on its answer", async () => {
   await app.close();
   db.close();
 });
+
+
+test("start round rechecks station readiness after confirmation", () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+
+  let teamAConnected = true;
+  let teamBConnected = true;
+
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    45_000,
+    undefined,
+    (role) =>
+      role === "team-a"
+        ? teamAConnected
+        : teamBConnected,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  assert.equal(manager.getSnapshot().stationsConfirmed, true);
+
+  teamBConnected = false;
+
+  assert.throws(
+    () => manager.startRound(),
+    /TEAM_B_NOT_READY/,
+  );
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "ROUND_READY");
+  assert.equal(snapshot.stationsConfirmed, false);
+  assert.equal(snapshot.stationReadiness.teamAConnected, true);
+  assert.equal(snapshot.stationReadiness.teamBConnected, false);
+
+  teamBConnected = true;
+  manager.confirmStations();
+  manager.startRound();
+
+  assert.equal(manager.getSnapshot().phase, "ROUND_ACTIVE");
+
+  io.close();
+  void app.close();
+  db.close();
+});
