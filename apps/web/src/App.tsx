@@ -135,6 +135,8 @@ function BulkImportPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [questionMode, setQuestionMode] =
+    useState<"append" | "replace">("append");
 
   const previewFile = async () => {
     if (!file) return;
@@ -180,6 +182,25 @@ function BulkImportPanel({
   const applyImport = async () => {
     if (!preview?.valid) return;
 
+    const importsQuestions =
+      preview.kinds.includes("questions");
+    const importsCategories =
+      preview.kinds.includes("categories");
+    const effectiveQuestionMode =
+      importsQuestions && importsCategories
+        ? "replace"
+        : questionMode;
+
+    if (
+      importsQuestions &&
+      effectiveQuestionMode === "replace" &&
+      !window.confirm(
+        "استبدال بنك الأسئلة الحالي بالكامل؟ سيتم حذف الأسئلة الحالية قبل إدخال أسئلة الملف.",
+      )
+    ) {
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -189,6 +210,11 @@ function BulkImportPanel({
         method: "POST",
         body: JSON.stringify({
           previewId: preview.previewId,
+          questionMode:
+            preview.kinds.includes("questions") &&
+            preview.kinds.includes("categories")
+              ? "replace"
+              : questionMode,
         }),
       });
 
@@ -253,6 +279,10 @@ function BulkImportPanel({
             category_key · question · option_a · option_b · option_c ·
             option_d · correct_option · source_ref
           </code>
+          <small className="muted">
+            category_key يقبل المفتاح الداخلي أو اسم المحور الظاهر، مثل
+            «تاريخ» أو «جغرافيا».
+          </small>
         </div>
         <div>
           <strong>Categories</strong>
@@ -274,6 +304,7 @@ function BulkImportPanel({
             setPreview(null);
             setError(null);
             setMessage(null);
+            setQuestionMode("append");
           }}
         />
         <button
@@ -344,6 +375,37 @@ function BulkImportPanel({
             </div>
           ) : null}
 
+          {preview.kinds.includes("questions") ? (
+            preview.kinds.includes("categories") ? (
+              <div className="import-mode-note">
+                هذا الملف يحتوي Categories وQuestions؛ سيتم استبدال
+                المحاور وبنك الأسئلة معًا عند الاعتماد.
+              </div>
+            ) : (
+              <div className="import-mode">
+                <strong>طريقة إدخال الأسئلة</strong>
+                <label>
+                  <input
+                    type="radio"
+                    name="question-import-mode"
+                    checked={questionMode === "append"}
+                    onChange={() => setQuestionMode("append")}
+                  />
+                  إضافة إلى بنك الأسئلة الحالي
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="question-import-mode"
+                    checked={questionMode === "replace"}
+                    onChange={() => setQuestionMode("replace")}
+                  />
+                  استبدال بنك الأسئلة بالكامل
+                </label>
+              </div>
+            )
+          ) : null}
+
           <div className="import-samples">
             {preview.samples.colleges.length > 0 ? (
               <div>
@@ -382,6 +444,7 @@ function BulkImportPanel({
             {questionBank.categories.map((category) => (
               <span key={category.key}>
                 {category.name}: {category.questionCount}
+                <small> · key: {category.key}</small>
               </span>
             ))}
           </div>

@@ -1275,3 +1275,31 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.import-mode,
+.import-mode-note {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.52);
+}
+
+.import-mode {
+  display: grid;
+  gap: 10px;
+}
+
+.import-mode label {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: #cbd5e1;
+}
+
+.import-mode-note {
+  color: #fde68a;
+}
+
+.question-bank-summary small {
+  color: #64748b;
+}

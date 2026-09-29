@@ -70,6 +70,7 @@ Pending creation for M5 implementation
 
 ## In progress
 - M5 audience branding/settings, round-total presentation, transition polish and real external-screen verification.
+- Importer usability fix: questions-only imports accept category names or keys and default to append instead of replacing the existing bank.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
 - Team reveal displays the full correct answer text plus option letter.
