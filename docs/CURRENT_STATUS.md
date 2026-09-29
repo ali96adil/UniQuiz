@@ -68,8 +68,7 @@ PR #12 — M4: Live Session & Team Stations
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- Official question timing changed to 30 seconds with whole-number scoring: 25 max while timer shows 30–25, then one point per displayed second down to 1; expiry = 0.
-- M4 real-device rehearsal on the Mac plus authenticated Team A/B browsers.
+- M4 complete and ready to merge; next milestone is M5 Audience Display & Ranking.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
 - Team reveal displays the full correct answer text plus option letter.
@@ -77,7 +76,10 @@ PR #12 — M4: Live Session & Team Stations
 - Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-On the isolated rehearsal database, create the 5-college official draw, lock the 30 imported questions into three rounds, verify the solo round is last, then open the tokenized Team A/B links and run the live flow. Station readiness is rechecked again at Start Round so a disconnect after confirmation cannot start a stale round.
+Merge M4, then start M5 Audience Display & Ranking by binding `/display` to the live round/question state, countdown, answer-received state and reveal results.
+
+## Completed
+- CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
 
 ## Blockers
 No current blocker.
