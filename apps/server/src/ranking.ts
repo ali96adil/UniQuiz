@@ -89,21 +89,15 @@ export function getQualificationRanking(
       if (b.scoreMicros !== a.scoreMicros) {
         return b.scoreMicros - a.scoreMicros;
       }
+      if (a.totalResponseTimeMs !== b.totalResponseTimeMs) {
+        return a.totalResponseTimeMs - b.totalResponseTimeMs;
+      }
       return a.sortOrder - b.sortOrder;
     });
 
-  let previousScore: number | null = null;
-  let previousRank = 0;
-
   const rankedStarted: QualificationRankingEntry[] = started.map(
     (row, index) => {
-      const rank =
-        previousScore !== null && row.scoreMicros === previousScore
-          ? previousRank
-          : index + 1;
-
-      previousScore = row.scoreMicros;
-      previousRank = rank;
+      const rank = index + 1;
 
       return {
         college: {
