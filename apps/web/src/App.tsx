@@ -225,6 +225,13 @@ function BulkImportPanel({
           </a>
           <a
             className="button-link"
+            href="/api/import/sample.xlsx"
+            download
+          >
+            تحميل ملف اختبار Excel
+          </a>
+          <a
+            className="button-link"
             href="/api/export/data.xlsx"
             download
           >
