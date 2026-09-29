@@ -1625,6 +1625,14 @@ function AudienceBroadcastFrame({
           {settings.eventSubtitle ? (
             <span>{settings.eventSubtitle}</span>
           ) : null}
+          <div className="audience-patronage">
+            <span>
+              برعاية السيد رئيس جامعة بابل الأستاذ الدكتور أمين عجيل ياسر الياسري المحترم
+            </span>
+            <span>
+              وإشراف الأستاذ الدكتور ميثاق طالب عبد الجبوري مساعد رئيس الجامعة للشؤون الإدارية المحترم
+            </span>
+          </div>
           {meta ? <small>{meta}</small> : null}
         </div>
         <div className="audience-brand-logo">
@@ -2111,23 +2119,6 @@ function AudienceLiveSurface({
           <h2 className="audience-title">
             {settings.copy.finalRankingTitle}
           </h2>
-
-          {totals ? (
-            <div className="audience-round-totals compact">
-              <div>
-                <span>{round.teamA.name}</span>
-                <strong>{totals.teamA}</strong>
-                <small>{settings.copy.pointsLabel}</small>
-              </div>
-              {round.teamB && totals.teamB !== null ? (
-                <div>
-                  <span>{round.teamB.name}</span>
-                  <strong>{totals.teamB}</strong>
-                  <small>{settings.copy.pointsLabel}</small>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
 
           <div className="audience-final-podium">
             {finalists.map((entry) => (
