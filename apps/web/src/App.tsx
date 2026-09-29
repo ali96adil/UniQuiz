@@ -2,17 +2,21 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
+  AudiencePresentationSnapshot,
   BulkImportPreview,
   ClientRole,
   CompetitionSetupSnapshot,
   DrawPresentationEvent,
   LiveSnapshot,
   LiveTeamSubmissionState,
+  OperationsDiagnosticsSnapshot,
+  OperationsPreflightSnapshot,
   QualificationRankingSnapshot,
   PresenceSnapshot,
   QualificationRound,
   QuestionAllocationSummary,
   QuestionBankSummary,
+  RuntimeMode,
   StationPresence,
 } from "@uniquiz/shared";
 
@@ -2291,6 +2295,382 @@ interface StationCredentialResponse {
   teamB: { station: "B"; token: string } | null;
 }
 
+
+
+function AudienceAnnouncementSurface({
+  presentation,
+}: {
+  presentation: AudiencePresentationSnapshot;
+}) {
+  return (
+    <section className="audience-stage audience-announcement">
+      <div className="audience-kicker">UniQuiz</div>
+      <h2 className="audience-title">
+        {presentation.title}
+      </h2>
+      {presentation.message ? (
+        <p className="audience-copy">
+          {presentation.message}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function PresentationControlPanel() {
+  const [customTitle, setCustomTitle] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const show = async (
+    kind:
+      | "BREAK"
+      | "PLEASE_WAIT"
+      | "NEXT_ROUND"
+      | "PREPARE_TEAMS"
+      | "FINAL_RESULTS_SOON"
+      | "CUSTOM",
+    title?: string,
+    text?: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/presentation/show", {
+        method: "POST",
+        body: JSON.stringify({
+          kind,
+          title,
+          message: text,
+        }),
+      });
+      setMessage("تم عرض المشهد على شاشة الجمهور.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر عرض المشهد",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clear = async () => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await apiRequest("/api/presentation/clear", {
+        method: "POST",
+        body: "{}",
+      });
+      setMessage("تم الرجوع إلى المشهد الحي.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إغلاق المشهد",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel presentation-control-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Audience Presentation</p>
+          <h2>مشاهد شاشة الجمهور</h2>
+        </div>
+      </div>
+
+      <div className="presentation-presets">
+        <button disabled={busy} onClick={() => void show("BREAK")}>
+          استراحة قصيرة
+        </button>
+        <button disabled={busy} onClick={() => void show("PLEASE_WAIT")}>
+          يرجى الانتظار
+        </button>
+        <button disabled={busy} onClick={() => void show("PREPARE_TEAMS")}>
+          استعداد الفرق
+        </button>
+        <button disabled={busy} onClick={() => void show("NEXT_ROUND")}>
+          الجولة القادمة
+        </button>
+        <button disabled={busy} onClick={() => void show("FINAL_RESULTS_SOON")}>
+          النتائج قريبًا
+        </button>
+      </div>
+
+      <div className="presentation-custom">
+        <input
+          value={customTitle}
+          placeholder="عنوان رسالة مخصصة"
+          onChange={(event) => setCustomTitle(event.target.value)}
+        />
+        <input
+          value={customMessage}
+          placeholder="نص الرسالة"
+          onChange={(event) => setCustomMessage(event.target.value)}
+        />
+        <button
+          disabled={busy || customTitle.trim().length === 0}
+          onClick={() =>
+            void show(
+              "CUSTOM",
+              customTitle.trim(),
+              customMessage.trim(),
+            )
+          }
+        >
+          عرض الرسالة المخصصة
+        </button>
+      </div>
+
+      <div className="actions">
+        <button
+          className="danger-outline"
+          disabled={busy}
+          onClick={() => void clear()}
+        >
+          إغلاق المشهد والرجوع للبث الحي
+        </button>
+      </div>
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
+function OperationsPreflightPanel() {
+  const [snapshot, setSnapshot] =
+    useState<OperationsPreflightSnapshot | null>(null);
+  const [diagnostics, setDiagnostics] =
+    useState<OperationsDiagnosticsSnapshot | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    try {
+      const [next, diagnosticSnapshot] =
+        await Promise.all([
+          apiRequest<OperationsPreflightSnapshot>(
+            "/api/operations/preflight",
+          ),
+          apiRequest<OperationsDiagnosticsSnapshot>(
+            "/api/operations/diagnostics",
+          ),
+        ]);
+      setSnapshot(next);
+      setDiagnostics(diagnosticSnapshot);
+      setError(null);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر قراءة Preflight",
+      );
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const createBackup = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest("/api/operations/backup", {
+        method: "POST",
+        body: "{}",
+      });
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إنشاء النسخة الاحتياطية",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendOscTest = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest("/api/operations/osc-test/send", {
+        method: "POST",
+        body: "{}",
+      });
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إرسال OSC Test",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmOscTest = async () => {
+    if (
+      !window.confirm(
+        "أكد فقط إذا شاهدت أو استلمت /uniquiz/system/test على نظام OSC.",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest("/api/operations/osc-test/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          confirm: "OSC_TEST_RECEIVED",
+        }),
+      });
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تأكيد OSC Test",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel preflight-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Event-Day Preflight</p>
+          <h2>جاهزية النظام</h2>
+        </div>
+        <span
+          className={[
+            "preflight-summary",
+            snapshot?.ready ? "ready" : "not-ready",
+          ].join(" ")}
+        >
+          {snapshot?.ready ? "READY" : "NOT READY"}
+        </span>
+      </div>
+
+      <div className="preflight-grid">
+        {snapshot?.checks.map((check) => (
+          <div
+            className={[
+              "preflight-check",
+              check.ready ? "ready" : "not-ready",
+              check.required ? "required" : "optional",
+            ].join(" ")}
+            key={check.key}
+          >
+            <div>
+              <strong>{check.label}</strong>
+              <span>
+                {check.required ? "مطلوب" : "اختياري"}
+              </span>
+            </div>
+            <b>{check.ready ? "READY" : "NOT READY"}</b>
+            <small>{check.detail}</small>
+          </div>
+        )) ?? <p>بانتظار فحص الجاهزية...</p>}
+      </div>
+
+      <div className="actions">
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() => void createBackup()}
+        >
+          إنشاء Backup موثّق الآن
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => void refresh()}
+        >
+          إعادة فحص الجاهزية
+        </button>
+        <a
+          className="button-link"
+          href="/api/export/results.xlsx"
+          download
+        >
+          تصدير النتائج + Audit
+        </a>
+      </div>
+
+      {snapshot?.latestBackup ? (
+        <p className="muted">
+          آخر Backup: {snapshot.latestBackup.fileName} ·{" "}
+          {Math.round(
+            snapshot.latestBackup.sizeBytes / 1024,
+          )} KB
+        </p>
+      ) : null}
+
+
+      {diagnostics ? (
+        <details className="network-diagnostics">
+          <summary>LAN / Network Diagnostics</summary>
+          <div className="network-diagnostics-meta">
+            <span>Host: {diagnostics.hostname}</span>
+            <span>Mode: {diagnostics.mode.toUpperCase()}</span>
+            <span>Node: {diagnostics.nodeVersion}</span>
+            <span>DB: {diagnostics.databaseFileName}</span>
+            <span>
+              OSC:{" "}
+              {diagnostics.osc.enabled
+                ? `${diagnostics.osc.host}:${diagnostics.osc.port}`
+                : "Disabled"}
+            </span>
+          </div>
+
+          <div className="network-url-list">
+            {diagnostics.interfaces.length > 0 ? (
+              diagnostics.interfaces.map((entry) => (
+                <div key={`${entry.name}:${entry.address}`}>
+                  <strong>
+                    {entry.name} · {entry.address}
+                  </strong>
+                  <code>{entry.webBaseUrl}/operator</code>
+                  <code>{entry.webBaseUrl}/display</code>
+                  <code>{entry.serverHealthUrl}</code>
+                </div>
+              ))
+            ) : (
+              <p className="muted">
+                لا توجد واجهة IPv4 LAN غير داخلية حاليًا.
+              </p>
+            )}
+          </div>
+        </details>
+      ) : null}
+
+      <StatusMessage error={error} message={null} />
+    </section>
+  );
+}
+
 function StationAccessPanel() {
   const [credentials, setCredentials] =
     useState<StationCredentialResponse | null>(null);
@@ -2436,6 +2816,250 @@ function StationPortal() {
 }
 
 
+function OperatorHotkeys({
+  snapshot,
+  busy,
+  run,
+  emergencyHold,
+  voidAndReplace,
+}: {
+  snapshot: LiveSnapshot;
+  busy: boolean;
+  run: (path: string, successMessage: string) => Promise<void>;
+  emergencyHold: () => Promise<void>;
+  voidAndReplace: () => Promise<void>;
+}) {
+  const [enabled, setEnabled] = useState(false);
+  const [lastAction, setLastAction] = useState<string | null>(null);
+
+  const confirmAndRun = async (
+    message: string,
+    path: string,
+    successMessage: string,
+  ) => {
+    if (!window.confirm(message)) {
+      return;
+    }
+    await run(path, successMessage);
+  };
+
+  useEffect(() => {
+    if (!enabled || busy) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable
+        )
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const consume = () => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+
+      if (key === "n") {
+        if (
+          snapshot.phase === "IDLE" ||
+          (snapshot.phase === "ROUND_COMPLETE" &&
+            snapshot.hasPendingRound)
+        ) {
+          consume();
+          setLastAction("Alt+N · تجهيز الجولة القادمة");
+          void run(
+            "/api/live/prepare-round",
+            "تم تجهيز الجولة القادمة.",
+          );
+          return;
+        }
+
+        if (
+          snapshot.phase === "ROUND_READY" &&
+          !snapshot.stationsConfirmed
+        ) {
+          consume();
+          setLastAction("Alt+N · تأكيد المحطات");
+          void run(
+            "/api/live/confirm-stations",
+            "تم تأكيد توزيع المحطات.",
+          );
+          return;
+        }
+
+        if (
+          snapshot.phase === "ROUND_ACTIVE" ||
+          snapshot.phase === "INTERMISSION" ||
+          (
+            snapshot.phase === "QUESTION_REVEAL" &&
+            (snapshot.question?.position ?? 0) < 10
+          )
+        ) {
+          consume();
+          setLastAction("Alt+N · تجهيز السؤال التالي");
+          void run(
+            "/api/live/start-next-question",
+            "بدأ السؤال التالي مباشرةً بالعد التنازلي 3-2-1.",
+          );
+        }
+        return;
+      }
+
+      if (key === "s") {
+        if (
+          snapshot.phase === "ROUND_READY" &&
+          snapshot.stationsConfirmed
+        ) {
+          consume();
+          setLastAction("Alt+S · بدء الجولة");
+          void confirmAndRun(
+            "بدء الجولة الآن؟",
+            "/api/live/start-round",
+            "بدأت الجولة.",
+          );
+          return;
+        }
+
+        if (snapshot.phase === "QUESTION_READY") {
+          consume();
+          setLastAction("Alt+S · START السؤال");
+          void confirmAndRun(
+            "بدء العد 3-2-1 وإظهار السؤال للمتسابقين؟",
+            "/api/live/start-question",
+            "بدأ العد التنازلي 3-2-1.",
+          );
+        }
+        return;
+      }
+
+      if (
+        key === "r" &&
+        snapshot.phase === "QUESTION_CLOSED" &&
+        snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
+        snapshot.closeReason !== "SOLO_ANSWERED" &&
+        snapshot.closeReason !== "TIMEOUT" &&
+        snapshot.closeReason !== "SERVER_RESTART_RECOVERY" &&
+        snapshot.closeReason !== "EMERGENCY_HOLD"
+      ) {
+        consume();
+        setLastAction("Alt+R · Reveal");
+        void confirmAndRun(
+          "إعلان نتيجة السؤال الآن؟",
+          "/api/live/reveal",
+          "تم إظهار الإجابة.",
+        );
+        return;
+      }
+
+      if (
+        key === "h" &&
+        (
+          snapshot.phase === "QUESTION_COUNTDOWN" ||
+          snapshot.phase === "QUESTION_ACTIVE"
+        )
+      ) {
+        consume();
+        setLastAction("Alt+H · Emergency Hold");
+        void emergencyHold();
+        return;
+      }
+
+      if (
+        key === "v" &&
+        snapshot.question?.position != null &&
+        [
+          "QUESTION_READY",
+          "QUESTION_CLOSED",
+          "QUESTION_REVEAL",
+          "INTERMISSION",
+        ].includes(snapshot.phase)
+      ) {
+        consume();
+        setLastAction("Alt+V · VOID + replacement");
+        void voidAndReplace();
+        return;
+      }
+
+      if (
+        key === "c" &&
+        snapshot.phase === "QUESTION_REVEAL" &&
+        snapshot.question?.position === 10
+      ) {
+        consume();
+        setLastAction("Alt+C · إنهاء الجولة");
+        void confirmAndRun(
+          "إنهاء الجولة واعتماد مجموعها الآن؟",
+          "/api/live/complete-round",
+          "تم إنهاء الجولة.",
+        );
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    enabled,
+    busy,
+    snapshot,
+    run,
+    emergencyHold,
+    voidAndReplace,
+  ]);
+
+  return (
+    <div className="operator-hotkeys">
+      <label>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => {
+            setEnabled(event.target.checked);
+            setLastAction(null);
+          }}
+        />
+        تفعيل اختصارات الأوبريتر لهذه الجلسة فقط
+      </label>
+
+      {enabled ? (
+        <>
+          <div className="hotkey-legend">
+            <kbd>Alt+N</kbd><span>التالي / تجهيز</span>
+            <kbd>Alt+S</kbd><span>START</span>
+            <kbd>Alt+R</kbd><span>Reveal</span>
+            <kbd>Alt+H</kbd><span>Emergency Hold</span>
+            <kbd>Alt+V</kbd><span>VOID + replacement</span>
+            <kbd>Alt+C</kbd><span>إنهاء الجولة</span>
+          </div>
+          <small>
+            START وReveal وإنهاء الجولة تبقى بتأكيد. Emergency Hold وVOID
+            يبقيان بسبب إلزامي + تأكيد. الاختصارات لا تعمل أثناء الكتابة
+            داخل الحقول.
+          </small>
+          {lastAction ? (
+            <small className="hotkey-last-action">
+              آخر اختصار: {lastAction}
+            </small>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+
 function OperatorLivePanel({
   snapshot,
 }: {
@@ -2480,6 +3104,116 @@ function OperatorLivePanel({
   };
 
   const questionPosition = snapshot.question?.position ?? null;
+
+  const runReasonAction = async (
+    path: string,
+    promptText: string,
+    confirmText: string,
+    successMessage: string,
+  ) => {
+    const reason = window.prompt(promptText, "");
+    if (!reason || reason.trim().length < 3) {
+      setError("يجب كتابة سبب واضح.");
+      setMessage(null);
+      return;
+    }
+
+    if (!window.confirm(confirmText)) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest(path, {
+        method: "POST",
+        body: JSON.stringify({
+          reason: reason.trim(),
+        }),
+      });
+      setMessage(successMessage);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تنفيذ الإجراء",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const overrideStations = async () =>
+    runReasonAction(
+      "/api/live/override-stations",
+      "اكتب سبب تجاوز Station Ready Check:",
+      "هذا Override طارئ وسيتم تسجيله في Audit. هل تريد المتابعة؟",
+      "تم اعتماد Station Ready Override وتسجيل السبب.",
+    );
+
+  const emergencyHold = async () =>
+    runReasonAction(
+      "/api/live/emergency-hold",
+      "اكتب سبب Emergency Hold:",
+      "سيتم إيقاف التسلسل الحالي بشكل صريح وتسجيل السبب. إذا كان السؤال فعالاً سيحتاج VOID + replacement. متابعة؟",
+      "تم تنفيذ Emergency Hold وتسجيل السبب.",
+    );
+
+  const voidAndReplace = async () => {
+    if (!snapshot.round || questionPosition === null) {
+      return;
+    }
+
+    const reason = window.prompt(
+      "سبب إلغاء السؤال واستبداله بنفس المحور:",
+      snapshot.closeReason === "SERVER_RESTART_RECOVERY"
+        ? "Server restart during active question"
+        : "",
+    );
+
+    if (!reason || reason.trim().length < 3) {
+      setError("يجب كتابة سبب واضح للإلغاء والاستبدال.");
+      setMessage(null);
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "سيتم VOID للسؤال الحالي وحذف إجاباته التشغيلية من النتيجة، مع الاحتفاظ بالتاريخ في Audit، ثم اختيار سؤال بديل من نفس المحور. متابعة؟",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/question-bank/void-replace", {
+        method: "POST",
+        body: JSON.stringify({
+          roundId: snapshot.round.id,
+          position: questionPosition,
+          reason: reason.trim(),
+          confirm: "VOID_AND_REPLACE",
+        }),
+      });
+      setMessage(
+        "تم VOID للسؤال وتجهيز بديل من نفس المحور. السؤال البديل جاهز لـ START.",
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إلغاء السؤال واستبداله",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <section className="panel live-operator-panel">
@@ -2555,6 +3289,14 @@ function OperatorLivePanel({
           </div>
         </div>
       ) : null}
+
+      <OperatorHotkeys
+        snapshot={snapshot}
+        busy={busy}
+        run={run}
+        emergencyHold={emergencyHold}
+        voidAndReplace={voidAndReplace}
+      />
 
       <div className="actions live-actions">
         {(snapshot.phase === "IDLE" ||
@@ -2642,7 +3384,9 @@ function OperatorLivePanel({
         {snapshot.phase === "QUESTION_CLOSED" &&
         snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
         snapshot.closeReason !== "SOLO_ANSWERED" &&
-        snapshot.closeReason !== "TIMEOUT" ? (
+        snapshot.closeReason !== "TIMEOUT" &&
+        snapshot.closeReason !== "SERVER_RESTART_RECOVERY" &&
+        snapshot.closeReason !== "EMERGENCY_HOLD" ? (
           <button
             className="primary"
             disabled={busy}
@@ -2654,6 +3398,22 @@ function OperatorLivePanel({
             }
           >
             Reveal الإجابة
+          </button>
+        ) : null}
+
+        {questionPosition !== null &&
+        [
+          "QUESTION_READY",
+          "QUESTION_CLOSED",
+          "QUESTION_REVEAL",
+          "INTERMISSION",
+        ].includes(snapshot.phase) ? (
+          <button
+            className="danger-outline"
+            disabled={busy}
+            onClick={() => void voidAndReplace()}
+          >
+            VOID + استبدال بنفس المحور
           </button>
         ) : null}
 
@@ -2689,6 +3449,17 @@ function OperatorLivePanel({
           </button>
         ) : null}
 
+        {(snapshot.phase === "QUESTION_COUNTDOWN" ||
+          snapshot.phase === "QUESTION_ACTIVE") ? (
+          <button
+            className="danger-button"
+            disabled={busy}
+            onClick={() => void emergencyHold()}
+          >
+            Emergency Hold — طارئ
+          </button>
+        ) : null}
+
         {(snapshot.phase === "ROUND_ACTIVE" ||
           snapshot.phase === "QUESTION_REVEAL") ? (
           <button
@@ -2715,6 +3486,22 @@ function OperatorLivePanel({
         <p className="locked-note">
           السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 25 ثانية.
         </p>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_CLOSED" &&
+      (snapshot.closeReason === "SERVER_RESTART_RECOVERY" ||
+        snapshot.closeReason === "EMERGENCY_HOLD") ? (
+        <div className="status-message error recovery-warning">
+          <strong>
+            {snapshot.closeReason === "EMERGENCY_HOLD"
+              ? "Emergency Hold مفعل"
+              : "Recovery مطلوب"}
+          </strong>
+          <span>
+            لا يمكن Reveal لهذا السؤال. استخدم VOID + استبدال بنفس المحور
+            ثم START من جديد.
+          </span>
+        </div>
       ) : null}
 
       {snapshot.phase === "QUESTION_CLOSED" &&
@@ -3301,10 +4088,14 @@ export function App() {
     useState<QualificationRankingSnapshot | null>(null);
   const [audienceSettings, setAudienceSettings] =
     useState<AudienceDisplaySettings | null>(null);
+  const [audiencePresentation, setAudiencePresentation] =
+    useState<AudiencePresentationSnapshot | null>(null);
   const [liveSocket, setLiveSocket] =
     useState<ReturnType<typeof io> | null>(null);
   const [effectiveRole, setEffectiveRole] =
     useState<ClientRole>("unknown");
+  const [runtimeMode, setRuntimeMode] =
+    useState<RuntimeMode>("official");
 
   useEffect(() => {
     const displayMode = surface === "display";
@@ -3369,8 +4160,12 @@ export function App() {
     });
     socket.on(
       "server:hello",
-      (payload: { role: ClientRole }) => {
+      (payload: {
+        role: ClientRole;
+        mode: RuntimeMode;
+      }) => {
         setEffectiveRole(payload.role);
+        setRuntimeMode(payload.mode);
       },
     );
     socket.on("presence:snapshot", (snapshot: PresenceSnapshot) => {
@@ -3410,6 +4205,12 @@ export function App() {
       "audience:settings",
       (settings: AudienceDisplaySettings) => {
         setAudienceSettings(settings);
+      },
+    );
+    socket.on(
+      "audience:presentation",
+      (presentation: AudiencePresentationSnapshot) => {
+        setAudiencePresentation(presentation);
       },
     );
     socket.on(
@@ -3485,6 +4286,12 @@ export function App() {
               : "shell"
       }
     >
+      {runtimeMode === "rehearsal" ? (
+        <div className="rehearsal-banner">
+          REHEARSAL · تدريب — البيانات والنتائج معزولة عن الرسمي
+        </div>
+      ) : null}
+
       {surface !== "display" &&
       surface !== "report" &&
       surface !== "team-a" &&
@@ -3558,7 +4365,15 @@ export function App() {
       competition &&
       audienceSettings ? (
         <AudienceBroadcastFrame settings={audienceSettings}>
-          {liveSnapshot &&
+          {audiencePresentation?.active ? (
+            <AudienceSceneTransition
+              sceneKey={`presentation:${audiencePresentation.updatedAt}`}
+            >
+              <AudienceAnnouncementSurface
+                presentation={audiencePresentation}
+              />
+            </AudienceSceneTransition>
+          ) : liveSnapshot &&
           liveSnapshot.phase !== "IDLE" ? (
             <AudienceSceneTransition
               sceneKey={[
@@ -3610,6 +4425,8 @@ export function App() {
 
       {surface === "operator" ? (
         <>
+          <PresentationControlPanel />
+          <OperationsPreflightPanel />
           <OperatorLivePanel snapshot={liveSnapshot} />
           <StationAccessPanel />
         </>
