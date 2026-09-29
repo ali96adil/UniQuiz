@@ -320,6 +320,60 @@ test("automatically reveals only after all required teams answer", async () => {
 });
 
 
+test("timeout automatically reveals and preserves unanswered result as zero", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+
+  const events: string[] = [];
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    12,
+    {
+      send(address) {
+        events.push(address);
+      },
+    },
+    () => true,
+    8,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  manager.submitAnswer("team-a", "B");
+
+  await new Promise((resolve) => setTimeout(resolve, 35));
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_REVEAL");
+  assert.equal(snapshot.closeReason, "TIMEOUT");
+  assert.equal(snapshot.revealResults?.teamA.answered, true);
+  assert.equal(snapshot.revealResults?.teamB?.answered, false);
+  assert.equal(snapshot.revealResults?.teamB?.scorePoints, 0);
+
+  const timeoutIndex = events.lastIndexOf(
+    "/uniquiz/question/timeout",
+  );
+  const revealIndex = events.lastIndexOf(
+    "/uniquiz/question/reveal",
+  );
+  assert.ok(timeoutIndex >= 0);
+  assert.ok(revealIndex > timeoutIndex);
+
+  manager.dispose();
+  io.close();
+  await app.close();
+  db.close();
+});
+
+
 test("reveal results stay hidden until reveal", async () => {
   const db = seedLiveRound();
   const app = Fastify();

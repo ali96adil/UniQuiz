@@ -1901,7 +1901,9 @@ function AudienceLiveSurface({
       className={[
         "audience-team-result",
         result?.isCorrect === true ? "correct" : "",
-        result?.isCorrect === false ? "wrong" : "",
+        result?.answered === false || result?.isCorrect === false
+          ? "wrong"
+          : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -2167,10 +2169,15 @@ function AudienceLiveSurface({
 
     const nextRound =
       competition.rounds.find(
-        (candidate) => candidate.id === competition.nextRoundId,
+        (candidate) =>
+          candidate.id === competition.nextRoundId &&
+          candidate.id !== round.id &&
+          candidate.status === "PENDING",
       ) ??
       competition.rounds.find(
-        (candidate) => candidate.status === "PENDING",
+        (candidate) =>
+          candidate.id !== round.id &&
+          candidate.status === "PENDING",
       ) ??
       null;
 
@@ -2604,7 +2611,8 @@ function OperatorLivePanel({
 
         {snapshot.phase === "QUESTION_CLOSED" &&
         snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
-        snapshot.closeReason !== "SOLO_ANSWERED" ? (
+        snapshot.closeReason !== "SOLO_ANSWERED" &&
+        snapshot.closeReason !== "TIMEOUT" ? (
           <button
             className="primary"
             disabled={busy}
@@ -2685,6 +2693,13 @@ function OperatorLivePanel({
         <p className="locked-note">
           اكتملت الإجابات المطلوبة. تم إرسال OSC وسيتم إعلان النتيجة
           تلقائيًا بعد لحظة قصيرة.
+        </p>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_CLOSED" &&
+      snapshot.closeReason === "TIMEOUT" ? (
+        <p className="locked-note">
+          انتهى وقت الإجابة. سيتم إعلان النتيجة تلقائيًا بعد لحظة قصيرة.
         </p>
       ) : null}
 
@@ -2865,7 +2880,7 @@ function OfficialResultsReport({
 
       <div className="report-meta">
         <span>
-          <b>عدد الكليات:</b> {finalEntries.length}
+          <b>عدد الكليات المشاركة:</b> {finalEntries.length}
         </span>
         <span>
           <b>تاريخ ووقت إصدار البيان:</b> {issuedAt}
@@ -2915,7 +2930,8 @@ function OfficialResultsReport({
             <th>الكلية</th>
             <th>المجموع</th>
             <th>مجموع زمن الإجابات</th>
-            <th>الأسئلة المحتسبة</th>
+            <th>الإجابات الصحيحة</th>
+            <th>الإجابات الخاطئة</th>
           </tr>
         </thead>
         <tbody>
@@ -2934,7 +2950,8 @@ function OfficialResultsReport({
               <td>
                 {(entry.totalResponseTimeMs / 1000).toFixed(3)} ثانية
               </td>
-              <td>{entry.revealedQuestions} / 10</td>
+              <td>{entry.correctAnswers}</td>
+              <td>{entry.wrongAnswers}</td>
             </tr>
           ))}
         </tbody>
@@ -3001,6 +3018,13 @@ function TeamLivePanel({
     station === "A"
       ? snapshot.round?.teamA ?? null
       : snapshot.round?.teamB ?? null;
+
+  const teamRevealResult =
+    snapshot.revealResults === null
+      ? null
+      : station === "A"
+        ? snapshot.revealResults.teamA
+        : snapshot.revealResults.teamB;
 
   const serverNow = now + serverOffsetMs;
   const countdownValue =
@@ -3164,6 +3188,18 @@ function TeamLivePanel({
               {teamState.responseTimeMs !== null
                 ? ` — ${(teamState.responseTimeMs / 1000).toFixed(3)} ثانية`
                 : ""}
+              {snapshot.phase === "QUESTION_REVEAL" &&
+              teamRevealResult !== null
+                ? ` — ${teamRevealResult.scorePoints} نقطة`
+                : ""}
+            </div>
+          ) : null}
+
+          {snapshot.phase === "QUESTION_REVEAL" &&
+          teamRevealResult?.answered === false ? (
+            <div className="answer-locked wrong unanswered-result">
+              <strong>لم تتم الإجابة</strong>
+              <span>0 نقطة</span>
             </div>
           ) : null}
         </>

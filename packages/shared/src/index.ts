@@ -247,6 +247,8 @@ export interface QualificationRankingEntry {
   scorePoints: number;
   revealedQuestions: number;
   totalResponseTimeMs: number;
+  correctAnswers: number;
+  wrongAnswers: number;
 }
 
 export interface QualificationRankingSnapshot {

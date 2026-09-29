@@ -14,6 +14,8 @@ interface RankingRow {
   scoreMicros: number;
   revealedQuestions: number;
   totalResponseTimeMs: number;
+  correctAnswers: number;
+  wrongAnswers: number;
 }
 
 export function getQualificationRanking(
@@ -66,7 +68,43 @@ export function getQualificationRanking(
         FROM audit_events a
         WHERE a.event_type = 'QUESTION_REVEALED'
           AND a.round_id = r.id
-      ) AS totalResponseTimeMs
+      ) AS totalResponseTimeMs,
+      (
+        SELECT COUNT(*)
+        FROM live_submissions s3
+        WHERE s3.round_id = r.id
+          AND s3.is_correct = 1
+          AND (
+            (r.college_a_id = c.id AND s3.station = 'A')
+            OR
+            (r.college_b_id = c.id AND s3.station = 'B')
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM audit_events a3
+            WHERE a3.event_type = 'QUESTION_REVEALED'
+              AND a3.round_id = s3.round_id
+              AND a3.position = s3.question_position
+          )
+      ) AS correctAnswers,
+      (
+        SELECT COUNT(*)
+        FROM live_submissions s4
+        WHERE s4.round_id = r.id
+          AND s4.is_correct = 0
+          AND (
+            (r.college_a_id = c.id AND s4.station = 'A')
+            OR
+            (r.college_b_id = c.id AND s4.station = 'B')
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM audit_events a4
+            WHERE a4.event_type = 'QUESTION_REVEALED'
+              AND a4.round_id = s4.round_id
+              AND a4.position = s4.question_position
+          )
+      ) AS wrongAnswers
     FROM participants p
     JOIN colleges c ON c.id = p.college_id
     JOIN qualification_rounds r
@@ -114,6 +152,8 @@ export function getQualificationRanking(
         scorePoints: row.scoreMicros / 1_000_000,
         revealedQuestions: row.revealedQuestions,
         totalResponseTimeMs: row.totalResponseTimeMs,
+        correctAnswers: row.correctAnswers,
+        wrongAnswers: row.wrongAnswers,
       };
     },
   );
@@ -133,6 +173,8 @@ export function getQualificationRanking(
       scorePoints: 0,
       revealedQuestions: 0,
       totalResponseTimeMs: 0,
+      correctAnswers: 0,
+      wrongAnswers: 0,
     }));
 
   return {

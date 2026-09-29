@@ -137,6 +137,13 @@ export class LiveSessionManager {
     );
   }
 
+  private shouldAutoReveal(reason: string | null): boolean {
+    return (
+      this.isAnsweredCloseReason(reason) ||
+      reason === "TIMEOUT"
+    );
+  }
+
   private scheduleAutomaticReveal(
     roundId: number,
     position: number,
@@ -153,7 +160,7 @@ export class LiveSessionManager {
         current.phase !== "QUESTION_CLOSED" ||
         current.roundId !== roundId ||
         current.questionPosition !== position ||
-        !this.isAnsweredCloseReason(current.closeReason)
+        !this.shouldAutoReveal(current.closeReason)
       ) {
         return;
       }
@@ -172,7 +179,7 @@ export class LiveSessionManager {
       state.roundId === null ||
       state.questionPosition === null ||
       state.questionClosedAtEpochMs === null ||
-      !this.isAnsweredCloseReason(state.closeReason)
+      !this.shouldAutoReveal(state.closeReason)
     ) {
       return;
     }
@@ -1000,7 +1007,9 @@ export class LiveSessionManager {
         "/uniquiz/question/answered",
         [roundOrder, state.questionPosition, reason],
       );
+    }
 
+    if (this.shouldAutoReveal(reason)) {
       this.scheduleAutomaticReveal(
         state.roundId,
         state.questionPosition,

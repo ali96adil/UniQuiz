@@ -892,8 +892,16 @@ h2 {
 }
 
 .answer-locked.wrong {
-  background: rgba(239, 68, 68, 0.16);
+  border: 2px solid rgba(239, 68, 68, 0.82);
+  background: rgba(239, 68, 68, 0.18);
   color: #fecaca;
+  box-shadow: 0 0 28px rgba(239, 68, 68, 0.16);
+}
+
+.unanswered-result {
+  display: grid;
+  gap: 4px;
+  place-items: center;
 }
 
 .audience-live-stage {
@@ -1995,28 +2003,30 @@ h2 {
 
 .official-results-table th:nth-child(1),
 .official-results-table td:nth-child(1) {
-  width: 12%;
+  width: 9%;
 }
 
 .official-results-table th:nth-child(2),
 .official-results-table td:nth-child(2) {
-  width: 36%;
+  width: 30%;
   text-align: right;
 }
 
 .official-results-table th:nth-child(3),
 .official-results-table td:nth-child(3) {
-  width: 16%;
+  width: 14%;
 }
 
 .official-results-table th:nth-child(4),
 .official-results-table td:nth-child(4) {
-  width: 22%;
+  width: 21%;
 }
 
 .official-results-table th:nth-child(5),
-.official-results-table td:nth-child(5) {
-  width: 14%;
+.official-results-table td:nth-child(5),
+.official-results-table th:nth-child(6),
+.official-results-table td:nth-child(6) {
+  width: 13%;
 }
 
 .official-results-table .report-top-row {

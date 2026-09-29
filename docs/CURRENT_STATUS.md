@@ -76,3 +76,11 @@ No code blocker. Only real-display and print-preview visual acceptance remain fo
 - Do not reintroduce the old 30/45-second scoring rules.
 - Do not restore the unnecessary between-question audience page.
 - Do not retarget PR #14 onto `main` until PR #15 has been accepted and merged.
+
+## Latest test findings and fixes
+- Timeout now follows the same automatic Reveal handoff as completed answers; no manual Reveal is required after the 25-second window expires.
+- Unanswered required stations show an explicit red result state with 0 points on both audience/team result surfaces.
+- Team Reveal now includes awarded points after correctness and response time.
+- Next-round preview ignores the current/non-pending round, fixing the transition into a final solo round.
+- Official report label changed to `عدد الكليات المشاركة`.
+- Official report replaces counted-question column with correct-answer and wrong-answer counts.
