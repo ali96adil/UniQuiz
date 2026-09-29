@@ -3,105 +3,93 @@
 Updated: 2026-09-29
 
 ## Active work
-Post-M5 event-day refinement and visual acceptance.
+M6 — Event-Day Hardening & Recovery, rebuilt cleanly on the accepted Post-M5 `main`.
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/post-m5-presentation-scoring-pdf`
+`feature/m6-hardening-recovery-clean`
 
 ## Active pull request
-PR #15 — Post-M5: presentation, scoring, ranking time & official PDF
+PR #16 — M6: hardening & recovery on current main
 
-Current head before this checkpoint:
-`37ac0f5ed532830f153595e4fa4b7989604e7e11`
+Current verified feature head before this documentation checkpoint:
+`e95cfda4d031c45f1f424bc4babadcb9888140bd`
 
 Latest verified CI:
-Run #36555351727 — PASS
+Run #36605322460 — PASS
 
-## Completed
-- M5 PR #13 merged to `main` as squash commit `c9d4e5910db12eab3c03142c9b80afe3860904f2`.
-- Issue #6 — M5 Audience Display, Reveal & Live Ranking — closed as completed.
-- Principal audience-display headings centered, including the final qualification ranking title.
-- University and Student Activities Department logos enlarged.
-- Patronage and supervision lines added to the audience header.
-- Final-results scene no longer duplicates the last-round result block above the podium.
-- Authoritative answer window changed to 25 seconds.
-- Correct-answer score equals the displayed remaining whole second: 25 → 25 points, 24 → 24, …, 1 → 1; timeout/wrong/no answer = 0.
-- Normal operator flow moves directly from Reveal to the next 3-2-1 countdown without exposing a separate QUESTION_READY audience page.
-- Qualification ranking includes cumulative response time per college.
-- A revealed unanswered question counts as the full 25-second window in cumulative response time.
-- Ranking order is points descending, then cumulative response time ascending; lower total time wins a point tie.
-- Official A4 results statement implemented at `/report`.
-- After qualification completion, Operator shows `تصدير بيان النتائج PDF`; `/report?print=1` waits for logos, decoded images, web fonts and completed browser paint before opening Print / Save as PDF, including repeated exports.
-- Official report includes both logos, competition identity, patronage/supervision, issue date/time, top three, full ranking, points, cumulative answer time and counted questions.
-- Live-session timer cleanup added for application shutdown and tests.
-- Active documentation synchronized to the 25-second scoring rule and direct next-question flow.
-- PR #15 has no open review comments or review threads.
-- PR #15 is mergeable and its latest verified CI is green.
+PR #16 remains Draft intentionally until the real-device rehearsal is accepted.
 
-## M6 status
-Issue #7 / PR #14 — M6 Event-Day Hardening & Recovery — remains code-complete and intentionally deferred.
+## Main baseline
+Post-M5 PR #15 is merged to `main` as:
+`faf70890c5539847492f20f46a2d9499214d48a5`
 
-PR #14 is still stacked on `feature/m5-audience-live-display`. Do not retarget or merge it yet. After PR #15 is visually accepted and merged to `main`, rebuild the M6 branch cleanly on the updated `main` to avoid the earlier squash-history conflict.
+The accepted baseline includes:
+- 25-second authoritative question window;
+- correct-answer score = displayed remaining whole second, 25 → 1;
+- wrong / no answer / expiry = 0;
+- direct next-question → 3-2-1 flow;
+- timeout auto-Reveal;
+- cumulative response-time ranking;
+- correct/wrong answer counts;
+- current Setup/Draw workflow with live participant selection;
+- full-screen contestant stations;
+- current audience/final-results presentation;
+- official A4 browser Print / Save as PDF report.
 
-## Latest refinement
-- Audience logos increased again to 150px on desktop presentation.
-- Audience display is locked to exactly one viewport (100dvh) with page overflow disabled.
-- Setup and Operator now have direct navigation buttons between each other.
-- Short station portal added at `/s`; it provides direct authenticated Station A / Station B links plus Audience Display access.
+## M6 clean rebuild
+Historical PR #14 is closed and superseded. Do not retarget or merge it.
 
-## Next action
-On the event Mac, pull PR #15 and perform the remaining acceptance checks:
+The clean M6 candidate includes:
+- verified SQLite backup creation and offline restore;
+- automatic safety backup before restore/reset;
+- Preflight READY / NOT READY dashboard;
+- LAN/network diagnostics;
+- restart recovery during countdown and active question;
+- safe VOID + same-category replacement;
+- invalidation of stale score, revealed count, cumulative time, correct count and wrong count after VOID;
+- audited Station Ready Override, exposed only when a required station is offline;
+- Emergency Hold;
+- isolated rehearsal database with visible REHEARSAL mode;
+- scoring-neutral audience announcement/intermission scenes;
+- official results/submissions/audit XLSX export;
+- XLSX metadata aligned to the current 25-second scoring rule;
+- OSC readiness send/confirm gate when OSC is enabled;
+- opt-in safe Operator hotkeys aligned with the current direct question flow;
+- shutdown timer cleanup;
+- event-day startup commands and checklist.
 
-1. Open `/display` on the real audience screen and verify logo sizing, patronage/supervision readability, centered headings, no duplicate college in final results, 25-second timer, direct next-question 3-2-1 flow, and cumulative response time.
-2. Complete a qualification rehearsal and open `/report?print=1`.
-3. Verify Print Preview / Save as PDF on A4: Arabic text and logos render correctly, top three and full table fit cleanly, and there is no clipping.
+## Latest verification
+- CI #36605322460 PASS.
+- Typecheck PASS.
+- Tests PASS.
+- Build PASS.
+- Server/realtime/M2 persistence smoke PASS.
+- VOID regression now verifies score, revealed-count, cumulative-time, correct-count and wrong-count invalidation.
+- XLSX export regression verifies 25-second metadata plus ranking time/correct/wrong columns.
+- PR #16 is mergeable/clean and has no known code blocker.
 
-If accepted:
-- mark PR #15 Ready for Review;
-- merge PR #15 into `main`;
-- resume M6 by rebuilding/retargeting PR #14 on the new `main`.
+## Remaining acceptance
+Requires real hardware:
+1. Full Mac + Team A Windows + Team B Windows + audience display rehearsal.
+2. Real OSC receiver send/confirm.
+3. Browser disconnect/reconnect test.
+4. Server restart during countdown.
+5. Server restart during active question → Recovery → VOID + replacement.
+6. Emergency Hold test.
+7. Backup creation + offline restore drill.
+8. Visual acceptance of Operator Preflight, rehearsal banner, announcement scenes and exported workbook.
 
-## Blockers
-No code blocker. Only real-display and print-preview visual acceptance remain for PR #15.
+Do not merge PR #16 until these real-device checks are accepted.
 
 ## Do not repeat
 - Do not recreate the repository.
-- Do not reintroduce question difficulty levels.
 - Do not create separate repositories for server/web/team stations.
-- Do not commit real competition questions or correct answers.
-- Do not build a knockout qualification bracket.
+- Do not reintroduce question difficulty levels.
 - Do not reintroduce the old 30/45-second scoring rules.
 - Do not restore the unnecessary between-question audience page.
-- Do not retarget PR #14 onto `main` until PR #15 has been accepted and merged.
-
-## Latest test findings and fixes
-- Timeout now follows the same automatic Reveal handoff as completed answers; no manual Reveal is required after the 25-second window expires.
-- Unanswered required stations show an explicit red result state with 0 points on both audience/team result surfaces.
-- Team Reveal now includes awarded points after correctness and response time.
-- Next-round preview ignores the current/non-pending round, fixing the transition into a final solo round.
-- Official report label changed to `عدد الكليات المشاركة`.
-- Official report replaces counted-question column with correct-answer and wrong-answer counts.
-
-## Setup / contestant layout refinement
-- Contestant Station A/B surfaces now use a dedicated full-screen 100dvh layout with the generic app hero removed, giving the question and four answer choices the available screen area.
-- Setup cards reordered into one dependency flow: data import → college list → participant selection → official draw → question allocation → audience branding.
-- Official draw is embedded directly in `/setup`; the standalone `/draw` route remains available.
-- Participant selection persists immediately on every checkbox change instead of requiring a separate Save Participants action.
-- The server now accepts incremental participant lists before lock; the existing lock operation still enforces at least two participants.
-- Before participant lock, the audience display now shows the currently selected colleges and updates from the authoritative competition snapshot in real time.
-
-- Contestant answer-choice cards rebalanced after visual review: shorter card height, larger answer text, and larger A/B/C/D badges while preserving the full-screen station layout.
-
-## M6 clean rebuild
-- Rebuilt from current `main` after Post-M5 acceptance; historical stacked branch is reference-only.
-- Active clean branch: `feature/m6-hardening-recovery-clean`.
-- Transferred M6-only behavior: verified backup/restore, Preflight, restart recovery, safe VOID/replacement, XLSX results/audit export, readiness override backend, Emergency Hold, isolated rehearsal database, audience announcement scenes, LAN diagnostics, OSC readiness send/confirm, safe Operator hotkeys, shutdown timer disposal, and reset safety backup.
-- Preserved current Post-M5 behavior: 25-second scoring, direct next-question 3-2-1 flow, timeout auto-reveal, current Setup/Draw flow, full-screen contestant stations, cumulative-time ranking, correct/wrong counts, and official A4 report.
-- Alt+N hotkey follows the current direct `/api/live/start-next-question` flow.
-- Timeout remains automatic and does not expose a manual Reveal action.
-- VOID invalidation applies to score, revealed count, cumulative response time, correct answers, and wrong answers.
-- Next gate: full CI on the clean branch, then real-device M6 rehearsal.
-
+- Do not commit real competition questions or correct answers.
+- Do not build a knockout qualification bracket.
+- Do not reopen or retarget superseded PR #14.
