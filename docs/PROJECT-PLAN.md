@@ -49,15 +49,16 @@ Deliverables:
 - exactly 2 questions per category
 - no repeated qualification question
 - session question-set lock
-- 45-second authoritative timer
+- 30-second authoritative timer
 - scoring formula
 - answer validation
 - audit records
 
 Scoring:
-- correct at <= 5 seconds: 10 points
-- correct after 5 seconds: linear decrease to 1 point at 45 seconds
-- wrong/no answer: 0 points
+- timer 30–25: 25 points
+- timer 24–1: points equal the displayed remaining second
+- timer 0 / wrong / no answer: 0 points
+- whole-number scores only
 
 Exit criteria:
 - Every generated session receives 10 valid unique questions.
@@ -89,7 +90,7 @@ Deliverables:
 - fullscreen audience display
 - question/timer presentation
 - answer received indicators
-- post-question reveal
+- automatic answered-path reveal after OSC handoff; explicit timeout reveal
 - correct/wrong display
 - response time display
 - awarded points animation
