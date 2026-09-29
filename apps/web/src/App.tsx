@@ -1211,8 +1211,12 @@ function AudienceRankingSidebar({
 
 function AudienceLiveSurface({
   snapshot,
+  competition,
+  ranking,
 }: {
   snapshot: LiveSnapshot;
+  competition: CompetitionSetupSnapshot;
+  ranking: QualificationRankingSnapshot | null;
 }) {
   const [now, setNow] = useState(Date.now());
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
@@ -1481,17 +1485,74 @@ function AudienceLiveSurface({
   }
 
   if (snapshot.phase === "ROUND_COMPLETE") {
+    if (snapshot.qualificationComplete) {
+      const finalists =
+        ranking?.entries
+          .filter((entry) => entry.rank !== null)
+          .slice(0, 3) ?? [];
+
+      return (
+        <section className="audience-stage audience-live-stage final-results-stage">
+          <div className="audience-kicker">انتهت مرحلة التصفيات</div>
+          <h2 className="audience-title">
+            الترتيب النهائي للتصفيات
+          </h2>
+
+          <div className="audience-final-podium">
+            {finalists.map((entry) => (
+              <div
+                className={[
+                  "audience-final-card",
+                  entry.rank === 1 ? "leader" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                key={entry.college.id}
+              >
+                <span>المركز {entry.rank}</span>
+                <strong>{entry.college.name}</strong>
+                <b>{entry.scorePoints} نقطة</b>
+              </div>
+            ))}
+          </div>
+
+          <p className="audience-copy">
+            تم اعتماد نتائج جميع جولات التصفيات
+          </p>
+        </section>
+      );
+    }
+
+    const nextRound =
+      competition.rounds.find(
+        (candidate) => candidate.id === competition.nextRoundId,
+      ) ??
+      competition.rounds.find(
+        (candidate) => candidate.status === "PENDING",
+      ) ??
+      null;
+
     return (
       <section className="audience-stage audience-live-stage">
         <div className="audience-kicker">
-          جولة {round.order}
+          انتهت جولة {round.order}
         </div>
-        <h2 className="audience-title">انتهت الجولة</h2>
-        <p className="audience-copy">
-          {snapshot.qualificationComplete
-            ? "انتهت جميع جولات التصفيات"
-            : "بانتظار الجولة القادمة"}
-        </p>
+        <h2 className="audience-title">الجولة القادمة</h2>
+
+        {nextRound ? (
+          <div className="audience-next-match">
+            <span>جولة {nextRound.order}</span>
+            <strong>{nextRound.collegeA.name}</strong>
+            <b>{nextRound.collegeB ? "VS" : "SOLO"}</b>
+            <strong>
+              {nextRound.collegeB?.name ?? "جولة فردية"}
+            </strong>
+          </div>
+        ) : (
+          <p className="audience-copy">
+            بانتظار تحديد الجولة القادمة
+          </p>
+        )}
       </section>
     );
   }
@@ -2343,7 +2404,11 @@ export function App() {
         liveSnapshot &&
         liveSnapshot.phase !== "IDLE" ? (
           <div className="audience-broadcast-layout">
-            <AudienceLiveSurface snapshot={liveSnapshot} />
+            <AudienceLiveSurface
+              snapshot={liveSnapshot}
+              competition={competition}
+              ranking={ranking}
+            />
             <AudienceRankingSidebar ranking={ranking} />
           </div>
         ) : (

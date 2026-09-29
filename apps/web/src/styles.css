@@ -1208,3 +1208,70 @@ h2 {
     min-height: auto;
   }
 }
+
+.audience-next-match {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 22px;
+  align-items: center;
+  margin-top: 52px;
+  padding: 30px;
+  border-radius: 24px;
+  background: rgba(30, 41, 59, 0.58);
+  text-align: center;
+  font-size: clamp(1.2rem, 2.4vw, 2rem);
+}
+
+.audience-next-match > span {
+  color: #93c5fd;
+  font-weight: 900;
+}
+
+.audience-next-match > b {
+  color: #60a5fa;
+}
+
+.audience-final-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 48px;
+}
+
+.audience-final-card {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  min-height: 210px;
+  padding: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 22px;
+  background: rgba(30, 41, 59, 0.62);
+  text-align: center;
+}
+
+.audience-final-card > span {
+  color: #93c5fd;
+  font-weight: 800;
+}
+
+.audience-final-card > strong {
+  font-size: clamp(1.3rem, 2.5vw, 2.3rem);
+}
+
+.audience-final-card > b {
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  color: #bfdbfe;
+}
+
+.audience-final-card.leader {
+  border-color: rgba(250, 204, 21, 0.55);
+  background: rgba(113, 63, 18, 0.18);
+}
+
+@media (max-width: 760px) {
+  .audience-next-match,
+  .audience-final-podium {
+    grid-template-columns: 1fr;
+  }
+}
