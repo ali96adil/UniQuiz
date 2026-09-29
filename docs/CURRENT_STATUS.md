@@ -69,6 +69,7 @@ Pending creation for M5 implementation
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
+- Setup can now reset all competition data safely while preserving Station A/B credentials and app metadata.
 - M5 audience branding/settings, round-total presentation, transition polish and real external-screen verification.
 - Importer usability fix: questions-only imports accept category names or keys and default to append instead of replacing the existing bank.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
@@ -92,6 +93,11 @@ Pull PR #13 on the Mac and visually verify `/display` through one live question:
 - CI Run #63 PASS: fullscreen audience surface.
 - Next-round and final qualification ranking scenes implemented.
 - CI Run #64 PASS: M5 end-scene UI build/runtime validation.
+
+## Completed
+- CI Run #67 PASS: category-name question import + safe append mode.
+- CI Run #68 PASS: full competition reset contract.
+- CI Run #69 PASS: clearer M3 pre-draw allocation state.
 
 ## Blockers
 No code blocker; real external-screen visual verification is pending.
