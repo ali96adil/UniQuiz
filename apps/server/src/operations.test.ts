@@ -132,3 +132,56 @@ test("preflight requires draw, allocation, stations and backup", () => {
 
   db.close();
 });
+
+
+test("LAN diagnostics reports usable browser and health URLs", async () => {
+  const { getOperationsDiagnostics } =
+    await import("./operations.js");
+
+  const presence: PresenceSnapshot = {
+    generatedAt: "2026-09-29T00:00:00.000Z",
+    stations: [],
+  };
+
+  const snapshot = getOperationsDiagnostics(
+    {
+      mode: "official",
+      databasePath: "/tmp/uniquiz.db",
+      serverPort: 8787,
+      webPort: 5173,
+      osc: {
+        enabled: true,
+        host: "127.0.0.1",
+        port: 9001,
+      },
+      presence,
+    },
+    {
+      en0: [
+        {
+          address: "192.168.3.114",
+          family: "IPv4",
+          internal: false,
+        },
+      ],
+      lo0: [
+        {
+          address: "127.0.0.1",
+          family: "IPv4",
+          internal: true,
+        },
+      ],
+    },
+  );
+
+  assert.equal(snapshot.mode, "official");
+  assert.equal(snapshot.interfaces.length, 1);
+  assert.equal(
+    snapshot.interfaces[0]?.webBaseUrl,
+    "http://192.168.3.114:5173",
+  );
+  assert.equal(
+    snapshot.interfaces[0]?.serverHealthUrl,
+    "http://192.168.3.114:8787/health",
+  );
+});

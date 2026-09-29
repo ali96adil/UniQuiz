@@ -165,7 +165,10 @@ registerResetAllRoute(
 );
 
 registerOperationsRoutes(app, database, {
+  mode: config.mode,
   databasePath: config.databasePath,
+  serverPort: config.port,
+  webPort: 5173,
   osc: config.osc,
   getPresence: presenceSnapshot,
 });

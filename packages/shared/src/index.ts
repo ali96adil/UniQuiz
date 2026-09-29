@@ -374,3 +374,27 @@ export interface AudiencePresentationSnapshot {
   message: string;
   updatedAt: string;
 }
+
+
+export interface OperationsDiagnosticsSnapshot {
+  generatedAt: string;
+  mode: RuntimeMode;
+  hostname: string;
+  platform: string;
+  nodeVersion: string;
+  serverPort: number;
+  webPort: number;
+  databaseFileName: string;
+  osc: {
+    enabled: boolean;
+    host: string;
+    port: number;
+  };
+  interfaces: Array<{
+    name: string;
+    address: string;
+    webBaseUrl: string;
+    serverHealthUrl: string;
+  }>;
+  presence: PresenceSnapshot;
+}

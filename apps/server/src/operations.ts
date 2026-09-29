@@ -10,13 +10,20 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
+import {
+  hostname,
+  networkInterfaces,
+  platform,
+} from "node:os";
 import Database from "better-sqlite3";
 import type { FastifyInstance } from "fastify";
 import type {
   OperationsBackupRecord,
   OperationsPreflightCheck,
+  OperationsDiagnosticsSnapshot,
   OperationsPreflightSnapshot,
   PresenceSnapshot,
+  RuntimeMode,
 } from "@uniquiz/shared";
 import { getCompetitionSnapshot } from "./competition.js";
 import type { AppDatabase } from "./database.js";
@@ -438,15 +445,90 @@ export function getOperationsPreflight(
   };
 }
 
+export function getOperationsDiagnostics(
+  options: {
+    mode: RuntimeMode;
+    databasePath: string;
+    serverPort: number;
+    webPort: number;
+    osc: OscOutputConfig;
+    presence: PresenceSnapshot;
+  },
+  interfaces: Record<
+    string,
+    readonly {
+      address: string;
+      family: string;
+      internal: boolean;
+    }[] | undefined
+  > = networkInterfaces(),
+): OperationsDiagnosticsSnapshot {
+  const lanInterfaces: OperationsDiagnosticsSnapshot["interfaces"] = [];
+
+  for (const [name, entries] of Object.entries(interfaces)) {
+    for (const entry of entries ?? []) {
+      if (entry.family !== "IPv4" || entry.internal) {
+        continue;
+      }
+
+      lanInterfaces.push({
+        name,
+        address: entry.address,
+        webBaseUrl:
+          `http://${entry.address}:${options.webPort}`,
+        serverHealthUrl:
+          `http://${entry.address}:${options.serverPort}/health`,
+      });
+    }
+  }
+
+  lanInterfaces.sort((a, b) =>
+    a.name.localeCompare(b.name) ||
+    a.address.localeCompare(b.address),
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    mode: options.mode,
+    hostname: hostname(),
+    platform: platform(),
+    nodeVersion: process.version,
+    serverPort: options.serverPort,
+    webPort: options.webPort,
+    databaseFileName: basename(options.databasePath),
+    osc: {
+      enabled: options.osc.enabled,
+      host: options.osc.host,
+      port: options.osc.port,
+    },
+    interfaces: lanInterfaces,
+    presence: options.presence,
+  };
+}
+
 export function registerOperationsRoutes(
   app: FastifyInstance,
   db: AppDatabase,
   options: {
+    mode: RuntimeMode;
     databasePath: string;
+    serverPort: number;
+    webPort: number;
     osc: OscOutputConfig;
     getPresence: () => PresenceSnapshot;
   },
 ): void {
+  app.get("/api/operations/diagnostics", async () =>
+    getOperationsDiagnostics({
+      mode: options.mode,
+      databasePath: options.databasePath,
+      serverPort: options.serverPort,
+      webPort: options.webPort,
+      osc: options.osc,
+      presence: options.getPresence(),
+    }),
+  );
+
   app.get("/api/operations/preflight", async () =>
     getOperationsPreflight(
       db,
