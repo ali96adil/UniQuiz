@@ -5,7 +5,7 @@ import {
   ServerQuestionClock,
 } from "./question-clock.js";
 
-test("question clock starts at 30 seconds and uses monotonic time", () => {
+test("question clock starts at 25 seconds and uses monotonic time", () => {
   let nowNs = 5_000_000_000n;
   let wallMs = 1_800_000_000_000;
 
@@ -25,11 +25,11 @@ test("question clock starts at 30 seconds and uses monotonic time", () => {
 
   const afterFiveSeconds = clock.snapshot();
   assert.equal(afterFiveSeconds.elapsedMs, 5000);
-  assert.equal(afterFiveSeconds.remainingMs, 25000);
+  assert.equal(afterFiveSeconds.remainingMs, 20000);
   assert.equal(afterFiveSeconds.expired, false);
 });
 
-test("question clock expires at exactly 30 seconds", () => {
+test("question clock expires at exactly 25 seconds", () => {
   let nowNs = 0n;
 
   const clock = new ServerQuestionClock(
@@ -38,10 +38,10 @@ test("question clock expires at exactly 30 seconds", () => {
   );
 
   clock.start("round-1:q1");
-  nowNs = 30_000_000_000n;
+  nowNs = 25_000_000_000n;
 
   const snapshot = clock.snapshot();
-  assert.equal(snapshot.elapsedMs, 30000);
+  assert.equal(snapshot.elapsedMs, 25000);
   assert.equal(snapshot.remainingMs, 0);
   assert.equal(snapshot.expired, true);
 });

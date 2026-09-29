@@ -3,6 +3,7 @@ import type {
   QualificationRankingSnapshot,
 } from "@uniquiz/shared";
 import type { AppDatabase } from "./database.js";
+import { QUESTION_DURATION_MS } from "./question-clock.js";
 
 interface RankingRow {
   collegeId: number;
@@ -12,6 +13,9 @@ interface RankingRow {
   roundStatus: "PENDING" | "ACTIVE" | "COMPLETED";
   scoreMicros: number;
   revealedQuestions: number;
+  totalResponseTimeMs: number;
+  correctAnswers: number;
+  wrongAnswers: number;
 }
 
 export function getQualificationRanking(
@@ -37,19 +41,70 @@ export function getQualificationRanking(
           ELSE 0
         END
       ), 0) AS scoreMicros,
-      COUNT(DISTINCT
-        CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM audit_events a
-            WHERE a.event_type = 'QUESTION_REVEALED'
-              AND a.round_id = s.round_id
-              AND a.position = s.question_position
+      (
+        SELECT COUNT(DISTINCT a.position)
+        FROM audit_events a
+        WHERE a.event_type = 'QUESTION_REVEALED'
+          AND a.round_id = r.id
+      ) AS revealedQuestions,
+      (
+        SELECT COALESCE(SUM(
+          COALESCE(
+            (
+              SELECT s2.response_time_ms
+              FROM live_submissions s2
+              WHERE s2.round_id = r.id
+                AND s2.question_position = a.position
+                AND (
+                  (r.college_a_id = c.id AND s2.station = 'A')
+                  OR
+                  (r.college_b_id = c.id AND s2.station = 'B')
+                )
+              LIMIT 1
+            ),
+            ${QUESTION_DURATION_MS}
           )
-          THEN s.question_position
-          ELSE NULL
-        END
-      ) AS revealedQuestions
+        ), 0)
+        FROM audit_events a
+        WHERE a.event_type = 'QUESTION_REVEALED'
+          AND a.round_id = r.id
+      ) AS totalResponseTimeMs,
+      (
+        SELECT COUNT(*)
+        FROM live_submissions s3
+        WHERE s3.round_id = r.id
+          AND s3.is_correct = 1
+          AND (
+            (r.college_a_id = c.id AND s3.station = 'A')
+            OR
+            (r.college_b_id = c.id AND s3.station = 'B')
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM audit_events a3
+            WHERE a3.event_type = 'QUESTION_REVEALED'
+              AND a3.round_id = s3.round_id
+              AND a3.position = s3.question_position
+          )
+      ) AS correctAnswers,
+      (
+        SELECT COUNT(*)
+        FROM live_submissions s4
+        WHERE s4.round_id = r.id
+          AND s4.is_correct = 0
+          AND (
+            (r.college_a_id = c.id AND s4.station = 'A')
+            OR
+            (r.college_b_id = c.id AND s4.station = 'B')
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM audit_events a4
+            WHERE a4.event_type = 'QUESTION_REVEALED'
+              AND a4.round_id = s4.round_id
+              AND a4.position = s4.question_position
+          )
+      ) AS wrongAnswers
     FROM participants p
     JOIN colleges c ON c.id = p.college_id
     JOIN qualification_rounds r
@@ -72,21 +127,15 @@ export function getQualificationRanking(
       if (b.scoreMicros !== a.scoreMicros) {
         return b.scoreMicros - a.scoreMicros;
       }
+      if (a.totalResponseTimeMs !== b.totalResponseTimeMs) {
+        return a.totalResponseTimeMs - b.totalResponseTimeMs;
+      }
       return a.sortOrder - b.sortOrder;
     });
 
-  let previousScore: number | null = null;
-  let previousRank = 0;
-
   const rankedStarted: QualificationRankingEntry[] = started.map(
     (row, index) => {
-      const rank =
-        previousScore !== null && row.scoreMicros === previousScore
-          ? previousRank
-          : index + 1;
-
-      previousScore = row.scoreMicros;
-      previousRank = rank;
+      const rank = index + 1;
 
       return {
         college: {
@@ -102,6 +151,9 @@ export function getQualificationRanking(
         rank,
         scorePoints: row.scoreMicros / 1_000_000,
         revealedQuestions: row.revealedQuestions,
+        totalResponseTimeMs: row.totalResponseTimeMs,
+        correctAnswers: row.correctAnswers,
+        wrongAnswers: row.wrongAnswers,
       };
     },
   );
@@ -120,6 +172,9 @@ export function getQualificationRanking(
       rank: null,
       scorePoints: 0,
       revealedQuestions: 0,
+      totalResponseTimeMs: 0,
+      correctAnswers: 0,
+      wrongAnswers: 0,
     }));
 
   return {

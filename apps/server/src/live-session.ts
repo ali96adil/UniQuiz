@@ -13,6 +13,7 @@ import type {
   LiveTeamSubmissionState,
 } from "@uniquiz/shared";
 import { appendAuditEvent } from "./audit.js";
+import { getCompetitionSnapshot } from "./competition.js";
 import type { AppDatabase } from "./database.js";
 import {
   QUESTION_DURATION_MS,
@@ -108,11 +109,39 @@ export class LiveSessionManager {
     this.restoreAutomaticReveal();
   }
 
+  dispose(): void {
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+
+    this.clearCountdownCueTimers();
+
+    if (this.questionTimer) {
+      clearTimeout(this.questionTimer);
+      this.questionTimer = null;
+    }
+
+    if (this.autoRevealTimer) {
+      clearTimeout(this.autoRevealTimer);
+      this.autoRevealTimer = null;
+    }
+
+    this.questionClock.clear();
+  }
+
 
   private isAnsweredCloseReason(reason: string | null): boolean {
     return (
       reason === "ALL_TEAMS_ANSWERED" ||
       reason === "SOLO_ANSWERED"
+    );
+  }
+
+  private shouldAutoReveal(reason: string | null): boolean {
+    return (
+      this.isAnsweredCloseReason(reason) ||
+      reason === "TIMEOUT"
     );
   }
 
@@ -132,7 +161,7 @@ export class LiveSessionManager {
         current.phase !== "QUESTION_CLOSED" ||
         current.roundId !== roundId ||
         current.questionPosition !== position ||
-        !this.isAnsweredCloseReason(current.closeReason)
+        !this.shouldAutoReveal(current.closeReason)
       ) {
         return;
       }
@@ -151,7 +180,7 @@ export class LiveSessionManager {
       state.roundId === null ||
       state.questionPosition === null ||
       state.questionClosedAtEpochMs === null ||
-      !this.isAnsweredCloseReason(state.closeReason)
+      !this.shouldAutoReveal(state.closeReason)
     ) {
       return;
     }
@@ -471,7 +500,7 @@ export class LiveSessionManager {
       questionDeadlineEpochMs:
         state.questionStartedAtEpochMs === null
           ? null
-          : state.questionStartedAtEpochMs + QUESTION_DURATION_MS,
+          : state.questionStartedAtEpochMs + this.questionDurationMs,
       questionClosedAtEpochMs: state.questionClosedAtEpochMs,
       closeReason: state.closeReason,
       hasPendingRound: pendingRoundCount > 0,
@@ -539,6 +568,10 @@ export class LiveSessionManager {
     this.io.emit(
       "ranking:snapshot",
       getQualificationRanking(this.db),
+    );
+    this.io.emit(
+      "competition:snapshot",
+      getCompetitionSnapshot(this.db),
     );
 
     const teamAState = this.getTeamSubmissionState("team-a");
@@ -779,7 +812,7 @@ export class LiveSessionManager {
     return this.publish();
   }
 
-  prepareNextQuestion(): LiveSnapshot {
+  prepareNextQuestion(publish = true): LiveSnapshot {
     const state = this.stateRow();
 
     if (
@@ -820,7 +853,12 @@ export class LiveSessionManager {
       position: nextPosition,
     });
 
-    return this.publish();
+    return publish ? this.publish() : this.getSnapshot();
+  }
+
+  startNextQuestion(): LiveSnapshot {
+    this.prepareNextQuestion(false);
+    return this.startQuestion();
   }
 
   startQuestion(): LiveSnapshot {
@@ -895,7 +933,7 @@ export class LiveSessionManager {
       position,
       occurredAt: new Date(clock.startedAtEpochMs).toISOString(),
       payload: {
-        durationMs: QUESTION_DURATION_MS,
+        durationMs: this.questionDurationMs,
       },
     });
 
@@ -974,7 +1012,9 @@ export class LiveSessionManager {
         "/uniquiz/question/answered",
         [roundOrder, state.questionPosition, reason],
       );
+    }
 
+    if (this.shouldAutoReveal(reason)) {
       this.scheduleAutomaticReveal(
         state.roundId,
         state.questionPosition,
@@ -1178,7 +1218,7 @@ export class LiveSessionManager {
     }
 
     const clock = this.questionClock.snapshot();
-    if (clock.elapsedMs >= QUESTION_DURATION_MS) {
+    if (clock.elapsedMs >= this.questionDurationMs) {
       const current = this.stateRow();
       if (current.phase === "QUESTION_ACTIVE") {
         this.closeActiveQuestion("TIMEOUT");
@@ -1333,6 +1373,10 @@ export function registerLiveSessionRoutes(
     isStationConnected,
   );
 
+  app.addHook("onClose", async () => {
+    manager.dispose();
+  });
+
   app.get("/api/live", async () => manager.getSnapshot());
 
   app.post("/api/live/prepare-round", async (request, reply) => {
@@ -1388,6 +1432,7 @@ export function registerLiveSessionRoutes(
   simple("/api/live/confirm-stations", () => manager.confirmStations());
   simple("/api/live/start-round", () => manager.startRound());
   simple("/api/live/prepare-question", () => manager.prepareNextQuestion());
+  simple("/api/live/start-next-question", () => manager.startNextQuestion());
   simple("/api/live/start-question", () => manager.startQuestion());
   simple("/api/live/reveal", () => manager.revealQuestion());
   simple("/api/live/intermission", () => manager.enterIntermission());

@@ -231,6 +231,7 @@ test("complete paired round runs 10 operator-paced questions end-to-end", async 
     1,
   );
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -257,6 +258,7 @@ test("required station readiness blocks confirmation", () => {
     /TEAM_B_NOT_READY/,
   );
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -307,6 +309,7 @@ test("throwing show-control output cannot stop official live flow", async () => 
     "QUESTION_CLOSED",
   );
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();

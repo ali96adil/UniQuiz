@@ -5,8 +5,7 @@ export const MAX_SCORE_MICROS =
 export const MIN_CORRECT_SCORE_MICROS =
   1 * SCORE_MICROS_PER_POINT;
 
-export const FULL_SCORE_WINDOW_MS = 5_000;
-export const QUESTION_DEADLINE_MS = 30_000;
+export const QUESTION_DEADLINE_MS = 25_000;
 
 export function calculateScoreMicros(
   correct: boolean,

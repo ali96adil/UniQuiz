@@ -138,6 +138,7 @@ test("team answers lock once and paired round closes after both submit", async (
   assert.equal(recovered?.locked, true);
   assert.equal(recovered?.selectedOption, "B");
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -176,8 +177,32 @@ test("solo round requires only Team A and closes on its answer", async () => {
   assert.equal(snapshot.answerStatus.teamARequired, true);
   assert.equal(snapshot.answerStatus.teamBRequired, false);
 
+  manager.dispose();
   io.close();
   await app.close();
+  db.close();
+});
+
+
+test("startNextQuestion skips the intermediate ready screen", () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(db, io, 10_000, 25_000);
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+
+  const snapshot = manager.startNextQuestion();
+
+  assert.equal(snapshot.phase, "QUESTION_COUNTDOWN");
+  assert.equal(snapshot.question?.position, 1);
+  assert.equal(snapshot.question?.prompt, null);
+
+  manager.dispose();
+  io.close();
+  void app.close();
   db.close();
 });
 
@@ -225,6 +250,7 @@ test("start round rechecks station readiness after confirmation", () => {
 
   assert.equal(manager.getSnapshot().phase, "ROUND_ACTIVE");
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -287,6 +313,61 @@ test("automatically reveals only after all required teams answer", async () => {
   );
   assert.ok(revealIndex > answeredIndex);
 
+  manager.dispose();
+  io.close();
+  await app.close();
+  db.close();
+});
+
+
+test("timeout automatically reveals and preserves unanswered result as zero", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+
+  const events: string[] = [];
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    12,
+    {
+      send(address) {
+        events.push(address);
+      },
+    },
+    () => true,
+    8,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  manager.submitAnswer("team-a", "B");
+
+  await new Promise((resolve) => setTimeout(resolve, 35));
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_REVEAL");
+  assert.equal(snapshot.closeReason, "TIMEOUT");
+  assert.equal(snapshot.revealResults?.teamA.answered, true);
+  assert.equal(snapshot.revealResults?.teamB?.answered, false);
+  assert.equal(snapshot.revealResults?.teamB?.scorePoints, 0);
+
+  const timeoutIndex = events.lastIndexOf(
+    "/uniquiz/question/timeout",
+  );
+  const revealIndex = events.lastIndexOf(
+    "/uniquiz/question/reveal",
+  );
+  assert.ok(timeoutIndex >= 0);
+  assert.ok(revealIndex > timeoutIndex);
+
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -339,6 +420,7 @@ test("reveal results stay hidden until reveal", async () => {
   assert.equal(snapshot.revealResults?.teamB?.isCorrect, false);
   assert.equal(snapshot.revealResults?.teamB?.scorePoints, 0);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -380,6 +462,7 @@ test("round totals include only revealed question scores", async () => {
   assert.ok((snapshot.roundTotals?.teamA ?? 0) > 0);
   assert.equal(snapshot.roundTotals?.teamB, 0);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();

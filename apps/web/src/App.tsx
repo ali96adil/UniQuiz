@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -22,6 +22,8 @@ type Surface =
   | "draw"
   | "operator"
   | "display"
+  | "report"
+  | "stations"
   | "team-a"
   | "team-b";
 
@@ -31,9 +33,16 @@ const surfaceTitles: Record<Surface, string> = {
   draw: "القرعة",
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
+  report: "بيان النتائج الرسمي",
+  stations: "بوابة المحطات",
   "team-a": "محطة المتسابق A",
   "team-b": "محطة المتسابق B",
 };
+
+const PATRONAGE_LINE =
+  "برعاية السيد رئيس جامعة بابل الأستاذ الدكتور أمين عجيل ياسر الياسري المحترم";
+const SUPERVISION_LINE =
+  "وإشراف الأستاذ الدكتور ميثاق طالب عبد الجبوري مساعد رئيس الجامعة للشؤون الإدارية المحترم";
 
 const roleTitles: Record<ClientRole, string> = {
   operator: "Operator",
@@ -47,6 +56,8 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/setup")) return "setup";
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
+  if (pathname.startsWith("/report")) return "report";
+  if (pathname === "/s" || pathname.startsWith("/stations")) return "stations";
   if (pathname.startsWith("/display")) return "display";
   if (pathname.startsWith("/team/a")) return "team-a";
   if (pathname.startsWith("/team/b")) return "team-b";
@@ -58,6 +69,7 @@ function roleForSurface(surface: Surface): ClientRole {
     case "setup":
     case "draw":
     case "operator":
+    case "report":
       return "operator";
     case "display":
       return "display";
@@ -251,8 +263,8 @@ function BulkImportPanel({
     <section className="panel import-panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">إدخال جماعي</p>
-          <h2>استيراد Excel / CSV</h2>
+          <p className="step-label">الخطوة 1</p>
+          <h2>إدخال البيانات</h2>
         </div>
         <div className="actions compact-actions">
           <a
@@ -639,7 +651,7 @@ function AudienceSettingsPanel({
     <section className="panel audience-settings-panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">Audience Branding</p>
+          <p className="step-label">الخطوة 6</p>
           <h2>هوية شاشة الجمهور</h2>
         </div>
       </div>
@@ -991,7 +1003,7 @@ function QuestionAllocationPanel({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">M3</p>
+          <p className="step-label">الخطوة 5</p>
           <h2>توزيع أسئلة الجولات</h2>
         </div>
         <span
@@ -1168,17 +1180,30 @@ function SetupSurface({
       "تم حفظ قائمة الكليات.",
     );
 
-  const saveParticipants = () =>
-    run(
-      () =>
-        apiRequest("/api/setup/participants", {
-          method: "PUT",
-          body: JSON.stringify({
-            collegeIds: [...selectedIds],
-          }),
+  const persistParticipants = async (nextIds: Set<number>) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/setup/participants", {
+        method: "PUT",
+        body: JSON.stringify({
+          collegeIds: [...nextIds],
         }),
-      "تم حفظ الكليات المشاركة.",
-    );
+      });
+      setMessage("تم تحديث الكليات المشاركة مباشرةً على شاشة الجمهور.");
+    } catch (caught) {
+      setSelectedIds(new Set(snapshot.participantCollegeIds));
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تحديث الكليات المشاركة",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const lockParticipants = () =>
     run(
@@ -1212,12 +1237,14 @@ function SetupSurface({
   };
 
   const toggleParticipant = (collegeId: number) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(collegeId)) next.delete(collegeId);
-      else next.add(collegeId);
-      return next;
-    });
+    if (snapshot.participantsLocked || busy) return;
+
+    const next = new Set(selectedIds);
+    if (next.has(collegeId)) next.delete(collegeId);
+    else next.add(collegeId);
+
+    setSelectedIds(next);
+    void persistParticipants(next);
   };
 
   return (
@@ -1225,7 +1252,7 @@ function SetupSurface({
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="step-label">الخطوة 1</p>
+            <p className="step-label">الخطوة 2</p>
             <h2>قائمة الكليات</h2>
           </div>
           <span className="counter">
@@ -1270,8 +1297,8 @@ function SetupSurface({
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="step-label">الخطوة 2</p>
-            <h2>اختيار المشاركين</h2>
+            <p className="step-label">الخطوة 3</p>
+            <h2>تحديد الكليات المشاركة</h2>
           </div>
           <span className="counter">{selectedIds.size} مختارة</span>
         </div>
@@ -1303,23 +1330,19 @@ function SetupSurface({
           </div>
         )}
 
-        <div className="actions">
-          <button
-            disabled={
-              snapshot.participantsLocked ||
-              snapshot.colleges.length === 0 ||
-              busy
-            }
-            onClick={() => void saveParticipants()}
-          >
-            حفظ المشاركين
-          </button>
+        {!snapshot.participantsLocked &&
+        snapshot.colleges.length > 0 ? (
+          <p className="live-sync-note">
+            كل تحديد أو إلغاء تحديد يُحفظ فورًا ويظهر مباشرةً على شاشة الجمهور.
+          </p>
+        ) : null}
 
+        <div className="actions">
           {!snapshot.participantsLocked ? (
             <button
               className="primary"
               disabled={
-                snapshot.participantCollegeIds.length < 2 || busy
+                selectedIds.size < 2 || busy
               }
               onClick={() => void lockParticipants()}
             >
@@ -1483,7 +1506,7 @@ function DrawSurface({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">M2</p>
+          <p className="step-label">الخطوة 4</p>
           <h2>القرعة الرسمية</h2>
         </div>
         <span className="counter">
@@ -1625,6 +1648,10 @@ function AudienceBroadcastFrame({
           {settings.eventSubtitle ? (
             <span>{settings.eventSubtitle}</span>
           ) : null}
+          <div className="audience-patronage">
+            <span>{PATRONAGE_LINE}</span>
+            <span>{SUPERVISION_LINE}</span>
+          </div>
           {meta ? <small>{meta}</small> : null}
         </div>
         <div className="audience-brand-logo">
@@ -1665,6 +1692,25 @@ function AudienceDrawSurface({
         <div className="audience-kicker">{settings.eventTitle}</div>
         <h2 className="audience-title">{settings.copy.welcomeTitle}</h2>
         <p className="audience-copy">{settings.copy.waitingParticipantsText}</p>
+
+        {participantNames.length > 0 ? (
+          <>
+            <p className="audience-live-participant-count">
+              {audienceText(
+                settings.copy.participatingCollegeCountText,
+                { count: participantNames.length },
+              )}
+            </p>
+            <div className="audience-participants live-selection">
+              {participantNames.map((name) => (
+                <span key={name}>{name}</span>
+              ))}
+            </div>
+            <div className="draw-waiting">
+              بانتظار تثبيت قائمة الكليات المشاركة
+            </div>
+          </>
+        ) : null}
       </section>
     );
   }
@@ -1797,6 +1843,11 @@ function AudienceRankingSidebar({
                   ? ""
                   : ` ${settings.copy.pointsLabel}`}
               </small>
+              {entry.status !== "NOT_STARTED" ? (
+                <small className="audience-rank-time">
+                  الزمن: {(entry.totalResponseTimeMs / 1000).toFixed(3)} ث
+                </small>
+              ) : null}
             </div>
           </div>
         )) ?? (
@@ -1880,7 +1931,9 @@ function AudienceLiveSurface({
       className={[
         "audience-team-result",
         result?.isCorrect === true ? "correct" : "",
-        result?.isCorrect === false ? "wrong" : "",
+        result?.answered === false || result?.isCorrect === false
+          ? "wrong"
+          : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -2112,23 +2165,6 @@ function AudienceLiveSurface({
             {settings.copy.finalRankingTitle}
           </h2>
 
-          {totals ? (
-            <div className="audience-round-totals compact">
-              <div>
-                <span>{round.teamA.name}</span>
-                <strong>{totals.teamA}</strong>
-                <small>{settings.copy.pointsLabel}</small>
-              </div>
-              {round.teamB && totals.teamB !== null ? (
-                <div>
-                  <span>{round.teamB.name}</span>
-                  <strong>{totals.teamB}</strong>
-                  <small>{settings.copy.pointsLabel}</small>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
           <div className="audience-final-podium">
             {finalists.map((entry) => (
               <div
@@ -2147,6 +2183,9 @@ function AudienceLiveSurface({
                 </span>
                 <strong>{entry.college.name}</strong>
                 <b>{entry.scorePoints} {settings.copy.pointsLabel}</b>
+                <small>
+                  الزمن الإجمالي: {(entry.totalResponseTimeMs / 1000).toFixed(3)} ث
+                </small>
               </div>
             ))}
           </div>
@@ -2160,10 +2199,15 @@ function AudienceLiveSurface({
 
     const nextRound =
       competition.rounds.find(
-        (candidate) => candidate.id === competition.nextRoundId,
+        (candidate) =>
+          candidate.id === competition.nextRoundId &&
+          candidate.id !== round.id &&
+          candidate.status === "PENDING",
       ) ??
       competition.rounds.find(
-        (candidate) => candidate.status === "PENDING",
+        (candidate) =>
+          candidate.id !== round.id &&
+          candidate.status === "PENDING",
       ) ??
       null;
 
@@ -2313,6 +2357,84 @@ function StationAccessPanel() {
     </section>
   );
 }
+
+function StationPortal() {
+  const [credentials, setCredentials] =
+    useState<StationCredentialResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void apiRequest<StationCredentialResponse>(
+      "/api/stations/credentials",
+    )
+      .then(setCredentials)
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "تعذر تحميل بيانات المحطات",
+        );
+      });
+  }, []);
+
+  const stationUrl = (
+    station: "a" | "b",
+    token: string,
+  ) =>
+    `/team/${station}?token=${encodeURIComponent(token)}`;
+
+  return (
+    <section className="panel station-portal">
+      <div className="station-portal-heading">
+        <p className="step-label">Quick Station Access</p>
+        <h2>اختيار محطة المسابقة</h2>
+        <p className="muted">
+          افتح هذا العنوان على الحاسبات الأخرى ثم اختر المحطة المطلوبة.
+        </p>
+      </div>
+
+      {credentials ? (
+        <div className="station-portal-grid">
+          {credentials.teamA ? (
+            <a
+              className="station-portal-card"
+              href={stationUrl("a", credentials.teamA.token)}
+            >
+              <span>Station A</span>
+              <strong>محطة الفريق A</strong>
+              <small>دخول مباشر وآمن بالتوكن</small>
+            </a>
+          ) : null}
+
+          {credentials.teamB ? (
+            <a
+              className="station-portal-card"
+              href={stationUrl("b", credentials.teamB.token)}
+            >
+              <span>Station B</span>
+              <strong>محطة الفريق B</strong>
+              <small>دخول مباشر وآمن بالتوكن</small>
+            </a>
+          ) : null}
+
+          <a
+            className="station-portal-card secondary"
+            href="/display"
+          >
+            <span>Display</span>
+            <strong>شاشة الجمهور</strong>
+            <small>فتح العرض العام بملء الشاشة</small>
+          </a>
+        </div>
+      ) : (
+        <p className="muted">جاري تجهيز روابط المحطات...</p>
+      )}
+
+      <StatusMessage error={error} message={null} />
+    </section>
+  );
+}
+
 
 function OperatorLivePanel({
   snapshot,
@@ -2489,16 +2611,16 @@ function OperatorLivePanel({
         (snapshot.phase === "QUESTION_REVEAL" &&
           (snapshot.question?.position ?? 0) < 10) ? (
           <button
-            className="primary"
+            className="primary live-start-button"
             disabled={busy}
             onClick={() =>
               void run(
-                "/api/live/prepare-question",
-                "تم تجهيز السؤال التالي.",
+                "/api/live/start-next-question",
+                "بدأ السؤال التالي مباشرةً بالعد التنازلي 3-2-1.",
               )
             }
           >
-            تجهيز السؤال التالي
+            السؤال التالي — 3 · 2 · 1
           </button>
         ) : null}
 
@@ -2519,7 +2641,8 @@ function OperatorLivePanel({
 
         {snapshot.phase === "QUESTION_CLOSED" &&
         snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
-        snapshot.closeReason !== "SOLO_ANSWERED" ? (
+        snapshot.closeReason !== "SOLO_ANSWERED" &&
+        snapshot.closeReason !== "TIMEOUT" ? (
           <button
             className="primary"
             disabled={busy}
@@ -2550,6 +2673,22 @@ function OperatorLivePanel({
           </button>
         ) : null}
 
+        {snapshot.qualificationComplete ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => {
+              window.open(
+                "/report?print=1",
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
+          >
+            تصدير بيان النتائج PDF
+          </button>
+        ) : null}
+
         {(snapshot.phase === "ROUND_ACTIVE" ||
           snapshot.phase === "QUESTION_REVEAL") ? (
           <button
@@ -2574,7 +2713,7 @@ function OperatorLivePanel({
 
       {snapshot.phase === "QUESTION_ACTIVE" ? (
         <p className="locked-note">
-          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 30 ثانية.
+          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 25 ثانية.
         </p>
       ) : null}
 
@@ -2584,6 +2723,13 @@ function OperatorLivePanel({
         <p className="locked-note">
           اكتملت الإجابات المطلوبة. تم إرسال OSC وسيتم إعلان النتيجة
           تلقائيًا بعد لحظة قصيرة.
+        </p>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_CLOSED" &&
+      snapshot.closeReason === "TIMEOUT" ? (
+        <p className="locked-note">
+          انتهى وقت الإجابة. سيتم إعلان النتيجة تلقائيًا بعد لحظة قصيرة.
         </p>
       ) : null}
 
@@ -2599,6 +2745,259 @@ function OperatorLivePanel({
     </section>
   );
 }
+
+function OfficialResultsReport({
+  ranking,
+  settings,
+  snapshot,
+}: {
+  ranking: QualificationRankingSnapshot | null;
+  settings: AudienceDisplaySettings | null;
+  snapshot: LiveSnapshot | null;
+}) {
+  const autoPrintRequested = useMemo(
+    () =>
+      new URLSearchParams(window.location.search).get("print") ===
+      "1",
+    [],
+  );
+  const autoPrintStarted = useRef(false);
+  const [exportedAt] = useState(() => new Date());
+
+  const reportReady =
+    ranking !== null &&
+    settings !== null &&
+    snapshot !== null &&
+    snapshot.qualificationComplete;
+
+  useEffect(() => {
+    document.title = "بيان النتائج الرسمي - مسابقة بنك المعلومات";
+
+    if (
+      !autoPrintRequested ||
+      autoPrintStarted.current ||
+      !reportReady
+    ) {
+      return;
+    }
+
+    autoPrintStarted.current = true;
+    let cancelled = false;
+
+    const waitForReportPaint = async () => {
+      const images = Array.from(document.images);
+
+      await Promise.all(
+        images.map(
+          async (image) => {
+            if (!image.complete) {
+              await new Promise<void>((resolve) => {
+                const finish = () => resolve();
+                image.addEventListener("load", finish, { once: true });
+                image.addEventListener("error", finish, { once: true });
+              });
+            }
+
+            try {
+              await image.decode();
+            } catch {
+              // A failed optional logo must not block the report.
+            }
+          },
+        ),
+      );
+
+      try {
+        await document.fonts.ready;
+      } catch {
+        // Font readiness is best-effort; browser fallback fonts remain printable.
+      }
+
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 500);
+      });
+
+      if (cancelled) return;
+
+      window.focus();
+      window.print();
+    };
+
+    void waitForReportPaint();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoPrintRequested, reportReady]);
+
+  if (!ranking || !settings || !snapshot) {
+    return (
+      <section className="official-report report-loading" dir="rtl">
+        <strong>جاري تجهيز بيان النتائج الرسمي...</strong>
+      </section>
+    );
+  }
+
+  if (!snapshot.qualificationComplete) {
+    return (
+      <section className="official-report report-loading" dir="rtl">
+        <strong>بيان النتائج غير متاح قبل اكتمال جميع جولات التصفيات.</strong>
+        <a className="button-link" href="/operator">
+          العودة إلى لوحة التحكم
+        </a>
+      </section>
+    );
+  }
+
+  const finalEntries = ranking.entries.filter(
+    (entry) => entry.rank !== null,
+  );
+  const topThree = finalEntries.slice(0, 3);
+  const issuedAt = new Intl.DateTimeFormat("ar-IQ", {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(exportedAt);
+
+  return (
+    <section className="official-report" dir="rtl">
+      <div className="report-toolbar">
+        <a className="button-link" href="/operator">
+          العودة إلى لوحة التحكم
+        </a>
+        <button className="primary" onClick={() => window.print()}>
+          طباعة / حفظ PDF
+        </button>
+      </div>
+
+      <header className="report-letterhead">
+        <div className="report-logo">
+          {settings.universityLogoUrl ? (
+            <img
+              src={settings.universityLogoUrl}
+              alt="شعار جامعة بابل"
+            />
+          ) : null}
+        </div>
+
+        <div className="report-heading">
+          <h1>{settings.eventTitle}</h1>
+          {settings.eventSubtitle ? (
+            <p>{settings.eventSubtitle}</p>
+          ) : null}
+          <h2>بيان النتائج الرسمي - مرحلة التصفيات</h2>
+        </div>
+
+        <div className="report-logo">
+          {settings.departmentLogoUrl ? (
+            <img
+              src={settings.departmentLogoUrl}
+              alt="شعار قسم النشاطات الطلابية"
+            />
+          ) : null}
+        </div>
+      </header>
+
+      <div className="report-patronage">
+        <strong>{PATRONAGE_LINE}</strong>
+        <strong>{SUPERVISION_LINE}</strong>
+      </div>
+
+      <div className="report-meta">
+        <span>
+          <b>عدد الكليات المشاركة:</b> {finalEntries.length}
+        </span>
+        <span>
+          <b>تاريخ ووقت إصدار البيان:</b> {issuedAt}
+        </span>
+        {settings.venue ? (
+          <span>
+            <b>المكان:</b> {settings.venue}
+          </span>
+        ) : null}
+        {settings.season ? (
+          <span>
+            <b>الموسم:</b> {settings.season}
+          </span>
+        ) : null}
+      </div>
+
+      <section className="report-top-three">
+        {topThree.map((entry) => (
+          <article
+            className={[
+              "report-podium-card",
+              entry.rank === 1 ? "first" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            key={entry.college.id}
+          >
+            <span>المركز {entry.rank}</span>
+            <strong>{entry.college.name}</strong>
+            <b>{entry.scorePoints} نقطة</b>
+            <small>
+              مجموع زمن الإجابات:{" "}
+              {(entry.totalResponseTimeMs / 1000).toFixed(3)} ثانية
+            </small>
+          </article>
+        ))}
+      </section>
+
+      <h3 className="report-table-title">
+        {settings.copy.finalRankingTitle}
+      </h3>
+
+      <table className="official-results-table">
+        <thead>
+          <tr>
+            <th>المركز</th>
+            <th>الكلية</th>
+            <th>المجموع</th>
+            <th>مجموع زمن الإجابات</th>
+            <th>الإجابات الصحيحة</th>
+            <th>الإجابات الخاطئة</th>
+          </tr>
+        </thead>
+        <tbody>
+          {finalEntries.map((entry) => (
+            <tr
+              key={entry.college.id}
+              className={
+                (entry.rank ?? 99) <= 3
+                  ? "report-top-row"
+                  : undefined
+              }
+            >
+              <td>{entry.rank}</td>
+              <td>{entry.college.name}</td>
+              <td>{entry.scorePoints} نقطة</td>
+              <td>
+                {(entry.totalResponseTimeMs / 1000).toFixed(3)} ثانية
+              </td>
+              <td>{entry.correctAnswers}</td>
+              <td>{entry.wrongAnswers}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <footer className="report-footer">
+        <span>
+          تم إصدار هذا البيان من نظام مسابقة بنك المعلومات اعتمادًا
+          على النتائج المسجلة في النظام بعد اكتمال التصفيات.
+        </span>
+        <span>{settings.footerText}</span>
+      </footer>
+    </section>
+  );
+}
+
 
 function TeamLivePanel({
   snapshot,
@@ -2649,6 +3048,13 @@ function TeamLivePanel({
     station === "A"
       ? snapshot.round?.teamA ?? null
       : snapshot.round?.teamB ?? null;
+
+  const teamRevealResult =
+    snapshot.revealResults === null
+      ? null
+      : station === "A"
+        ? snapshot.revealResults.teamA
+        : snapshot.revealResults.teamB;
 
   const serverNow = now + serverOffsetMs;
   const countdownValue =
@@ -2812,6 +3218,18 @@ function TeamLivePanel({
               {teamState.responseTimeMs !== null
                 ? ` — ${(teamState.responseTimeMs / 1000).toFixed(3)} ثانية`
                 : ""}
+              {snapshot.phase === "QUESTION_REVEAL" &&
+              teamRevealResult !== null
+                ? ` — ${teamRevealResult.scorePoints} نقطة`
+                : ""}
+            </div>
+          ) : null}
+
+          {snapshot.phase === "QUESTION_REVEAL" &&
+          teamRevealResult?.answered === false ? (
+            <div className="answer-locked wrong unanswered-result">
+              <strong>لم تتم الإجابة</strong>
+              <span>0 نقطة</span>
             </div>
           ) : null}
         </>
@@ -2887,6 +3305,35 @@ export function App() {
     useState<ReturnType<typeof io> | null>(null);
   const [effectiveRole, setEffectiveRole] =
     useState<ClientRole>("unknown");
+
+  useEffect(() => {
+    const displayMode = surface === "display";
+    const teamMode = surface === "team-a" || surface === "team-b";
+
+    document.documentElement.classList.toggle(
+      "display-mode",
+      displayMode,
+    );
+    document.body.classList.toggle(
+      "display-mode",
+      displayMode,
+    );
+    document.documentElement.classList.toggle(
+      "team-mode",
+      teamMode,
+    );
+    document.body.classList.toggle(
+      "team-mode",
+      teamMode,
+    );
+
+    return () => {
+      document.documentElement.classList.remove("display-mode");
+      document.body.classList.remove("display-mode");
+      document.documentElement.classList.remove("team-mode");
+      document.body.classList.remove("team-mode");
+    };
+  }, [surface]);
 
   const stationToken = useMemo(() => {
     if (role !== "team-a" && role !== "team-b") {
@@ -3031,10 +3478,17 @@ export function App() {
       className={
         surface === "display"
           ? "display-shell"
-          : "shell"
+          : surface === "report"
+            ? "report-shell"
+            : surface === "team-a" || surface === "team-b"
+              ? "team-shell"
+              : "shell"
       }
     >
-      {surface !== "display" ? (
+      {surface !== "display" &&
+      surface !== "report" &&
+      surface !== "team-a" &&
+      surface !== "team-b" ? (
         <section className="hero">
           <p className="eyebrow">University Knowledge Competition</p>
           <h1>{surfaceTitles[surface]}</h1>
@@ -3053,15 +3507,45 @@ export function App() {
               ? "متصل بالسيرفر"
               : "جاري الاتصال بالسيرفر"}
           </div>
+
+          {surface === "setup" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/draw">
+                القرعة الرسمية
+              </a>
+              <a className="button-link" href="/operator">
+                الانتقال إلى لوحة التحكم
+              </a>
+            </div>
+          ) : surface === "draw" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/setup">
+                العودة إلى الإعدادات
+              </a>
+              <a className="button-link" href="/operator">
+                الانتقال إلى لوحة التحكم
+              </a>
+            </div>
+          ) : surface === "operator" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/setup">
+                الانتقال إلى الإعدادات
+              </a>
+              <a className="button-link" href="/draw">
+                القرعة الرسمية
+              </a>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
       {surface === "setup" && competition ? (
         <>
-          <AudienceSettingsPanel settings={audienceSettings} />
           <BulkImportPanel questionBank={questionBank} />
-          <QuestionAllocationPanel allocation={questionAllocation} />
           <SetupSurface snapshot={competition} />
+          <DrawSurface snapshot={competition} />
+          <QuestionAllocationPanel allocation={questionAllocation} />
+          <AudienceSettingsPanel settings={audienceSettings} />
           <ResetAllCompetitionPanel />
         </>
       ) : null}
@@ -3116,11 +3600,23 @@ export function App() {
         </AudienceBroadcastFrame>
       ) : null}
 
+      {surface === "report" ? (
+        <OfficialResultsReport
+          ranking={ranking}
+          settings={audienceSettings}
+          snapshot={liveSnapshot}
+        />
+      ) : null}
+
       {surface === "operator" ? (
         <>
           <OperatorLivePanel snapshot={liveSnapshot} />
           <StationAccessPanel />
         </>
+      ) : null}
+
+      {surface === "stations" ? (
+        <StationPortal />
       ) : null}
 
       {surface === "team-a" || surface === "team-b" ? (
@@ -3149,6 +3645,8 @@ export function App() {
       surface !== "draw" &&
       surface !== "operator" &&
       surface !== "display" &&
+      surface !== "report" &&
+      surface !== "stations" &&
       surface !== "team-a" &&
       surface !== "team-b" ? (
         <section className="panel">
