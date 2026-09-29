@@ -1676,6 +1676,11 @@ function TeamLivePanel({
               const correct =
                 snapshot.phase === "QUESTION_REVEAL" &&
                 snapshot.question?.correctOption === option;
+              const wrong =
+                snapshot.phase === "QUESTION_REVEAL" &&
+                selected &&
+                snapshot.question?.correctOption !== null &&
+                snapshot.question?.correctOption !== option;
 
               return (
                 <button
@@ -1684,6 +1689,7 @@ function TeamLivePanel({
                     "team-option",
                     selected ? "selected" : "",
                     correct ? "correct" : "",
+                    wrong ? "wrong" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
@@ -1702,8 +1708,34 @@ function TeamLivePanel({
           </div>
 
           {teamState?.locked ? (
-            <div className="answer-locked">
-              تم تثبيت الإجابة: {teamState.selectedOption}
+            <div
+              className={[
+                "answer-locked",
+                snapshot.phase === "QUESTION_REVEAL" &&
+                snapshot.question?.correctOption ===
+                  teamState.selectedOption
+                  ? "correct"
+                  : "",
+                snapshot.phase === "QUESTION_REVEAL" &&
+                snapshot.question?.correctOption !== null &&
+                snapshot.question?.correctOption !==
+                  teamState.selectedOption
+                  ? "wrong"
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {snapshot.phase === "QUESTION_REVEAL" ? (
+                <strong>
+                  {snapshot.question?.correctOption ===
+                  teamState.selectedOption
+                    ? "إجابتك صحيحة"
+                    : "إجابتك غير صحيحة"}
+                </strong>
+              ) : (
+                <>تم تثبيت الإجابة: {teamState.selectedOption}</>
+              )}
               {teamState.responseTimeMs !== null
                 ? ` — ${(teamState.responseTimeMs / 1000).toFixed(3)} ثانية`
                 : ""}
@@ -1746,7 +1778,7 @@ function TeamLivePanel({
       ].includes(snapshot.phase) ? (
         <div className="team-waiting-card">
           <strong>{phaseLabel(snapshot.phase)}</strong>
-          <span>سيظهر السؤال تلقائيًا عند بدء الأوبريتر.</span>
+          <span>سيظهر السؤال تلقائيًا عند بدء النظام.</span>
         </div>
       ) : null}
 
