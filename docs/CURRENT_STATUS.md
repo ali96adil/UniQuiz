@@ -69,7 +69,7 @@ Pending creation for M5 implementation
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M5 live audience display: current round, countdown, question, answer-received state and reveal.
+- M5 audience branding/settings, round-total presentation, transition polish and real external-screen verification.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
 - Team reveal displays the full correct answer text plus option letter.
@@ -77,13 +77,23 @@ Pending creation for M5 implementation
 - Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-Bind `/display` to the authoritative live snapshot and add reveal-safe per-team results. Ranking sidebar follows after the live question/reveal scene is verified.
+Pull PR #13 on the Mac and visually verify `/display` through one live question: 3-2-1 → active question → answer-received only → closed hold → automatic Reveal → per-team result → ranking update. Then continue branding/settings and transition polish.
 
 ## Completed
 - CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
 
+## Completed
+- M5 live audience question/reveal scene implemented with reveal-safe per-team results.
+- CI Run #61 PASS: live display/reveal contract.
+- Reveal-gated qualification ranking sidebar implemented; only revealed questions affect totals.
+- CI Run #62 PASS: ranking logic and tie/not-started behavior.
+- Dedicated fullscreen `/display` implemented.
+- CI Run #63 PASS: fullscreen audience surface.
+- Next-round and final qualification ranking scenes implemented.
+- CI Run #64 PASS: M5 end-scene UI build/runtime validation.
+
 ## Blockers
-No current blocker.
+No code blocker; real external-screen visual verification is pending.
 
 ## Do not repeat
 - Do not recreate the repository.
