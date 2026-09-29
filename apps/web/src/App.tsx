@@ -1580,6 +1580,24 @@ function DrawSurface({
 
 
 
+
+function AudienceSceneTransition({
+  sceneKey,
+  children,
+}: {
+  sceneKey: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      key={sceneKey}
+      className="audience-scene-transition"
+    >
+      {children}
+    </div>
+  );
+}
+
 function AudienceBroadcastFrame({
   settings,
   children,
@@ -1752,6 +1770,7 @@ function AudienceRankingSidebar({
           <div
             className={[
               "audience-ranking-row",
+              "ranking-motion",
               entry.status.toLowerCase().replace("_", "-"),
             ].join(" ")}
             key={entry.college.id}
@@ -1988,7 +2007,7 @@ function AudienceLiveSurface({
             <div
               className={[
                 "audience-option",
-                reveal && correctOption === option ? "correct" : "",
+                reveal && correctOption === option ? "correct reveal-correct" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
@@ -3057,24 +3076,42 @@ export function App() {
         <AudienceBroadcastFrame settings={audienceSettings}>
           {liveSnapshot &&
           liveSnapshot.phase !== "IDLE" ? (
-            <div className="audience-broadcast-layout">
-              <AudienceLiveSurface
-                snapshot={liveSnapshot}
-                competition={competition}
-                ranking={ranking}
-                settings={audienceSettings}
-              />
-              <AudienceRankingSidebar
-                ranking={ranking}
-                settings={audienceSettings}
-              />
-            </div>
+            <AudienceSceneTransition
+              sceneKey={[
+                "live",
+                liveSnapshot.phase,
+                liveSnapshot.round?.id ?? 0,
+                liveSnapshot.question?.position ?? 0,
+              ].join(":")}
+            >
+              <div className="audience-broadcast-layout">
+                <AudienceLiveSurface
+                  snapshot={liveSnapshot}
+                  competition={competition}
+                  ranking={ranking}
+                  settings={audienceSettings}
+                />
+                <AudienceRankingSidebar
+                  ranking={ranking}
+                  settings={audienceSettings}
+                />
+              </div>
+            </AudienceSceneTransition>
           ) : (
-            <AudienceDrawSurface
-              snapshot={competition}
-              presentation={drawPresentation}
-              settings={audienceSettings}
-            />
+            <AudienceSceneTransition
+              sceneKey={[
+                "draw",
+                competition.participantsLocked ? "locked" : "open",
+                competition.rounds.length,
+                drawPresentation?.startedAt ?? "stable",
+              ].join(":")}
+            >
+              <AudienceDrawSurface
+                snapshot={competition}
+                presentation={drawPresentation}
+                settings={audienceSettings}
+              />
+            </AudienceSceneTransition>
           )}
         </AudienceBroadcastFrame>
       ) : null}

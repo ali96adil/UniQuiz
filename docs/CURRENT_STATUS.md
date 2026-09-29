@@ -12,7 +12,7 @@ Issue #8 — UniQuiz Roadmap & Current Work
 `feature/m5-audience-live-display`
 
 ## Active pull request
-Pending creation for M5 implementation
+PR #13 — M5: Audience Display & Ranking
 
 ## Completed
 - M4 PR #12 merged to `main` as squash commit `ffb660561ab2c5ee8005ad1e247547656abe6a4f`.
@@ -70,7 +70,7 @@ Pending creation for M5 implementation
 
 ## In progress
 - Setup can now reset all competition data safely while preserving Station A/B credentials and app metadata.
-- M5 audience branding/settings, round-total presentation, transition polish and real external-screen verification.
+- M5 code-complete candidate: persistent branding/settings, configurable audience wording, round-total presentation and polished scene transitions are implemented; real external-screen verification remains.
 - Importer usability fix: questions-only imports accept category names or keys and default to append instead of replacing the existing bank.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
@@ -79,7 +79,7 @@ Pending creation for M5 implementation
 - Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-Pull PR #13 on the Mac and visually verify `/display` through one live question: 3-2-1 → active question → answer-received only → closed hold → automatic Reveal → per-team result → ranking update. Then continue branding/settings and transition polish.
+Pull PR #13 on the Mac and visually verify `/display` on the target external screen through draw → live question → automatic Reveal → ranking update → round total → next-round scene. If accepted, close and merge M5, then start M6 Event-Day Hardening & Recovery.
 
 ## Completed
 - CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.

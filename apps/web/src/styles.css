@@ -1574,3 +1574,62 @@ h2 {
 .audience-copy-settings[open] > summary {
   margin-bottom: 12px;
 }
+
+.audience-scene-transition {
+  min-height: 100%;
+  animation: audience-scene-enter 360ms cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.audience-option.reveal-correct {
+  animation: audience-correct-reveal 520ms ease-out both;
+}
+
+.audience-ranking-row.ranking-motion {
+  transition:
+    transform 320ms ease,
+    background-color 320ms ease,
+    border-color 320ms ease,
+    opacity 320ms ease;
+}
+
+@keyframes audience-scene-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.992);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes audience-correct-reveal {
+  0% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 rgba(34, 197, 94, 0);
+  }
+  55% {
+    transform: scale(1.018);
+    box-shadow: 0 0 34px rgba(34, 197, 94, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audience-scene-transition,
+  .audience-option.reveal-correct,
+  .audience-round-totals > div,
+  .audience-next-round-block {
+    animation: none !important;
+  }
+
+  .audience-ranking-row.ranking-motion {
+    transition: none;
+  }
+}
