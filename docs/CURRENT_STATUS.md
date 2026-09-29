@@ -1,6 +1,6 @@
 # Current Status
 
-Updated: 2026-09-28
+Updated: 2026-09-29
 
 ## Active milestone
 Issue #6 — M5 Audience Display & Ranking
@@ -69,9 +69,7 @@ PR #13 — M5: Audience Display & Ranking
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- Setup can now reset all competition data safely while preserving Station A/B credentials and app metadata.
-- M5 code-complete candidate: persistent branding/settings, configurable audience wording, round-total presentation and polished scene transitions are implemented; real external-screen verification remains.
-- Importer usability fix: questions-only imports accept category names or keys and default to append instead of replacing the existing bank.
+- M5 is code-complete on PR #13. The only remaining gate is real external-screen/projector visual verification.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
 - Team reveal displays the full correct answer text plus option letter.
@@ -79,7 +77,7 @@ PR #13 — M5: Audience Display & Ranking
 - Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-Pull PR #13 on the Mac and visually verify `/display` on the target external screen through draw → live question → automatic Reveal → ranking update → round total → next-round scene. If accepted, close and merge M5, then start M6 Event-Day Hardening & Recovery.
+Pull PR #13 on the Mac and visually verify `/display` on the target external screen through: draw → branded live scene → 3-2-1 → 30-second question → answer-received only → automatic Reveal → ranking update → animated round totals → next-round scene → final-results scene. If accepted, close and merge M5, then start M6 Event-Day Hardening & Recovery.
 
 ## Completed
 - CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
@@ -98,6 +96,12 @@ Pull PR #13 on the Mac and visually verify `/display` on the target external scr
 - CI Run #67 PASS: category-name question import + safe append mode.
 - CI Run #68 PASS: full competition reset contract.
 - CI Run #69 PASS: clearer M3 pre-draw allocation state.
+
+## Completed
+- CI Run #72 PASS: persistent audience branding + local offline logo assets.
+- CI Run #73 PASS: revealed-only animated round totals.
+- CI Run #76 PASS: all static audience wording configurable from Setup.
+- CI Run #77 PASS: polished keyed scene transitions with reduced-motion fallback.
 
 ## Blockers
 No code blocker; real external-screen visual verification is pending.
