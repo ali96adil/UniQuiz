@@ -98,7 +98,7 @@ test("complete paired round runs 10 operator-paced questions end-to-end", async 
     db,
     io,
     1,
-    45_000,
+    30_000,
     showControl,
     () => true,
     5,
@@ -245,7 +245,7 @@ test("required station readiness blocks confirmation", () => {
     db,
     io,
     1,
-    45_000,
+    30_000,
     undefined,
     (role) => role === "team-a",
   );
@@ -277,7 +277,7 @@ test("throwing show-control output cannot stop official live flow", async () => 
     db,
     io,
     1,
-    45_000,
+    30_000,
     brokenShowControl,
     () => true,
   );

@@ -1055,7 +1055,7 @@ export class LiveSessionManager {
     }
 
     const clock = this.questionClock.snapshot();
-    if (clock.elapsedMs > QUESTION_DURATION_MS) {
+    if (clock.elapsedMs >= QUESTION_DURATION_MS) {
       const current = this.stateRow();
       if (current.phase === "QUESTION_ACTIVE") {
         this.closeActiveQuestion("TIMEOUT");

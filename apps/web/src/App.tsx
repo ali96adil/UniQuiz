@@ -1501,7 +1501,7 @@ function OperatorLivePanel({
 
       {snapshot.phase === "QUESTION_ACTIVE" ? (
         <p className="locked-note">
-          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 45 ثانية.
+          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 30 ثانية.
         </p>
       ) : null}
 

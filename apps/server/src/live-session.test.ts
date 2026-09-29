@@ -82,7 +82,7 @@ test("team answers lock once and paired round closes after both submit", async (
   const db = seedLiveRound();
   const app = Fastify();
   const io = new SocketIOServer(app.server);
-  const manager = new LiveSessionManager(db, io, 1, 45_000);
+  const manager = new LiveSessionManager(db, io, 1, 30_000);
 
   manager.prepareRound(1);
   manager.confirmStations();
@@ -153,7 +153,7 @@ test("solo round requires only Team A and closes on its answer", async () => {
 
   const app = Fastify();
   const io = new SocketIOServer(app.server);
-  const manager = new LiveSessionManager(db, io, 1, 45_000);
+  const manager = new LiveSessionManager(db, io, 1, 30_000);
 
   manager.prepareRound(1);
   manager.confirmStations();
@@ -194,7 +194,7 @@ test("start round rechecks station readiness after confirmation", () => {
     db,
     io,
     1,
-    45_000,
+    30_000,
     undefined,
     (role) =>
       role === "team-a"
@@ -241,7 +241,7 @@ test("automatically reveals only after all required teams answer", async () => {
     db,
     io,
     1,
-    45_000,
+    30_000,
     {
       send(address) {
         events.push(address);
