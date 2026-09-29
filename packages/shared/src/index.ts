@@ -187,6 +187,7 @@ export interface LiveSnapshot {
   qualificationComplete: boolean;
   stationReadiness: LiveStationReadiness;
   answerStatus: LiveAnswerStatus;
+  revealResults: LiveRevealResults | null;
 }
 
 export interface LiveAnswerStatus {
@@ -217,4 +218,18 @@ export interface LiveStationReadiness {
   teamAConnected: boolean;
   teamBRequired: boolean;
   teamBConnected: boolean;
+}
+
+export interface LiveRevealTeamResult {
+  station: "A" | "B";
+  answered: boolean;
+  selectedOption: "A" | "B" | "C" | "D" | null;
+  isCorrect: boolean | null;
+  responseTimeMs: number | null;
+  scorePoints: number;
+}
+
+export interface LiveRevealResults {
+  teamA: LiveRevealTeamResult;
+  teamB: LiveRevealTeamResult | null;
 }

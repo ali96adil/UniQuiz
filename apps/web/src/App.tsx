@@ -1151,6 +1151,301 @@ function AudienceDrawSurface({
 }
 
 
+
+function AudienceLiveSurface({
+  snapshot,
+}: {
+  snapshot: LiveSnapshot;
+}) {
+  const [now, setNow] = useState(Date.now());
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
+
+  useEffect(() => {
+    setServerOffsetMs(snapshot.serverNowEpochMs - Date.now());
+  }, [snapshot.serverNowEpochMs]);
+
+  useEffect(() => {
+    if (
+      snapshot.phase !== "QUESTION_COUNTDOWN" &&
+      snapshot.phase !== "QUESTION_ACTIVE"
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [snapshot.phase]);
+
+  const serverNow = now + serverOffsetMs;
+  const countdownValue =
+    snapshot.phase === "QUESTION_COUNTDOWN" &&
+    snapshot.countdownStartedAtEpochMs !== null
+      ? Math.max(
+          1,
+          Math.ceil(
+            (snapshot.countdownStartedAtEpochMs + 3000 - serverNow) /
+              1000,
+          ),
+        )
+      : null;
+
+  const remainingSeconds =
+    snapshot.phase === "QUESTION_ACTIVE" &&
+    snapshot.questionDeadlineEpochMs !== null
+      ? Math.max(
+          0,
+          Math.ceil(
+            (snapshot.questionDeadlineEpochMs - serverNow) / 1000,
+          ),
+        )
+      : null;
+
+  const round = snapshot.round;
+  const question = snapshot.question;
+
+  const resultCard = (
+    label: string,
+    collegeName: string,
+    result: LiveSnapshot["revealResults"] extends infer R
+      ? R extends { teamA: infer T } ? T : never
+      : never,
+  ) => (
+    <div
+      className={[
+        "audience-team-result",
+        result?.isCorrect === true ? "correct" : "",
+        result?.isCorrect === false ? "wrong" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span>{label}</span>
+      <strong>{collegeName}</strong>
+      {result?.answered ? (
+        <>
+          <b>
+            الإجابة: {result.selectedOption ?? "—"}
+          </b>
+          <small>
+            {result.isCorrect ? "صحيحة" : "غير صحيحة"}
+            {" · "}
+            {result.responseTimeMs !== null
+              ? `${(result.responseTimeMs / 1000).toFixed(3)} ثانية`
+              : "—"}
+            {" · "}
+            {result.scorePoints} نقطة
+          </small>
+        </>
+      ) : (
+        <>
+          <b>لم تتم الإجابة</b>
+          <small>0 نقطة</small>
+        </>
+      )}
+    </div>
+  );
+
+  if (!round) {
+    return (
+      <section className="audience-stage">
+        <div className="audience-kicker">مسابقة بنك المعلومات</div>
+        <h2 className="audience-title">بانتظار الجولة القادمة</h2>
+      </section>
+    );
+  }
+
+  if (snapshot.phase === "QUESTION_COUNTDOWN") {
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-round-strip">
+          <span>جولة {round.order}</span>
+          <strong>{round.teamA.name}</strong>
+          <b>{round.teamB ? "VS" : "SOLO"}</b>
+          <strong>{round.teamB?.name ?? "جولة فردية"}</strong>
+        </div>
+        <div className="audience-countdown">{countdownValue}</div>
+      </section>
+    );
+  }
+
+  if (
+    snapshot.phase === "QUESTION_READY" ||
+    snapshot.phase === "ROUND_READY" ||
+    snapshot.phase === "ROUND_ACTIVE" ||
+    snapshot.phase === "INTERMISSION"
+  ) {
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-kicker">
+          جولة {round.order}
+        </div>
+        <h2 className="audience-title">
+          {round.teamA.name}
+          <span className="audience-vs">
+            {round.teamB ? " VS " : " — "}
+          </span>
+          {round.teamB?.name ?? "جولة فردية"}
+        </h2>
+        <p className="audience-copy">
+          {snapshot.phase === "QUESTION_READY"
+            ? `السؤال ${question?.position ?? "—"} جاهز — بانتظار START من النظام`
+            : snapshot.phase === "INTERMISSION"
+              ? "استراحة قصيرة"
+              : "الجولة جاهزة"}
+        </p>
+      </section>
+    );
+  }
+
+  if (
+    snapshot.phase === "QUESTION_ACTIVE" ||
+    snapshot.phase === "QUESTION_CLOSED" ||
+    snapshot.phase === "QUESTION_REVEAL"
+  ) {
+    const reveal = snapshot.phase === "QUESTION_REVEAL";
+    const correctOption = question?.correctOption;
+
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-question-header">
+          <div>
+            <span>جولة {round.order}</span>
+            <strong>
+              سؤال {question?.position ?? "—"} / 10
+            </strong>
+          </div>
+          <span>{question?.categoryName ?? ""}</span>
+          <div className="audience-timer">
+            {remainingSeconds !== null
+              ? remainingSeconds
+              : snapshot.phase === "QUESTION_CLOSED"
+                ? "مغلق"
+                : "النتيجة"}
+          </div>
+        </div>
+
+        <h2 className="audience-question-text">
+          {question?.prompt ?? ""}
+        </h2>
+
+        <div className="audience-options">
+          {(["A", "B", "C", "D"] as const).map((option) => (
+            <div
+              className={[
+                "audience-option",
+                reveal && correctOption === option ? "correct" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              key={option}
+            >
+              <b>{option}</b>
+              <span>{question?.options?.[option] ?? ""}</span>
+            </div>
+          ))}
+        </div>
+
+        {!reveal ? (
+          <div className="audience-answer-status">
+            <div
+              className={
+                snapshot.answerStatus.teamAReceived
+                  ? "received"
+                  : ""
+              }
+            >
+              <strong>{round.teamA.name}</strong>
+              <span>
+                {snapshot.answerStatus.teamAReceived
+                  ? "تم استلام الإجابة"
+                  : "بانتظار الإجابة"}
+              </span>
+            </div>
+            {round.teamB ? (
+              <div
+                className={
+                  snapshot.answerStatus.teamBReceived
+                    ? "received"
+                    : ""
+                }
+              >
+                <strong>{round.teamB.name}</strong>
+                <span>
+                  {snapshot.answerStatus.teamBReceived
+                    ? "تم استلام الإجابة"
+                    : "بانتظار الإجابة"}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <div className="audience-correct-answer">
+              <span>الإجابة الصحيحة</span>
+              <strong>
+                {correctOption && question?.options
+                  ? question.options[correctOption]
+                  : "—"}
+              </strong>
+              <small>
+                {correctOption ? `الخيار ${correctOption}` : ""}
+              </small>
+            </div>
+
+            <div className="audience-results-grid">
+              {snapshot.revealResults
+                ? resultCard(
+                    "Team A",
+                    round.teamA.name,
+                    snapshot.revealResults.teamA,
+                  )
+                : null}
+              {snapshot.revealResults?.teamB && round.teamB
+                ? resultCard(
+                    "Team B",
+                    round.teamB.name,
+                    snapshot.revealResults.teamB,
+                  )
+                : null}
+            </div>
+          </>
+        )}
+
+        {snapshot.phase === "QUESTION_CLOSED" ? (
+          <div className="audience-closed-note">
+            تم إغلاق السؤال — بانتظار إعلان النتيجة
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  if (snapshot.phase === "ROUND_COMPLETE") {
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-kicker">
+          جولة {round.order}
+        </div>
+        <h2 className="audience-title">انتهت الجولة</h2>
+        <p className="audience-copy">
+          {snapshot.qualificationComplete
+            ? "انتهت جميع جولات التصفيات"
+            : "بانتظار الجولة القادمة"}
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="audience-stage">
+      <h2 className="audience-title">{phaseLabel(snapshot.phase)}</h2>
+    </section>
+  );
+}
+
 function phaseLabel(phase: LiveSnapshot["phase"]): string {
   const labels: Record<LiveSnapshot["phase"], string> = {
     IDLE: "بانتظار تجهيز الجولة",
@@ -1966,10 +2261,15 @@ export function App() {
       ) : null}
 
       {surface === "display" && competition ? (
-        <AudienceDrawSurface
-          snapshot={competition}
-          presentation={drawPresentation}
-        />
+        liveSnapshot &&
+        liveSnapshot.phase !== "IDLE" ? (
+          <AudienceLiveSurface snapshot={liveSnapshot} />
+        ) : (
+          <AudienceDrawSurface
+            snapshot={competition}
+            presentation={drawPresentation}
+          />
+        )
       ) : null}
 
       {surface === "operator" ? (

@@ -9,6 +9,7 @@ import type {
   LiveRoundView,
   LiveSnapshot,
   LiveSubmissionReceipt,
+  LiveRevealResults,
   LiveTeamSubmissionState,
 } from "@uniquiz/shared";
 import { appendAuditEvent } from "./audit.js";
@@ -351,19 +352,64 @@ export class LiveSessionManager {
     const submissionRows =
       state.roundId !== null && state.questionPosition !== null
         ? (this.db.prepare(`
-            SELECT station
+            SELECT
+              station,
+              selected_option AS selectedOption,
+              response_time_ms AS responseTimeMs,
+              is_correct AS isCorrect,
+              score_micros AS scoreMicros
             FROM live_submissions
             WHERE round_id = ?
               AND question_position = ?
           `).all(
             state.roundId,
             state.questionPosition,
-          ) as Array<{ station: "A" | "B" }>)
+          ) as Array<{
+            station: "A" | "B";
+            selectedOption: "A" | "B" | "C" | "D";
+            responseTimeMs: number;
+            isCorrect: number;
+            scoreMicros: number;
+          }>)
         : [];
 
     const receivedStations = new Set(
       submissionRows.map((submission) => submission.station),
     );
+
+    let revealResults: LiveRevealResults | null = null;
+
+    if (
+      state.phase === "QUESTION_REVEAL" &&
+      round !== null
+    ) {
+      const resultFor = (
+        station: "A" | "B",
+      ): LiveRevealResults["teamA"] => {
+        const submission = submissionRows.find(
+          (entry) => entry.station === station,
+        );
+
+        return {
+          station,
+          answered: Boolean(submission),
+          selectedOption: submission?.selectedOption ?? null,
+          isCorrect:
+            submission === undefined
+              ? null
+              : submission.isCorrect === 1,
+          responseTimeMs: submission?.responseTimeMs ?? null,
+          scorePoints:
+            (submission?.scoreMicros ?? 0) / 1_000_000,
+        };
+      };
+
+      revealResults = {
+        teamA: resultFor("A"),
+        teamB:
+          round.teamB === null ? null : resultFor("B"),
+      };
+    }
 
     const roundCounts = this.db.prepare(`
       SELECT
@@ -411,6 +457,7 @@ export class LiveSessionManager {
         teamBRequired: round?.teamB !== null,
         teamBReceived: receivedStations.has("B"),
       },
+      revealResults,
     };
   }
 
