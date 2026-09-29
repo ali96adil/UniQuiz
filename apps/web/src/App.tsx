@@ -109,6 +109,17 @@ function PresenceCard({ station }: { station: StationPresence }) {
   );
 }
 
+function audienceText(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return Object.entries(values).reduce(
+    (result, [key, value]) =>
+      result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 function StatusMessage({
   error,
   message,
@@ -500,6 +511,23 @@ function AudienceSettingsPanel({
     );
   };
 
+  const setCopyField = (
+    key: keyof AudienceDisplaySettings["copy"],
+    value: string,
+  ) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            copy: {
+              ...current.copy,
+              [key]: value,
+            },
+          }
+        : current,
+    );
+  };
+
   const save = async () => {
     setBusy(true);
     setError(null);
@@ -517,6 +545,7 @@ function AudienceSettingsPanel({
             season: draft.season,
             footerText: draft.footerText,
             roundLabel: draft.roundLabel,
+            copy: draft.copy,
           }),
         },
       );
@@ -671,6 +700,82 @@ function AudienceSettingsPanel({
           />
         </label>
       </div>
+
+
+      <details className="audience-copy-settings">
+        <summary>نصوص شاشة الجمهور المتقدمة</summary>
+        <p className="muted">
+          يمكن استخدام المتغيرات {"{count}"} و{"{question}"} و{"{rank}"}
+          في الحقول التي تحتويها افتراضيًا.
+        </p>
+        <div className="audience-settings-grid">
+          {([
+            ["welcomeTitle", "عنوان الترحيب"],
+            ["waitingParticipantsText", "انتظار المشاركين"],
+            ["drawPhaseLabel", "تسمية مرحلة القرعة"],
+            ["drawOfficialTitle", "عنوان القرعة"],
+            ["participatingCollegeCountText", "عدد الكليات المشاركة"],
+            ["drawWaitingText", "انتظار إجراء القرعة"],
+            ["drawPresentingKicker", "أثناء إعلان القرعة"],
+            ["drawResultsKicker", "بعد إعلان القرعة"],
+            ["roundsTitle", "عنوان الجولات"],
+            ["versusLabel", "VS"],
+            ["soloLabel", "SOLO"],
+            ["soloRoundText", "الجولة الفردية"],
+            ["drawPresentingFooter", "Footer أثناء القرعة"],
+            ["drawCompleteFooter", "Footer بعد القرعة"],
+            ["rankingTitle", "عنوان الترتيب"],
+            ["rankingSubtitle", "وصف الترتيب"],
+            ["playingStatus", "حالة يلعب الآن"],
+            ["completedStatus", "حالة مكتملة"],
+            ["notStartedStatus", "حالة لم تبدأ"],
+            ["pointsLabel", "تسمية النقاط"],
+            ["waitingRoundsText", "انتظار بدء الجولات"],
+            ["waitingNextRoundText", "انتظار الجولة القادمة"],
+            ["questionLabel", "تسمية السؤال"],
+            ["questionReadyText", "رسالة السؤال الجاهز"],
+            ["intermissionText", "رسالة الاستراحة"],
+            ["roundReadyText", "رسالة الجولة الجاهزة"],
+            ["closedLabel", "تسمية مغلق"],
+            ["resultLabel", "تسمية النتيجة"],
+            ["answerPrefix", "تسمية الإجابة"],
+            ["correctStatus", "تسمية صحيحة"],
+            ["wrongStatus", "تسمية غير صحيحة"],
+            ["secondsLabel", "تسمية الثانية"],
+            ["noAnswerText", "لم تتم الإجابة"],
+            ["answerReceivedText", "تم استلام الإجابة"],
+            ["waitingAnswerText", "بانتظار الإجابة"],
+            ["correctAnswerLabel", "الإجابة الصحيحة"],
+            ["optionLabel", "تسمية الخيار"],
+            ["closedWaitingResultText", "إغلاق السؤال قبل النتيجة"],
+            ["qualificationCompleteKicker", "انتهاء التصفيات"],
+            ["finalRankingTitle", "عنوان الترتيب النهائي"],
+            ["positionLabel", "تسمية المركز"],
+            ["qualificationFinalText", "نص اعتماد نتائج التصفيات"],
+            ["roundEndedPrefix", "بادئة انتهاء الجولة"],
+            ["roundResultTitle", "عنوان نتيجة الجولة"],
+            ["nextRoundTitle", "عنوان الجولة القادمة"],
+            ["waitingNextRoundSelectionText", "انتظار تحديد الجولة القادمة"],
+            ["teamALabel", "تسمية Team A"],
+            ["teamBLabel", "تسمية Team B"],
+          ] as Array<
+            [
+              keyof AudienceDisplaySettings["copy"],
+              string,
+            ]
+          >).map(([key, label]) => (
+            <label key={key}>
+              <span>{label}</span>
+              <input
+                value={draft.copy[key]}
+                onChange={(event) =>
+                  setCopyField(key, event.target.value)
+                }
+              />
+            </label>
+          ))}
+        </div>
+      </details>
 
       <div className="audience-logo-grid">
         {([
@@ -1270,8 +1375,10 @@ function RoundCard({
 
       <div className="versus">
         <span>{round.collegeA.name}</span>
-        <b>{round.collegeB ? "VS" : "SOLO"}</b>
-        <span>{round.collegeB?.name ?? "جولة فردية"}</span>
+        <b>{round.collegeB
+                ? settings.copy.versusLabel
+                : settings.copy.soloLabel}</b>
+        <span>{round.collegeB?.name ?? settings.copy.soloRoundText}</span>
       </div>
 
       <button
@@ -1540,8 +1647,8 @@ function AudienceDrawSurface({
     return (
       <section className="audience-stage">
         <div className="audience-kicker">مسابقة بنك المعلومات</div>
-        <h2 className="audience-title">أهلاً بكم</h2>
-        <p className="audience-copy">بانتظار تثبيت الكليات المشاركة</p>
+        <h2 className="audience-title">{settings.copy.welcomeTitle}</h2>
+        <p className="audience-copy">{settings.copy.waitingParticipantsText}</p>
       </section>
     );
   }
@@ -1549,17 +1656,17 @@ function AudienceDrawSurface({
   if (snapshot.rounds.length === 0) {
     return (
       <section className="audience-stage">
-        <div className="audience-kicker">مرحلة القرعة</div>
-        <h2 className="audience-title">القرعة الرسمية</h2>
+        <div className="audience-kicker">{settings.copy.drawPhaseLabel}</div>
+        <h2 className="audience-title">{settings.copy.drawOfficialTitle}</h2>
         <p className="audience-copy">
-          {participantNames.length} كلية مشاركة
+          {audienceText(settings.copy.participatingCollegeCountText, { count: participantNames.length })}
         </p>
         <div className="audience-participants">
           {participantNames.map((name) => (
             <span key={name}>{name}</span>
           ))}
         </div>
-        <div className="draw-waiting">بانتظار إجراء القرعة</div>
+        <div className="draw-waiting">{settings.copy.drawWaitingText}</div>
       </section>
     );
   }
@@ -1569,10 +1676,14 @@ function AudienceDrawSurface({
   return (
     <section className="audience-stage">
       <div className="audience-kicker">
-        {activePresentation ? "جاري إعلان القرعة" : "نتائج القرعة"}
+        {activePresentation
+          ? settings.copy.drawPresentingKicker
+          : settings.copy.drawResultsKicker}
       </div>
       <h2 className="audience-title">
-        {activePresentation ? "الجولات" : "القرعة الرسمية"}
+        {activePresentation
+          ? settings.copy.roundsTitle
+          : settings.copy.drawOfficialTitle}
       </h2>
 
       <div
@@ -1601,9 +1712,11 @@ function AudienceDrawSurface({
             </span>
             <div className="audience-matchup">
               <strong>{round.collegeA.name}</strong>
-              <b>{round.collegeB ? "VS" : "SOLO"}</b>
+              <b>{round.collegeB
+                ? settings.copy.versusLabel
+                : settings.copy.soloLabel}</b>
               <strong>
-                {round.collegeB?.name ?? "جولة فردية"}
+                {round.collegeB?.name ?? settings.copy.soloRoundText}
               </strong>
             </div>
           </article>
@@ -1612,8 +1725,8 @@ function AudienceDrawSurface({
 
       <div className="audience-footer-message">
         {activePresentation
-          ? "يتم إعلان الجولات حسب ترتيب القرعة"
-          : "تم اعتماد ترتيب الجولات"}
+          ? settings.copy.drawPresentingFooter
+          : settings.copy.drawCompleteFooter}
       </div>
     </section>
   );
@@ -1624,14 +1737,16 @@ function AudienceDrawSurface({
 
 function AudienceRankingSidebar({
   ranking,
+  settings,
 }: {
   ranking: QualificationRankingSnapshot | null;
+  settings: AudienceDisplaySettings;
 }) {
   return (
     <aside className="audience-ranking">
       <div className="audience-ranking-heading">
-        <span>الترتيب العام</span>
-        <small>بعد آخر Reveal</small>
+        <span>{settings.copy.rankingTitle}</span>
+        <small>{settings.copy.rankingSubtitle}</small>
       </div>
 
       <div className="audience-ranking-list">
@@ -1650,10 +1765,10 @@ function AudienceRankingSidebar({
               <strong>{entry.college.name}</strong>
               <small>
                 {entry.status === "PLAYING"
-                  ? "يلعب الآن"
+                  ? settings.copy.playingStatus
                   : entry.status === "COMPLETED"
-                    ? "مكتملة"
-                    : "لم تبدأ"}
+                    ? settings.copy.completedStatus
+                    : settings.copy.notStartedStatus}
               </small>
             </div>
             <div className="audience-rank-score">
@@ -1663,13 +1778,13 @@ function AudienceRankingSidebar({
               <small>
                 {entry.status === "NOT_STARTED"
                   ? ""
-                  : " نقطة"}
+                  : ` ${settings.copy.pointsLabel}`}
               </small>
             </div>
           </div>
         )) ?? (
           <div className="audience-ranking-empty">
-            بانتظار بدء الجولات
+            {settings.copy.waitingRoundsText}
           </div>
         )}
       </div>
@@ -1758,22 +1873,24 @@ function AudienceLiveSurface({
       {result?.answered ? (
         <>
           <b>
-            الإجابة: {result.selectedOption ?? "—"}
+            {settings.copy.answerPrefix}: {result.selectedOption ?? "—"}
           </b>
           <small>
-            {result.isCorrect ? "صحيحة" : "غير صحيحة"}
+            {result.isCorrect
+              ? settings.copy.correctStatus
+              : settings.copy.wrongStatus}
             {" · "}
             {result.responseTimeMs !== null
-              ? `${(result.responseTimeMs / 1000).toFixed(3)} ثانية`
+              ? `${(result.responseTimeMs / 1000).toFixed(3)} ${settings.copy.secondsLabel}`
               : "—"}
             {" · "}
-            {result.scorePoints} نقطة
+            {result.scorePoints} {settings.copy.pointsLabel}
           </small>
         </>
       ) : (
         <>
-          <b>لم تتم الإجابة</b>
-          <small>0 نقطة</small>
+          <b>{settings.copy.noAnswerText}</b>
+          <small>0 {settings.copy.pointsLabel}</small>
         </>
       )}
     </div>
@@ -1783,7 +1900,7 @@ function AudienceLiveSurface({
     return (
       <section className="audience-stage">
         <div className="audience-kicker">مسابقة بنك المعلومات</div>
-        <h2 className="audience-title">بانتظار الجولة القادمة</h2>
+        <h2 className="audience-title">{settings.copy.waitingNextRoundText}</h2>
       </section>
     );
   }
@@ -1794,8 +1911,10 @@ function AudienceLiveSurface({
         <div className="audience-round-strip">
           <span>{settings.roundLabel} {round.order}</span>
           <strong>{round.teamA.name}</strong>
-          <b>{round.teamB ? "VS" : "SOLO"}</b>
-          <strong>{round.teamB?.name ?? "جولة فردية"}</strong>
+          <b>{round.teamB
+            ? settings.copy.versusLabel
+            : settings.copy.soloLabel}</b>
+          <strong>{round.teamB?.name ?? settings.copy.soloRoundText}</strong>
         </div>
         <div className="audience-countdown">{countdownValue}</div>
       </section>
@@ -1818,14 +1937,16 @@ function AudienceLiveSurface({
           <span className="audience-vs">
             {round.teamB ? " VS " : " — "}
           </span>
-          {round.teamB?.name ?? "جولة فردية"}
+          {round.teamB?.name ?? settings.copy.soloRoundText}
         </h2>
         <p className="audience-copy">
           {snapshot.phase === "QUESTION_READY"
-            ? `السؤال ${question?.position ?? "—"} جاهز — بانتظار START من النظام`
+            ? audienceText(settings.copy.questionReadyText, {
+                question: question?.position ?? "—",
+              })
             : snapshot.phase === "INTERMISSION"
-              ? "استراحة قصيرة"
-              : "الجولة جاهزة"}
+              ? settings.copy.intermissionText
+              : settings.copy.roundReadyText}
         </p>
       </section>
     );
@@ -1845,7 +1966,7 @@ function AudienceLiveSurface({
           <div>
             <span>{settings.roundLabel} {round.order}</span>
             <strong>
-              سؤال {question?.position ?? "—"} / 10
+              {settings.copy.questionLabel} {question?.position ?? "—"} / 10
             </strong>
           </div>
           <span>{question?.categoryName ?? ""}</span>
@@ -1853,8 +1974,8 @@ function AudienceLiveSurface({
             {remainingSeconds !== null
               ? remainingSeconds
               : snapshot.phase === "QUESTION_CLOSED"
-                ? "مغلق"
-                : "النتيجة"}
+                ? settings.copy.closedLabel
+                : settings.copy.resultLabel}
           </div>
         </div>
 
@@ -1891,8 +2012,8 @@ function AudienceLiveSurface({
               <strong>{round.teamA.name}</strong>
               <span>
                 {snapshot.answerStatus.teamAReceived
-                  ? "تم استلام الإجابة"
-                  : "بانتظار الإجابة"}
+                  ? settings.copy.answerReceivedText
+                  : settings.copy.waitingAnswerText}
               </span>
             </div>
             {round.teamB ? (
@@ -1915,28 +2036,30 @@ function AudienceLiveSurface({
         ) : (
           <>
             <div className="audience-correct-answer">
-              <span>الإجابة الصحيحة</span>
+              <span>{settings.copy.correctAnswerLabel}</span>
               <strong>
                 {correctOption && question?.options
                   ? question.options[correctOption]
                   : "—"}
               </strong>
               <small>
-                {correctOption ? `الخيار ${correctOption}` : ""}
+                {correctOption
+                  ? `${settings.copy.optionLabel} ${correctOption}`
+                  : ""}
               </small>
             </div>
 
             <div className="audience-results-grid">
               {snapshot.revealResults
                 ? resultCard(
-                    "Team A",
+                    settings.copy.teamALabel,
                     round.teamA.name,
                     snapshot.revealResults.teamA,
                   )
                 : null}
               {snapshot.revealResults?.teamB && round.teamB
                 ? resultCard(
-                    "Team B",
+                    settings.copy.teamBLabel,
                     round.teamB.name,
                     snapshot.revealResults.teamB,
                   )
@@ -1947,7 +2070,7 @@ function AudienceLiveSurface({
 
         {snapshot.phase === "QUESTION_CLOSED" ? (
           <div className="audience-closed-note">
-            تم إغلاق السؤال — بانتظار إعلان النتيجة
+            {settings.copy.closedWaitingResultText}
           </div>
         ) : null}
       </section>
@@ -1965,9 +2088,9 @@ function AudienceLiveSurface({
 
       return (
         <section className="audience-stage audience-live-stage final-results-stage">
-          <div className="audience-kicker">انتهت مرحلة التصفيات</div>
+          <div className="audience-kicker">{settings.copy.qualificationCompleteKicker}</div>
           <h2 className="audience-title">
-            الترتيب النهائي للتصفيات
+            {settings.copy.finalRankingTitle}
           </h2>
 
           {totals ? (
@@ -1975,13 +2098,13 @@ function AudienceLiveSurface({
               <div>
                 <span>{round.teamA.name}</span>
                 <strong>{totals.teamA}</strong>
-                <small>نقطة</small>
+                <small>{settings.copy.pointsLabel}</small>
               </div>
               {round.teamB && totals.teamB !== null ? (
                 <div>
                   <span>{round.teamB.name}</span>
                   <strong>{totals.teamB}</strong>
-                  <small>نقطة</small>
+                  <small>{settings.copy.pointsLabel}</small>
                 </div>
               ) : null}
             </div>
@@ -1998,15 +2121,19 @@ function AudienceLiveSurface({
                   .join(" ")}
                 key={entry.college.id}
               >
-                <span>المركز {entry.rank}</span>
+                <span>
+                  {audienceText(settings.copy.positionLabel, {
+                    rank: entry.rank ?? "—",
+                  })}
+                </span>
                 <strong>{entry.college.name}</strong>
-                <b>{entry.scorePoints} نقطة</b>
+                <b>{entry.scorePoints} {settings.copy.pointsLabel}</b>
               </div>
             ))}
           </div>
 
           <p className="audience-copy">
-            تم اعتماد نتائج جميع جولات التصفيات
+            {settings.copy.qualificationFinalText}
           </p>
         </section>
       );
@@ -2024,42 +2151,44 @@ function AudienceLiveSurface({
     return (
       <section className="audience-stage audience-live-stage">
         <div className="audience-kicker">
-          انتهت {settings.roundLabel} {round.order}
+          {settings.copy.roundEndedPrefix} {settings.roundLabel} {round.order}
         </div>
-        <h2 className="audience-title">نتيجة الجولة</h2>
+        <h2 className="audience-title">{settings.copy.roundResultTitle}</h2>
 
         {totals ? (
           <div className="audience-round-totals">
             <div>
               <span>{round.teamA.name}</span>
               <strong>{totals.teamA}</strong>
-              <small>نقطة</small>
+              <small>{settings.copy.pointsLabel}</small>
             </div>
             {round.teamB && totals.teamB !== null ? (
               <div>
                 <span>{round.teamB.name}</span>
                 <strong>{totals.teamB}</strong>
-                <small>نقطة</small>
+                <small>{settings.copy.pointsLabel}</small>
               </div>
             ) : null}
           </div>
         ) : null}
 
         <div className="audience-next-round-block">
-          <h3>الجولة القادمة</h3>
+          <h3>{settings.copy.nextRoundTitle}</h3>
 
         {nextRound ? (
           <div className="audience-next-match">
             <span>{settings.roundLabel} {nextRound.order}</span>
             <strong>{nextRound.collegeA.name}</strong>
-            <b>{nextRound.collegeB ? "VS" : "SOLO"}</b>
+            <b>{nextRound.collegeB
+              ? settings.copy.versusLabel
+              : settings.copy.soloLabel}</b>
             <strong>
-              {nextRound.collegeB?.name ?? "جولة فردية"}
+              {nextRound.collegeB?.name ?? settings.copy.soloRoundText}
             </strong>
           </div>
         ) : (
           <p className="audience-copy">
-            بانتظار تحديد الجولة القادمة
+            {settings.copy.waitingNextRoundSelectionText}
           </p>
         )}
         </div>
@@ -2277,8 +2406,8 @@ function OperatorLivePanel({
               {!snapshot.answerStatus.teamBRequired
                 ? "غير مطلوبة"
                 : snapshot.answerStatus.teamBReceived
-                  ? "تم استلام الإجابة"
-                  : "بانتظار الإجابة"}
+                  ? settings.copy.answerReceivedText
+                  : settings.copy.waitingAnswerText}
             </small>
           </div>
         </div>
@@ -2933,7 +3062,10 @@ export function App() {
                 ranking={ranking}
                 settings={audienceSettings}
               />
-              <AudienceRankingSidebar ranking={ranking} />
+              <AudienceRankingSidebar
+                ranking={ranking}
+                settings={audienceSettings}
+              />
             </div>
           ) : (
             <AudienceDrawSurface

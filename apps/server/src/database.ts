@@ -255,8 +255,14 @@ export function openDatabase(databasePath: string) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS audience_copy (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      value_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     UPDATE app_meta
-    SET value = '9'
+    SET value = '10'
     WHERE key = 'schema_version';
   `);
 

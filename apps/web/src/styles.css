@@ -1557,3 +1557,20 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.audience-copy-settings {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(30, 41, 59, 0.38);
+}
+
+.audience-copy-settings > summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #bfdbfe;
+}
+
+.audience-copy-settings[open] > summary {
+  margin-bottom: 12px;
+}

@@ -253,6 +253,57 @@ export interface QualificationRankingSnapshot {
   entries: QualificationRankingEntry[];
 }
 
+export interface AudienceDisplayCopy {
+  welcomeTitle: string;
+  waitingParticipantsText: string;
+  drawPhaseLabel: string;
+  drawOfficialTitle: string;
+  participatingCollegeCountText: string;
+  drawWaitingText: string;
+  drawPresentingKicker: string;
+  drawResultsKicker: string;
+  roundsTitle: string;
+  versusLabel: string;
+  soloLabel: string;
+  soloRoundText: string;
+  drawPresentingFooter: string;
+  drawCompleteFooter: string;
+  rankingTitle: string;
+  rankingSubtitle: string;
+  playingStatus: string;
+  completedStatus: string;
+  notStartedStatus: string;
+  pointsLabel: string;
+  waitingRoundsText: string;
+  waitingNextRoundText: string;
+  questionLabel: string;
+  questionReadyText: string;
+  intermissionText: string;
+  roundReadyText: string;
+  closedLabel: string;
+  resultLabel: string;
+  answerPrefix: string;
+  correctStatus: string;
+  wrongStatus: string;
+  secondsLabel: string;
+  noAnswerText: string;
+  answerReceivedText: string;
+  waitingAnswerText: string;
+  correctAnswerLabel: string;
+  optionLabel: string;
+  closedWaitingResultText: string;
+  qualificationCompleteKicker: string;
+  finalRankingTitle: string;
+  positionLabel: string;
+  qualificationFinalText: string;
+  roundEndedPrefix: string;
+  roundResultTitle: string;
+  nextRoundTitle: string;
+  waitingNextRoundSelectionText: string;
+  teamALabel: string;
+  teamBLabel: string;
+}
+
 export interface AudienceDisplaySettings {
   eventTitle: string;
   eventSubtitle: string;
@@ -260,6 +311,7 @@ export interface AudienceDisplaySettings {
   season: string;
   footerText: string;
   roundLabel: string;
+  copy: AudienceDisplayCopy;
   universityLogoUrl: string | null;
   departmentLogoUrl: string | null;
   updatedAt: string;

@@ -42,8 +42,40 @@ test("audience branding persists across full competition reset", () => {
   assert.equal(settings.season, "2026");
   assert.equal(settings.footerText, "Custom Footer");
   assert.equal(settings.roundLabel, "مرحلة");
+  assert.equal(settings.copy.rankingTitle, "الترتيب العام");
   assert.ok(settings.universityLogoUrl?.includes("/university"));
   assert.equal(settings.departmentLogoUrl, null);
+
+  db.close();
+});
+
+
+test("custom audience copy persists with the branding settings", () => {
+  const db = openDatabase(":memory:");
+  const current = getAudienceDisplaySettings(db);
+
+  const copy = {
+    ...current.copy,
+    rankingTitle: "الترتيب التجريبي",
+    nextRoundTitle: "المواجهة التالية",
+    correctAnswerLabel: "الحل الصحيح",
+  };
+
+  db.prepare(`
+    INSERT INTO audience_copy (id, value_json, updated_at)
+    VALUES (1, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      value_json = excluded.value_json,
+      updated_at = excluded.updated_at
+  `).run(
+    JSON.stringify(copy),
+    "2026-09-29T01:00:00.000Z",
+  );
+
+  const updated = getAudienceDisplaySettings(db);
+  assert.equal(updated.copy.rankingTitle, "الترتيب التجريبي");
+  assert.equal(updated.copy.nextRoundTitle, "المواجهة التالية");
+  assert.equal(updated.copy.correctAnswerLabel, "الحل الصحيح");
 
   db.close();
 });
