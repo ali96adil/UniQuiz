@@ -628,7 +628,11 @@ function QuestionAllocationPanel({
               : "preview-state invalid"
           }
         >
-          {allocation.ready ? "READY" : "NOT READY"}
+          {allocation.ready
+            ? "READY"
+            : allocation.roundCount === 0
+              ? "بانتظار القرعة"
+              : "NOT READY"}
         </span>
       </div>
 
@@ -653,8 +657,10 @@ function QuestionAllocationPanel({
             >
               <strong>{category.name}</strong>
               <span>
-                المتوفر {category.availableQuestions} / المطلوب{" "}
-                {category.requiredQuestions}
+                المتوفر {category.availableQuestions} /{" "}
+                {allocation.roundCount === 0
+                  ? "المطلوب يتحدد بعد القرعة"
+                  : `المطلوب ${category.requiredQuestions}`}
               </span>
             </div>
           );
