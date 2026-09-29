@@ -2463,6 +2463,56 @@ function OperationsPreflightPanel() {
     }
   };
 
+  const sendOscTest = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest("/api/operations/osc-test/send", {
+        method: "POST",
+        body: "{}",
+      });
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إرسال OSC Test",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmOscTest = async () => {
+    if (
+      !window.confirm(
+        "أكد فقط إذا شاهدت أو استلمت /uniquiz/system/test على نظام OSC.",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest("/api/operations/osc-test/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          confirm: "OSC_TEST_RECEIVED",
+        }),
+      });
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تأكيد OSC Test",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="panel preflight-panel">
       <div className="section-heading">
