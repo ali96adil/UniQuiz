@@ -3,7 +3,6 @@ import { extname } from "node:path";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Server as SocketIOServer } from "socket.io";
 import ExcelJS from "exceljs";
-import JSZip from "jszip";
 import { parse as parseCsv } from "csv-parse/sync";
 import { z } from "zod";
 import type {
@@ -390,42 +389,6 @@ function detectCsvKind(record: RawRecord): ImportDataKind | null {
   return null;
 }
 
-
-function stripElementNamespacePrefixes(xml: string): string {
-  return xml.replace(
-    /(<\/?)([A-Za-z_][A-Za-z0-9_.-]*):([A-Za-z_][A-Za-z0-9_.-]*)(?=[\s>\/])/g,
-    "$1$3",
-  );
-}
-
-async function normalizeXlsxXmlNamespaces(
-  buffer: Buffer,
-): Promise<Buffer> {
-  const zip = await JSZip.loadAsync(buffer);
-  const xmlEntries = Object.values(zip.files).filter(
-    (entry) =>
-      !entry.dir &&
-      (entry.name.endsWith(".xml") ||
-        entry.name.endsWith(".rels")),
-  );
-
-  await Promise.all(
-    xmlEntries.map(async (entry) => {
-      const xml = await entry.async("string");
-      const normalized = stripElementNamespacePrefixes(xml);
-
-      if (normalized !== xml) {
-        zip.file(entry.name, normalized);
-      }
-    }),
-  );
-
-  return zip.generateAsync({
-    type: "nodebuffer",
-    compression: "DEFLATE",
-  });
-}
-
 function existingCategoryKeys(db: AppDatabase): Set<string> {
   const rows = db.prepare(`
     SELECT category_key AS categoryKey
@@ -477,16 +440,7 @@ export async function parseImportBuffer(
     const workbook = new ExcelJS.Workbook();
 
     try {
-      let workbookBuffer = buffer;
-
-      try {
-        workbookBuffer = await normalizeXlsxXmlNamespaces(buffer);
-      } catch {
-        // If ZIP normalization itself fails, ExcelJS below will report
-        // the workbook as invalid without leaking an internal parser error.
-      }
-
-      await workbook.xlsx.load(workbookBuffer as any);
+      await workbook.xlsx.load(buffer as any);
     } catch {
       issue(
         issues,
