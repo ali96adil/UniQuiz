@@ -2408,8 +2408,8 @@ function OperatorLivePanel({
               {!snapshot.answerStatus.teamBRequired
                 ? "غير مطلوبة"
                 : snapshot.answerStatus.teamBReceived
-                  ? settings.copy.answerReceivedText
-                  : settings.copy.waitingAnswerText}
+                  ? "تم استلام الإجابة"
+                  : "بانتظار الإجابة"}
             </small>
           </div>
         </div>
