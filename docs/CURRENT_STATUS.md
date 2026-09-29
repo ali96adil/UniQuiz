@@ -94,3 +94,14 @@ No code blocker. Only real-display and print-preview visual acceptance remain fo
 - Before participant lock, the audience display now shows the currently selected colleges and updates from the authoritative competition snapshot in real time.
 
 - Contestant answer-choice cards rebalanced after visual review: shorter card height, larger answer text, and larger A/B/C/D badges while preserving the full-screen station layout.
+
+## M6 clean rebuild
+- Rebuilt from current `main` after Post-M5 acceptance; historical stacked branch is reference-only.
+- Active clean branch: `feature/m6-hardening-recovery-clean`.
+- Transferred M6-only behavior: verified backup/restore, Preflight, restart recovery, safe VOID/replacement, XLSX results/audit export, readiness override backend, Emergency Hold, isolated rehearsal database, audience announcement scenes, LAN diagnostics, OSC readiness send/confirm, safe Operator hotkeys, shutdown timer disposal, and reset safety backup.
+- Preserved current Post-M5 behavior: 25-second scoring, direct next-question 3-2-1 flow, timeout auto-reveal, current Setup/Draw flow, full-screen contestant stations, cumulative-time ranking, correct/wrong counts, and official A4 report.
+- Alt+N hotkey follows the current direct `/api/live/start-next-question` flow.
+- Timeout remains automatic and does not expose a manual Reveal action.
+- VOID invalidation applies to score, revealed count, cumulative response time, correct answers, and wrong answers.
+- Next gate: full CI on the clean branch, then real-device M6 rehearsal.
+
