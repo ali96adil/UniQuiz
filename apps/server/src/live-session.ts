@@ -108,6 +108,27 @@ export class LiveSessionManager {
     this.restoreAutomaticReveal();
   }
 
+  dispose(): void {
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+
+    this.clearCountdownCueTimers();
+
+    if (this.questionTimer) {
+      clearTimeout(this.questionTimer);
+      this.questionTimer = null;
+    }
+
+    if (this.autoRevealTimer) {
+      clearTimeout(this.autoRevealTimer);
+      this.autoRevealTimer = null;
+    }
+
+    this.questionClock.clear();
+  }
+
 
   private isAnsweredCloseReason(reason: string | null): boolean {
     return (
@@ -1337,6 +1358,10 @@ export function registerLiveSessionRoutes(
     showControl,
     isStationConnected,
   );
+
+  app.addHook("onClose", async () => {
+    manager.dispose();
+  });
 
   app.get("/api/live", async () => manager.getSnapshot());
 

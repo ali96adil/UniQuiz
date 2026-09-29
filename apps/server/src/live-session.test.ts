@@ -138,6 +138,7 @@ test("team answers lock once and paired round closes after both submit", async (
   assert.equal(recovered?.locked, true);
   assert.equal(recovered?.selectedOption, "B");
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -176,6 +177,7 @@ test("solo round requires only Team A and closes on its answer", async () => {
   assert.equal(snapshot.answerStatus.teamARequired, true);
   assert.equal(snapshot.answerStatus.teamBRequired, false);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -198,6 +200,7 @@ test("startNextQuestion skips the intermediate ready screen", () => {
   assert.equal(snapshot.question?.position, 1);
   assert.equal(snapshot.question?.prompt, null);
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -247,6 +250,7 @@ test("start round rechecks station readiness after confirmation", () => {
 
   assert.equal(manager.getSnapshot().phase, "ROUND_ACTIVE");
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -309,6 +313,7 @@ test("automatically reveals only after all required teams answer", async () => {
   );
   assert.ok(revealIndex > answeredIndex);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -361,6 +366,7 @@ test("reveal results stay hidden until reveal", async () => {
   assert.equal(snapshot.revealResults?.teamB?.isCorrect, false);
   assert.equal(snapshot.revealResults?.teamB?.scorePoints, 0);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -402,6 +408,7 @@ test("round totals include only revealed question scores", async () => {
   assert.ok((snapshot.roundTotals?.teamA ?? 0) > 0);
   assert.equal(snapshot.roundTotals?.teamB, 0);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
