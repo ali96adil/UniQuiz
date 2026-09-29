@@ -2658,27 +2658,52 @@ function OfficialResultsReport({
     autoPrintStarted.current = true;
     let cancelled = false;
 
-    const images = Array.from(document.images);
-    const imagesReady = images.map(
-      (image) =>
-        new Promise<void>((resolve) => {
-          if (image.complete) {
-            resolve();
-            return;
-          }
+    const waitForReportPaint = async () => {
+      const images = Array.from(document.images);
 
-          const finish = () => resolve();
-          image.addEventListener("load", finish, { once: true });
-          image.addEventListener("error", finish, { once: true });
-        }),
-    );
+      await Promise.all(
+        images.map(
+          async (image) => {
+            if (!image.complete) {
+              await new Promise<void>((resolve) => {
+                const finish = () => resolve();
+                image.addEventListener("load", finish, { once: true });
+                image.addEventListener("error", finish, { once: true });
+              });
+            }
 
-    void Promise.all(imagesReady).then(() => {
+            try {
+              await image.decode();
+            } catch {
+              // A failed optional logo must not block the report.
+            }
+          },
+        ),
+      );
+
+      try {
+        await document.fonts.ready;
+      } catch {
+        // Font readiness is best-effort; browser fallback fonts remain printable.
+      }
+
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      });
+
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 500);
+      });
+
       if (cancelled) return;
-      window.setTimeout(() => {
-        if (!cancelled) window.print();
-      }, 250);
-    });
+
+      window.focus();
+      window.print();
+    };
+
+    void waitForReportPaint();
 
     return () => {
       cancelled = true;
