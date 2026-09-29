@@ -105,6 +105,77 @@ export class LiveSessionManager {
     ) => boolean = () => true,
     private readonly autoRevealDelayMs = 1_500,
   ) {
+    this.restorePersistedRuntime();
+  }
+
+  private restorePersistedRuntime(): void {
+    const state = this.stateRow();
+
+    if (
+      state.phase === "QUESTION_COUNTDOWN" &&
+      state.roundId !== null &&
+      state.questionPosition !== null
+    ) {
+      this.updateState({
+        phase: "QUESTION_READY",
+        countdownStartedAtEpochMs: null,
+        questionStartedAtEpochMs: null,
+        questionClosedAtEpochMs: null,
+        closeReason: null,
+      });
+
+      appendAuditEvent(this.db, {
+        eventType: "LIVE_RECOVERY",
+        roundId: state.roundId,
+        position: state.questionPosition,
+        reason: "SERVER_RESTART_DURING_COUNTDOWN",
+        payload: {
+          fromPhase: "QUESTION_COUNTDOWN",
+          toPhase: "QUESTION_READY",
+          action: "REQUIRE_NEW_START",
+        },
+      });
+      return;
+    }
+
+    if (
+      state.phase === "QUESTION_ACTIVE" &&
+      state.roundId !== null &&
+      state.questionPosition !== null
+    ) {
+      const recoveredAt = Date.now();
+
+      this.updateState({
+        phase: "QUESTION_CLOSED",
+        questionClosedAtEpochMs: recoveredAt,
+        closeReason: "SERVER_RESTART_RECOVERY",
+      });
+
+      appendAuditEvent(this.db, {
+        eventType: "LIVE_RECOVERY",
+        roundId: state.roundId,
+        position: state.questionPosition,
+        reason: "SERVER_RESTART_DURING_ACTIVE_QUESTION",
+        payload: {
+          fromPhase: "QUESTION_ACTIVE",
+          toPhase: "QUESTION_CLOSED",
+          action: "VOID_REPLACEMENT_REQUIRED",
+          originalQuestionStartedAtEpochMs:
+            state.questionStartedAtEpochMs,
+        },
+        occurredAt: new Date(recoveredAt).toISOString(),
+      });
+
+      this.sendShowControl(
+        "/uniquiz/question/recovery_required",
+        [
+          this.roundOrder(state.roundId),
+          state.questionPosition,
+        ],
+      );
+      return;
+    }
+
     this.restoreAutomaticReveal();
   }
 
@@ -998,6 +1069,10 @@ export class LiveSessionManager {
       state.questionPosition === null
     ) {
       throw new Error("QUESTION_NOT_CLOSED");
+    }
+
+    if (state.closeReason === "SERVER_RESTART_RECOVERY") {
+      throw new Error("RECOVERY_QUESTION_REQUIRES_VOID");
     }
 
     this.updateState({

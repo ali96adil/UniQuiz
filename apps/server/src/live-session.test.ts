@@ -384,3 +384,146 @@ test("round totals include only revealed question scores", async () => {
   await app.close();
   db.close();
 });
+
+
+test("restart during countdown returns the same question to ready", () => {
+  const db = seedLiveRound();
+  db.prepare(`
+    UPDATE qualification_rounds
+    SET status = 'ACTIVE'
+    WHERE id = 1
+  `).run();
+
+  db.prepare(`
+    UPDATE live_state
+    SET
+      phase = 'QUESTION_COUNTDOWN',
+      round_id = 1,
+      question_position = 1,
+      stations_confirmed = 1,
+      countdown_started_at_epoch_ms = ?,
+      question_started_at_epoch_ms = NULL,
+      question_closed_at_epoch_ms = NULL,
+      close_reason = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `).run(Date.now() - 1000);
+
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    3000,
+    30_000,
+  );
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_READY");
+  assert.equal(snapshot.question?.position, 1);
+  assert.equal(snapshot.countdownStartedAtEpochMs, null);
+
+  const audit = db.prepare(`
+    SELECT reason, payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'LIVE_RECOVERY'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as {
+    reason: string;
+    payloadJson: string;
+  };
+
+  assert.equal(
+    audit.reason,
+    "SERVER_RESTART_DURING_COUNTDOWN",
+  );
+  assert.match(audit.payloadJson, /REQUIRE_NEW_START/);
+
+  io.close();
+  void app.close();
+  db.close();
+});
+
+test("restart during active question fail-closes and requires void replacement", () => {
+  const db = seedLiveRound();
+  db.prepare(`
+    UPDATE qualification_rounds
+    SET status = 'ACTIVE'
+    WHERE id = 1
+  `).run();
+
+  db.prepare(`
+    UPDATE live_state
+    SET
+      phase = 'QUESTION_ACTIVE',
+      round_id = 1,
+      question_position = 1,
+      stations_confirmed = 1,
+      countdown_started_at_epoch_ms = ?,
+      question_started_at_epoch_ms = ?,
+      question_closed_at_epoch_ms = NULL,
+      close_reason = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `).run(
+    Date.now() - 4000,
+    Date.now() - 1000,
+  );
+
+  const events: string[] = [];
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    3000,
+    30_000,
+    {
+      send(address) {
+        events.push(address);
+      },
+    },
+  );
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_CLOSED");
+  assert.equal(
+    snapshot.closeReason,
+    "SERVER_RESTART_RECOVERY",
+  );
+  assert.throws(
+    () => manager.revealQuestion(),
+    /RECOVERY_QUESTION_REQUIRES_VOID/,
+  );
+  assert.equal(
+    events.includes(
+      "/uniquiz/question/recovery_required",
+    ),
+    true,
+  );
+
+  const audit = db.prepare(`
+    SELECT reason, payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'LIVE_RECOVERY'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as {
+    reason: string;
+    payloadJson: string;
+  };
+
+  assert.equal(
+    audit.reason,
+    "SERVER_RESTART_DURING_ACTIVE_QUESTION",
+  );
+  assert.match(
+    audit.payloadJson,
+    /VOID_REPLACEMENT_REQUIRED/,
+  );
+
+  io.close();
+  void app.close();
+  db.close();
+});
