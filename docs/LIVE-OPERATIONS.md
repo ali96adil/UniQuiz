@@ -112,7 +112,17 @@ The operator can put the audience display into manual presentation scenes such a
 These presentation states must not mutate competition scoring/state.
 
 ## Hotkeys
-Operator hotkeys may be added for speed, but dangerous actions require confirmation or deliberately safe key combinations.
+Operator hotkeys are available but remain **OFF by default for every browser session**.
+
+### Implemented operator hotkeys
+- `Alt+N` — context-aware prepare/next action.
+- `Alt+S` — start round or question; requires confirmation.
+- `Alt+R` — Reveal when manual Reveal is allowed; requires confirmation.
+- `Alt+H` — Emergency Hold; still requires a reason and confirmation.
+- `Alt+V` — VOID + same-category replacement; still requires a reason and confirmation.
+- `Alt+C` — complete the round after question 10 Reveal; requires confirmation.
+
+Hotkeys do not fire while focus is in an input, textarea, select, or editable field. They are intentionally session-only and do not persist as enabled after reopening the page.
 
 ## OSC Reliability
 OSC is show-control output only. OSC failure never changes official state.
