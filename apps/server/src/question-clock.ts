@@ -1,4 +1,4 @@
-export const QUESTION_DURATION_MS = 45_000;
+export const QUESTION_DURATION_MS = 30_000;
 
 export interface QuestionClockSnapshot {
   questionKey: string;

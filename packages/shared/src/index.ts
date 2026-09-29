@@ -138,3 +138,83 @@ export interface QuestionAllocationSummary {
   categories: QuestionAllocationCategorySummary[];
   rounds: RoundQuestionSetSummary[];
 }
+
+export type LivePhase =
+  | "IDLE"
+  | "ROUND_READY"
+  | "ROUND_ACTIVE"
+  | "QUESTION_READY"
+  | "QUESTION_COUNTDOWN"
+  | "QUESTION_ACTIVE"
+  | "QUESTION_CLOSED"
+  | "QUESTION_REVEAL"
+  | "INTERMISSION"
+  | "ROUND_COMPLETE";
+
+export interface LiveQuestionView {
+  position: number;
+  categoryKey: string;
+  categoryName: string;
+  prompt: string | null;
+  options: {
+    A: string;
+    B: string;
+    C: string;
+    D: string;
+  } | null;
+  correctOption: "A" | "B" | "C" | "D" | null;
+}
+
+export interface LiveRoundView {
+  id: number;
+  order: number;
+  teamA: College;
+  teamB: College | null;
+}
+
+export interface LiveSnapshot {
+  phase: LivePhase;
+  serverNowEpochMs: number;
+  round: LiveRoundView | null;
+  stationsConfirmed: boolean;
+  question: LiveQuestionView | null;
+  countdownStartedAtEpochMs: number | null;
+  questionStartedAtEpochMs: number | null;
+  questionDeadlineEpochMs: number | null;
+  questionClosedAtEpochMs: number | null;
+  closeReason: string | null;
+  hasPendingRound: boolean;
+  qualificationComplete: boolean;
+  stationReadiness: LiveStationReadiness;
+  answerStatus: LiveAnswerStatus;
+}
+
+export interface LiveAnswerStatus {
+  teamARequired: boolean;
+  teamAReceived: boolean;
+  teamBRequired: boolean;
+  teamBReceived: boolean;
+}
+
+export interface LiveTeamSubmissionState {
+  station: "A" | "B";
+  required: boolean;
+  locked: boolean;
+  selectedOption: "A" | "B" | "C" | "D" | null;
+  submittedAtEpochMs: number | null;
+  responseTimeMs: number | null;
+}
+
+export interface LiveSubmissionReceipt {
+  station: "A" | "B";
+  selectedOption: "A" | "B" | "C" | "D";
+  submittedAtEpochMs: number;
+  responseTimeMs: number;
+}
+
+export interface LiveStationReadiness {
+  teamARequired: boolean;
+  teamAConnected: boolean;
+  teamBRequired: boolean;
+  teamBConnected: boolean;
+}

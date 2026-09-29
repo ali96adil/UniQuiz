@@ -3,18 +3,31 @@
 Updated: 2026-09-28
 
 ## Active milestone
-Issue #4 — M3 Question Bank & Scoring
+Issue #5 — M4 Live Session & Team Stations
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m3-question-bank-import`
+`feature/m4-live-session-stations`
 
 ## Active pull request
-PR #11 — M3: Question Bank, Bulk Import & Scoring
+PR #12 — M4: Live Session & Team Stations
 
 ## Completed
+- M3 PR #11 merged to `main` as squash commit `3a29003c0c50d83d0f54adf41e77862e1495e971`.
+- M4 persistent operator-paced live state machine implemented.
+- Team A/B answer submissions are locked once, persisted, and restored after reconnect; paired questions auto-close when both answer and solo questions close after Team A answers.
+- Operator and Team A/B live interfaces implemented, including 3-2-1, question/options, countdown and answer lock feedback.
+- CI Run #37 PASS: live runtime.
+- CI Run #38 PASS: submission locking and solo/paired closure.
+- CI Run #39 PASS: live web interfaces.
+- CI Run #40 PASS: pre-question station-state correction.
+- Fail-safe OSC show-control output implemented for countdown 3/2/1, question start, answered, timeout, close, reveal, intermission and round completion.
+- Persistent Station A/B access tokens implemented; authenticated presence is required by Station Ready Check.
+- CI Run #42 PASS: OSC output.
+- CI Run #44 PASS: station token binding and readiness.
+- CI Run #45 PASS: full 10-question paired-round integration with 20 locked submissions, manual Reveal, persisted completion, OSC events and OSC-failure isolation.
 - M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
 - M3 bulk import implemented for CSV/XLSX with Preview → Validation → Apply, plus downloadable Excel template.
 - Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
@@ -55,10 +68,18 @@ PR #11 — M3: Question Bank, Bulk Import & Scoring
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M3 complete; preparing M4 Live Session & Team Stations.
+- M4 complete and ready to merge; next milestone is M5 Audience Display & Ranking.
+- App-generated Excel import sample verified successfully on the isolated rehearsal database.
+- Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
+- Team reveal displays the full correct answer text plus option letter.
+- Team waiting copy now says "بانتظار START من النظام".
+- Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-Merge M3, then start M4 operator-paced live-session state machine and Team A/B station assignment.
+Merge M4, then start M5 Audience Display & Ranking by binding `/display` to the live round/question state, countdown, answer-received state and reveal results.
+
+## Completed
+- CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
 
 ## Blockers
 No current blocker.

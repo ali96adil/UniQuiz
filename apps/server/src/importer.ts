@@ -438,7 +438,25 @@ export async function parseImportBuffer(
     }
   } else if (extension === ".xlsx") {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer as any);
+
+    try {
+      await workbook.xlsx.load(buffer as any);
+    } catch {
+      issue(
+        issues,
+        "error",
+        "Workbook",
+        null,
+        "INVALID_XLSX_FILE: The Excel workbook could not be parsed. Re-save it as a standard .xlsx file or use the UniQuiz template.",
+      );
+
+      return {
+        colleges: null,
+        categories: null,
+        questions: null,
+        issues,
+      };
+    }
 
     const collegesSheet = workbook.getWorksheet("Colleges");
     const categoriesSheet = workbook.getWorksheet("Categories");
@@ -639,6 +657,80 @@ async function sendTemplate(reply: FastifyReply) {
 }
 
 
+
+async function sendSampleWorkbook(reply: FastifyReply) {
+  const workbook = new ExcelJS.Workbook();
+
+  const colleges = workbook.addWorksheet("Colleges");
+  colleges.addRow(["name", "short_name", "participating"]);
+  for (const row of [
+    ["كلية الهندسة", "الهندسة", "yes"],
+    ["كلية العلوم", "العلوم", "yes"],
+    ["كلية الطب", "الطب", "yes"],
+    ["كلية القانون", "القانون", "yes"],
+    ["كلية التربية", "التربية", "yes"],
+  ]) {
+    colleges.addRow(row);
+  }
+
+  const categoriesData = [
+    ["sports", "الرياضة"],
+    ["history", "التاريخ"],
+    ["science", "العلوم"],
+    ["arts", "الفنون والثقافة"],
+    ["general", "معلومات عامة"],
+  ] as const;
+
+  const categories = workbook.addWorksheet("Categories");
+  categories.addRow(["key", "name"]);
+  for (const category of categoriesData) {
+    categories.addRow(category);
+  }
+
+  const questions = workbook.addWorksheet("Questions");
+  questions.addRow([
+    "category_key",
+    "question",
+    "option_a",
+    "option_b",
+    "option_c",
+    "option_d",
+    "correct_option",
+    "source_ref",
+  ]);
+
+  const correctOptions = ["A", "B", "C", "D"] as const;
+
+  for (const [categoryKey, categoryName] of categoriesData) {
+    for (let index = 1; index <= 6; index += 1) {
+      questions.addRow([
+        categoryKey,
+        `${categoryName} — سؤال تجريبي ${index}`,
+        `الخيار A-${index}`,
+        `الخيار B-${index}`,
+        `الخيار C-${index}`,
+        `الخيار D-${index}`,
+        correctOptions[(index - 1) % correctOptions.length],
+        "",
+      ]);
+    }
+  }
+
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+  reply
+    .header(
+      "content-type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    .header(
+      "content-disposition",
+      'attachment; filename="UniQuiz-test-import.xlsx"',
+    );
+
+  return reply.send(buffer);
+}
+
 async function sendExport(
   db: AppDatabase,
   reply: FastifyReply,
@@ -762,6 +854,10 @@ export function registerImportRoutes(
   app.get("/api/question-bank", async () => getQuestionBankSummary(db));
   app.get("/api/import/template.xlsx", async (_request, reply) =>
     sendTemplate(reply),
+  );
+
+  app.get("/api/import/sample.xlsx", async (_request, reply) =>
+    sendSampleWorkbook(reply),
   );
 
   app.get("/api/export/data.xlsx", async (_request, reply) =>

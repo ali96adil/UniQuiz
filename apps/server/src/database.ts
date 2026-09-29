@@ -159,8 +159,63 @@ export function openDatabase(databasePath: string) {
     CREATE INDEX IF NOT EXISTS idx_audit_events_round
       ON audit_events(round_id, occurred_at);
 
+    CREATE TABLE IF NOT EXISTS live_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      phase TEXT NOT NULL DEFAULT 'IDLE',
+      round_id INTEGER,
+      question_position INTEGER,
+      stations_confirmed INTEGER NOT NULL DEFAULT 0
+        CHECK (stations_confirmed IN (0, 1)),
+      countdown_started_at_epoch_ms INTEGER,
+      question_started_at_epoch_ms INTEGER,
+      question_closed_at_epoch_ms INTEGER,
+      close_reason TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT INTO live_state (
+      id,
+      phase,
+      round_id,
+      question_position,
+      stations_confirmed,
+      updated_at
+    )
+    VALUES (1, 'IDLE', NULL, NULL, 0, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS live_submissions (
+      round_id INTEGER NOT NULL,
+      question_position INTEGER NOT NULL
+        CHECK (question_position BETWEEN 1 AND 10),
+      station TEXT NOT NULL
+        CHECK (station IN ('A', 'B')),
+      question_id INTEGER NOT NULL,
+      selected_option TEXT NOT NULL
+        CHECK (selected_option IN ('A', 'B', 'C', 'D')),
+      submitted_at_epoch_ms INTEGER NOT NULL,
+      response_time_ms INTEGER NOT NULL,
+      is_correct INTEGER NOT NULL
+        CHECK (is_correct IN (0, 1)),
+      score_micros INTEGER NOT NULL,
+      PRIMARY KEY (round_id, question_position, station),
+      FOREIGN KEY (round_id) REFERENCES qualification_rounds(id),
+      FOREIGN KEY (question_id) REFERENCES questions(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_live_submissions_round_question
+      ON live_submissions(round_id, question_position);
+
+    CREATE TABLE IF NOT EXISTS station_credentials (
+      station TEXT PRIMARY KEY
+        CHECK (station IN ('A', 'B')),
+      access_token TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      rotated_at TEXT
+    );
+
     UPDATE app_meta
-    SET value = '5'
+    SET value = '8'
     WHERE key = 'schema_version';
   `);
 
