@@ -5,34 +5,49 @@ import {
   scoreMicrosToPoints,
 } from "./scoring.js";
 
-test("correct answers at or before 5 seconds receive 10 points", () => {
-  assert.equal(scoreMicrosToPoints(calculateScoreMicros(true, 0)), 10);
-  assert.equal(scoreMicrosToPoints(calculateScoreMicros(true, 5000)), 10);
+test("timer 30 through 25 awards the 25-point maximum", () => {
+  for (const responseTimeMs of [0, 1000, 4999, 5000, 5001, 5999]) {
+    assert.equal(
+      scoreMicrosToPoints(
+        calculateScoreMicros(true, responseTimeMs),
+      ),
+      25,
+    );
+  }
 });
 
-test("score decreases linearly after 5 seconds", () => {
+test("after the 25-second display, points follow the displayed second", () => {
   assert.equal(
-    scoreMicrosToPoints(calculateScoreMicros(true, 5001)),
-    9.999775,
+    scoreMicrosToPoints(calculateScoreMicros(true, 6000)),
+    24,
+  );
+  assert.equal(
+    scoreMicrosToPoints(calculateScoreMicros(true, 15000)),
+    15,
   );
   assert.equal(
     scoreMicrosToPoints(calculateScoreMicros(true, 25000)),
-    5.5,
+    5,
   );
-});
-
-test("correct answer at exactly 45 seconds receives 1 point", () => {
   assert.equal(
-    scoreMicrosToPoints(calculateScoreMicros(true, 45000)),
+    scoreMicrosToPoints(calculateScoreMicros(true, 29000)),
+    1,
+  );
+  assert.equal(
+    scoreMicrosToPoints(calculateScoreMicros(true, 29999)),
     1,
   );
 });
 
-test("wrong, unanswered and late answers receive zero", () => {
+test("at 30 seconds the question is expired and scores zero", () => {
+  assert.equal(calculateScoreMicros(true, 30000), 0);
+  assert.equal(calculateScoreMicros(true, 30001), 0);
+});
+
+test("wrong and unanswered responses receive zero", () => {
   assert.equal(calculateScoreMicros(false, 1000), 0);
-  assert.equal(calculateScoreMicros(false, 45000), 0);
+  assert.equal(calculateScoreMicros(false, 29999), 0);
   assert.equal(calculateScoreMicros(true, null), 0);
-  assert.equal(calculateScoreMicros(true, 45001), 0);
 });
 
 test("invalid response times are rejected", () => {

@@ -1,13 +1,12 @@
 export const SCORE_MICROS_PER_POINT = 1_000_000;
-export const MAX_SCORE_MICROS = 10 * SCORE_MICROS_PER_POINT;
-export const MIN_CORRECT_SCORE_MICROS = 1 * SCORE_MICROS_PER_POINT;
+export const MAX_SCORE_POINTS = 25;
+export const MAX_SCORE_MICROS =
+  MAX_SCORE_POINTS * SCORE_MICROS_PER_POINT;
+export const MIN_CORRECT_SCORE_MICROS =
+  1 * SCORE_MICROS_PER_POINT;
 
-const FULL_SCORE_WINDOW_MS = 5_000;
-const QUESTION_DEADLINE_MS = 45_000;
-
-// Between 5s and 45s, 9 points are lost over 40,000ms.
-// 9,000,000 micro-points / 40,000ms = 225 micro-points per millisecond.
-const SCORE_DECAY_MICROS_PER_MS = 225;
+export const FULL_SCORE_WINDOW_MS = 5_000;
+export const QUESTION_DEADLINE_MS = 30_000;
 
 export function calculateScoreMicros(
   correct: boolean,
@@ -24,19 +23,21 @@ export function calculateScoreMicros(
     throw new Error("responseTimeMs must be a non-negative integer.");
   }
 
-  if (responseTimeMs > QUESTION_DEADLINE_MS) {
+  if (responseTimeMs >= QUESTION_DEADLINE_MS) {
     return 0;
   }
 
-  if (responseTimeMs <= FULL_SCORE_WINDOW_MS) {
-    return MAX_SCORE_MICROS;
-  }
-
-  return (
-    MAX_SCORE_MICROS -
-    (responseTimeMs - FULL_SCORE_WINDOW_MS) *
-      SCORE_DECAY_MICROS_PER_MS
+  const remainingMs =
+    QUESTION_DEADLINE_MS - responseTimeMs;
+  const displayedRemainingSeconds = Math.ceil(
+    remainingMs / 1000,
   );
+  const scorePoints = Math.min(
+    MAX_SCORE_POINTS,
+    displayedRemainingSeconds,
+  );
+
+  return scorePoints * SCORE_MICROS_PER_POINT;
 }
 
 export function scoreMicrosToPoints(scoreMicros: number): number {
