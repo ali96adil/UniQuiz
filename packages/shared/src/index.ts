@@ -321,3 +321,36 @@ export interface LiveRoundTotals {
   teamA: number;
   teamB: number | null;
 }
+
+export interface OperationsBackupRecord {
+  fileName: string;
+  createdAt: string;
+  sizeBytes: number;
+  sha256: string;
+  integrity: "ok";
+  purpose: "manual" | "pre-restore";
+}
+
+export interface OperationsPreflightCheck {
+  key:
+    | "server"
+    | "database"
+    | "draw"
+    | "question_allocation"
+    | "display"
+    | "team_a"
+    | "team_b"
+    | "osc"
+    | "backup";
+  label: string;
+  required: boolean;
+  ready: boolean;
+  detail: string;
+}
+
+export interface OperationsPreflightSnapshot {
+  generatedAt: string;
+  ready: boolean;
+  checks: OperationsPreflightCheck[];
+  latestBackup: OperationsBackupRecord | null;
+}

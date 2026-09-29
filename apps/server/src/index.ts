@@ -21,6 +21,7 @@ import {
 } from "./audience-settings.js";
 import { registerResetAllRoute } from "./reset-all.js";
 import { OscOutput } from "./osc-output.js";
+import { registerOperationsRoutes } from "./operations.js";
 import {
   ensureStationCredentials,
   registerStationAuthRoutes,
@@ -147,6 +148,12 @@ registerResetAllRoute(
   io,
   liveSession,
 );
+
+registerOperationsRoutes(app, database, {
+  databasePath: config.databasePath,
+  osc: config.osc,
+  getPresence: presenceSnapshot,
+});
 
 io.on("connection", (socket) => {
   const role = normalizeRole(
