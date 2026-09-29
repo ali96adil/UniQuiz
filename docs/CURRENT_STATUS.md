@@ -3,16 +3,21 @@
 Updated: 2026-09-29
 
 ## Active milestone
-Issue #6 — M5 Audience Display & Ranking
+Issue #6 — M5 Audience Display & Ranking (real external-screen acceptance pending)
+
+## Stacked milestone
+Issue #7 — M6 Event-Day Hardening & Recovery — code-complete candidate
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
-## Active branch
-`feature/m5-audience-live-display`
+## Active branches
+- `feature/m5-audience-live-display` — PR #13
+- `feature/m6-hardening-recovery` — PR #14 stacked on M5
 
-## Active pull request
-PR #13 — M5: Audience Display & Ranking
+## Active pull requests
+- PR #13 — M5: Audience Display & Ranking
+- PR #14 — M6: Hardening & Event-Day Recovery (stacked; do not merge before M5)
 
 ## Completed
 - M4 PR #12 merged to `main` as squash commit `ffb660561ab2c5ee8005ad1e247547656abe6a4f`.
@@ -77,7 +82,7 @@ PR #13 — M5: Audience Display & Ranking
 - Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-Pull PR #13 on the Mac and visually verify `/display` on the target external screen through: draw → branded live scene → 3-2-1 → 30-second question → answer-received only → automatic Reveal → ranking update → animated round totals → next-round scene → final-results scene. If accepted, close and merge M5, then start M6 Event-Day Hardening & Recovery.
+When the Mac and event devices are available, visually accept PR #13 on the real audience screen/projector. Then merge M5, retarget/rebase PR #14 onto `main`, and run the real-device M6 rehearsal/failure-simulation checklist.
 
 ## Completed
 - CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
@@ -103,8 +108,19 @@ Pull PR #13 on the Mac and visually verify `/display` on the target external scr
 - CI Run #76 PASS: all static audience wording configurable from Setup.
 - CI Run #77 PASS: polished keyed scene transitions with reduced-motion fallback.
 
+## M6 code-complete checkpoint
+- CI Run #82 PASS: verified SQLite backup/restore core + Preflight API.
+- CI Run #83 PASS: server-restart fail-safe during countdown/active question.
+- CI Run #84/#85/#86 PASS: safe VOID/replacement, stale-score invalidation, live-slot reset, Operator recovery flow.
+- CI Run #88 PASS: official results/submissions/audit XLSX export.
+- CI Run #91 PASS: audited Station Ready Override + Emergency Hold.
+- CI Run #92 PASS: isolated rehearsal database + visible REHEARSAL mode.
+- CI Run #93 PASS: scoring-neutral audience presentation/announcement scenes.
+- CI Run #103–#105 PASS: OSC readiness send/confirm gate + reset behavior.
+- CI Run #106 PASS: opt-in safe Operator hotkeys; all M6 code paths validated.
+
 ## Blockers
-No code blocker; real external-screen visual verification is pending.
+No code blocker. Remaining gates require real hardware: M5 external-screen acceptance, M6 full Mac + 2 Windows + audience rehearsal, real OSC receiver confirmation, backup/restore drill, and failure simulation.
 
 ## Do not repeat
 - Do not recreate the repository.
