@@ -46,6 +46,12 @@ Issue #7 / PR #14 — M6 Event-Day Hardening & Recovery — remains code-complet
 
 PR #14 is still stacked on `feature/m5-audience-live-display`. Do not retarget or merge it yet. After PR #15 is visually accepted and merged to `main`, rebuild the M6 branch cleanly on the updated `main` to avoid the earlier squash-history conflict.
 
+## Latest refinement
+- Audience logos increased again to 150px on desktop presentation.
+- Audience display is locked to exactly one viewport (100dvh) with page overflow disabled.
+- Setup and Operator now have direct navigation buttons between each other.
+- Short station portal added at `/s`; it provides direct authenticated Station A / Station B links plus Audience Display access.
+
 ## Next action
 On the event Mac, pull PR #15 and perform the remaining acceptance checks:
 

@@ -23,6 +23,7 @@ type Surface =
   | "operator"
   | "display"
   | "report"
+  | "stations"
   | "team-a"
   | "team-b";
 
@@ -33,6 +34,7 @@ const surfaceTitles: Record<Surface, string> = {
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
   report: "بيان النتائج الرسمي",
+  stations: "بوابة المحطات",
   "team-a": "محطة المتسابق A",
   "team-b": "محطة المتسابق B",
 };
@@ -55,6 +57,7 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
   if (pathname.startsWith("/report")) return "report";
+  if (pathname === "/s" || pathname.startsWith("/stations")) return "stations";
   if (pathname.startsWith("/display")) return "display";
   if (pathname.startsWith("/team/a")) return "team-a";
   if (pathname.startsWith("/team/b")) return "team-b";
@@ -2318,6 +2321,84 @@ function StationAccessPanel() {
   );
 }
 
+function StationPortal() {
+  const [credentials, setCredentials] =
+    useState<StationCredentialResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void apiRequest<StationCredentialResponse>(
+      "/api/stations/credentials",
+    )
+      .then(setCredentials)
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "تعذر تحميل بيانات المحطات",
+        );
+      });
+  }, []);
+
+  const stationUrl = (
+    station: "a" | "b",
+    token: string,
+  ) =>
+    `/team/${station}?token=${encodeURIComponent(token)}`;
+
+  return (
+    <section className="panel station-portal">
+      <div className="station-portal-heading">
+        <p className="step-label">Quick Station Access</p>
+        <h2>اختيار محطة المسابقة</h2>
+        <p className="muted">
+          افتح هذا العنوان على الحاسبات الأخرى ثم اختر المحطة المطلوبة.
+        </p>
+      </div>
+
+      {credentials ? (
+        <div className="station-portal-grid">
+          {credentials.teamA ? (
+            <a
+              className="station-portal-card"
+              href={stationUrl("a", credentials.teamA.token)}
+            >
+              <span>Station A</span>
+              <strong>محطة الفريق A</strong>
+              <small>دخول مباشر وآمن بالتوكن</small>
+            </a>
+          ) : null}
+
+          {credentials.teamB ? (
+            <a
+              className="station-portal-card"
+              href={stationUrl("b", credentials.teamB.token)}
+            >
+              <span>Station B</span>
+              <strong>محطة الفريق B</strong>
+              <small>دخول مباشر وآمن بالتوكن</small>
+            </a>
+          ) : null}
+
+          <a
+            className="station-portal-card secondary"
+            href="/display"
+          >
+            <span>Display</span>
+            <strong>شاشة الجمهور</strong>
+            <small>فتح العرض العام بملء الشاشة</small>
+          </a>
+        </div>
+      ) : (
+        <p className="muted">جاري تجهيز روابط المحطات...</p>
+      )}
+
+      <StatusMessage error={error} message={null} />
+    </section>
+  );
+}
+
+
 function OperatorLivePanel({
   snapshot,
 }: {
@@ -3159,6 +3240,23 @@ export function App() {
   const [effectiveRole, setEffectiveRole] =
     useState<ClientRole>("unknown");
 
+  useEffect(() => {
+    const displayMode = surface === "display";
+    document.documentElement.classList.toggle(
+      "display-mode",
+      displayMode,
+    );
+    document.body.classList.toggle(
+      "display-mode",
+      displayMode,
+    );
+
+    return () => {
+      document.documentElement.classList.remove("display-mode");
+      document.body.classList.remove("display-mode");
+    };
+  }, [surface]);
+
   const stationToken = useMemo(() => {
     if (role !== "team-a" && role !== "team-b") {
       return null;
@@ -3326,6 +3424,20 @@ export function App() {
               ? "متصل بالسيرفر"
               : "جاري الاتصال بالسيرفر"}
           </div>
+
+          {surface === "setup" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/operator">
+                الانتقال إلى لوحة التحكم
+              </a>
+            </div>
+          ) : surface === "operator" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/setup">
+                الانتقال إلى الإعدادات
+              </a>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -3404,6 +3516,10 @@ export function App() {
         </>
       ) : null}
 
+      {surface === "stations" ? (
+        <StationPortal />
+      ) : null}
+
       {surface === "team-a" || surface === "team-b" ? (
         <TeamLivePanel
           snapshot={liveSnapshot}
@@ -3431,6 +3547,7 @@ export function App() {
       surface !== "operator" &&
       surface !== "display" &&
       surface !== "report" &&
+      surface !== "stations" &&
       surface !== "team-a" &&
       surface !== "team-b" ? (
         <section className="panel">
