@@ -3463,6 +3463,18 @@ export function App() {
 
           {surface === "setup" ? (
             <div className="surface-switcher">
+              <a className="button-link" href="/draw">
+                القرعة الرسمية
+              </a>
+              <a className="button-link" href="/operator">
+                الانتقال إلى لوحة التحكم
+              </a>
+            </div>
+          ) : surface === "draw" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/setup">
+                العودة إلى الإعدادات
+              </a>
               <a className="button-link" href="/operator">
                 الانتقال إلى لوحة التحكم
               </a>
@@ -3471,6 +3483,9 @@ export function App() {
             <div className="surface-switcher">
               <a className="button-link" href="/setup">
                 الانتقال إلى الإعدادات
+              </a>
+              <a className="button-link" href="/draw">
+                القرعة الرسمية
               </a>
             </div>
           ) : null}
