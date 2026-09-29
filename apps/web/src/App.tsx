@@ -8,6 +8,7 @@ import type {
   DrawPresentationEvent,
   LiveSnapshot,
   LiveTeamSubmissionState,
+  OperationsPreflightSnapshot,
   QualificationRankingSnapshot,
   PresenceSnapshot,
   QualificationRound,
@@ -2247,6 +2248,127 @@ interface StationCredentialResponse {
   teamB: { station: "B"; token: string } | null;
 }
 
+
+function OperationsPreflightPanel() {
+  const [snapshot, setSnapshot] =
+    useState<OperationsPreflightSnapshot | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    try {
+      const next =
+        await apiRequest<OperationsPreflightSnapshot>(
+          "/api/operations/preflight",
+        );
+      setSnapshot(next);
+      setError(null);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر قراءة Preflight",
+      );
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+    const timer = window.setInterval(() => {
+      void refresh();
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const createBackup = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest("/api/operations/backup", {
+        method: "POST",
+        body: "{}",
+      });
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إنشاء النسخة الاحتياطية",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel preflight-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Event-Day Preflight</p>
+          <h2>جاهزية النظام</h2>
+        </div>
+        <span
+          className={[
+            "preflight-summary",
+            snapshot?.ready ? "ready" : "not-ready",
+          ].join(" ")}
+        >
+          {snapshot?.ready ? "READY" : "NOT READY"}
+        </span>
+      </div>
+
+      <div className="preflight-grid">
+        {snapshot?.checks.map((check) => (
+          <div
+            className={[
+              "preflight-check",
+              check.ready ? "ready" : "not-ready",
+              check.required ? "required" : "optional",
+            ].join(" ")}
+            key={check.key}
+          >
+            <div>
+              <strong>{check.label}</strong>
+              <span>
+                {check.required ? "مطلوب" : "اختياري"}
+              </span>
+            </div>
+            <b>{check.ready ? "READY" : "NOT READY"}</b>
+            <small>{check.detail}</small>
+          </div>
+        )) ?? <p>بانتظار فحص الجاهزية...</p>}
+      </div>
+
+      <div className="actions">
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() => void createBackup()}
+        >
+          إنشاء Backup موثّق الآن
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => void refresh()}
+        >
+          إعادة فحص الجاهزية
+        </button>
+      </div>
+
+      {snapshot?.latestBackup ? (
+        <p className="muted">
+          آخر Backup: {snapshot.latestBackup.fileName} ·{" "}
+          {Math.round(
+            snapshot.latestBackup.sizeBytes / 1024,
+          )} KB
+        </p>
+      ) : null}
+
+      <StatusMessage error={error} message={null} />
+    </section>
+  );
+}
+
 function StationAccessPanel() {
   const [credentials, setCredentials] =
     useState<StationCredentialResponse | null>(null);
@@ -3118,6 +3240,7 @@ export function App() {
 
       {surface === "operator" ? (
         <>
+          <OperationsPreflightPanel />
           <OperatorLivePanel snapshot={liveSnapshot} />
           <StationAccessPanel />
         </>
