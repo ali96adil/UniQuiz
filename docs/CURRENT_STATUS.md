@@ -2,109 +2,64 @@
 
 Updated: 2026-09-29
 
-## Active milestone
-Issue #6 — M5 Audience Display & Ranking
+## Active work
+Post-M5 event-day refinement and visual acceptance.
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m5-audience-live-display`
+`feature/post-m5-presentation-scoring-pdf`
 
 ## Active pull request
-PR #13 — M5: Audience Display & Ranking
+PR #15 — Post-M5: presentation, scoring, ranking time & official PDF
+
+Current head before this checkpoint:
+`37ac0f5ed532830f153595e4fa4b7989604e7e11`
+
+Latest verified CI:
+Run #36555351727 — PASS
 
 ## Completed
-- M4 PR #12 merged to `main` as squash commit `ffb660561ab2c5ee8005ad1e247547656abe6a4f`.
-- M3 PR #11 merged to `main` as squash commit `3a29003c0c50d83d0f54adf41e77862e1495e971`.
-- M4 persistent operator-paced live state machine implemented.
-- Team A/B answer submissions are locked once, persisted, and restored after reconnect; paired questions auto-close when both answer and solo questions close after Team A answers.
-- Operator and Team A/B live interfaces implemented, including 3-2-1, question/options, countdown and answer lock feedback.
-- CI Run #37 PASS: live runtime.
-- CI Run #38 PASS: submission locking and solo/paired closure.
-- CI Run #39 PASS: live web interfaces.
-- CI Run #40 PASS: pre-question station-state correction.
-- Fail-safe OSC show-control output implemented for countdown 3/2/1, question start, answered, timeout, close, reveal, intermission and round completion.
-- Persistent Station A/B access tokens implemented; authenticated presence is required by Station Ready Check.
-- CI Run #42 PASS: OSC output.
-- CI Run #44 PASS: station token binding and readiness.
-- CI Run #45 PASS: full 10-question paired-round integration with 20 locked submissions, manual Reveal, persisted completion, OSC events and OSC-failure isolation.
-- M2 PR #10 merged to `main` as squash commit `359d72f2b5a63eb9be91035ef890bfff93a636a1`.
-- M3 bulk import implemented for CSV/XLSX with Preview → Validation → Apply, plus downloadable Excel template.
-- Categories/questions persist in SQLite; question schema has four options and one A/B/C/D correct option with no difficulty field.
-- CI Run #24 PASS: CSV/XLSX parser and validation tests.
-- CI Run #25 PASS: import UI, typecheck, tests, build and runtime smoke.
-- Full Excel export added for current Colleges / Categories / Questions; blank `source_ref` is explicitly tested and supported.
-- Locked question allocation implemented: 10 questions per round, exactly 2 per category, no cross-round reuse.
-- Exact official scoring core implemented using integer micro-points with millisecond response timing.
-- CI Run #27 PASS: export and optional `source_ref`.
-- CI Run #28 PASS: allocation invariants.
-- CI Run #29 PASS: allocation UI and scoring boundary tests.
-- CI Run #31 PASS: monotonic question clock, audit and VOID/replacement core.
-- CI Run #33 PASS: integration test for same-category replacement and persistent audit.
-- CI Run #34 PASS: Excel export structure and blank `source_ref` verified.
-- M1 PR #9 merged to `main` as squash commit `2fe7cc17ae79329677907cd8aff15baa762a13fe`.
-- Repository foundation merged to `main`.
-- Public visibility intentionally retained during development.
-- Qualification rules and architecture decisions documented.
-- Audience display states and layout documented in `docs/AUDIENCE-DISPLAY.md`.
-- Audience-facing terminology is configurable; default Arabic term for session is `جولة`.
-- Qualification questions are fixed to four options: A, B, C, D.
-- Server-controlled 3-2-1 countdown is required before every question.
-- OSC show-control events and manual round/question progression are documented.
-- Live safety requirements are documented: Station Ready Check, VOID + same-category replacement, recovery, audit, preflight, rehearsal and intermission scenes.
-- `apps/server`, `apps/web`, and `packages/shared` are scaffolded.
-- Fastify server, SQLite bootstrap, `/health`, Socket.IO presence and placeholder web surfaces are implemented.
-- Routes recognized by the M1 web shell: `/setup`, `/draw`, `/operator`, `/display`, `/team/a`, `/team/b`.
-- Operator placeholder displays live station connection state without refresh.
-- CI workflow added with install, typecheck, build, live server health check and Socket.IO handshake.
-- CI Run #4 passed on commit `2a1fbc43e49cb9813e071f92deaeeaba8d7a66db`.
-- Local/LAN verification instructions added in `docs/LOCAL-DEVELOPMENT.md`.
-- Real Mac startup verified on 2026-09-28: Vite `192.168.3.114:5173`, Fastify/Socket.IO `192.168.3.114:8787`, SQLite created at `data/uniquiz.db`.
-- Real realtime presence verified: Operator connected, Display connected, Team A and Team B both verified over LAN, and disconnect/reconnect state reflected live in Operator without refresh.
-- Vite development proxy emitted `ECONNRESET` WebSocket logs during client disconnect/reconnect activity; no functional failure has been observed. Reclassify as a bug only if presence flaps while clients remain continuously open.
-- Node 24.21.0 verified on the Mac after installing Homebrew `node@24` and updating PATH.
-- Clean restart verified under Node 24.21.0 after stopping stale processes: Vite `172.20.10.4:5173`, Fastify/Socket.IO `172.20.10.4:8787`, SQLite reused successfully.
-- M2 core implemented and CI verified: participant setup/lock, persistent official draw, manual next-round selection, solo-last rule, audience draw presentation, and replay.
-- CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
+- M5 PR #13 merged to `main` as squash commit `c9d4e5910db12eab3c03142c9b80afe3860904f2`.
+- Issue #6 — M5 Audience Display, Reveal & Live Ranking — closed as completed.
+- Principal audience-display headings centered, including the final qualification ranking title.
+- University and Student Activities Department logos enlarged.
+- Patronage and supervision lines added to the audience header.
+- Final-results scene no longer duplicates the last-round result block above the podium.
+- Authoritative answer window changed to 25 seconds.
+- Correct-answer score equals the displayed remaining whole second: 25 → 25 points, 24 → 24, …, 1 → 1; timeout/wrong/no answer = 0.
+- Normal operator flow moves directly from Reveal to the next 3-2-1 countdown without exposing a separate QUESTION_READY audience page.
+- Qualification ranking includes cumulative response time per college.
+- A revealed unanswered question counts as the full 25-second window in cumulative response time.
+- Cumulative response time is informational only; tied ranks remain tied on points.
+- Official A4 results statement implemented at `/report`.
+- After qualification completion, Operator shows `تصدير بيان النتائج PDF`; it opens `/report?print=1`, waits for logos, then opens browser Print / Save as PDF.
+- Official report includes both logos, competition identity, patronage/supervision, issue date/time, top three, full ranking, points, cumulative answer time and counted questions.
+- Live-session timer cleanup added for application shutdown and tests.
+- Active documentation synchronized to the 25-second scoring rule and direct next-question flow.
+- PR #15 has no open review comments or review threads.
+- PR #15 is mergeable and its latest verified CI is green.
 
-## In progress
-- M5 is code-complete on PR #13. The only remaining gate is real external-screen/projector visual verification.
-- App-generated Excel import sample verified successfully on the isolated rehearsal database.
-- Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
-- Team reveal displays the full correct answer text plus option letter.
-- Team waiting copy now says "بانتظار START من النظام".
-- Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
+## M6 status
+Issue #7 / PR #14 — M6 Event-Day Hardening & Recovery — remains code-complete and intentionally deferred.
+
+PR #14 is still stacked on `feature/m5-audience-live-display`. Do not retarget or merge it yet. After PR #15 is visually accepted and merged to `main`, rebuild the M6 branch cleanly on the updated `main` to avoid the earlier squash-history conflict.
 
 ## Next action
-Pull PR #13 on the Mac and visually verify `/display` on the target external screen through: draw → branded live scene → 3-2-1 → 30-second question → answer-received only → automatic Reveal → ranking update → animated round totals → next-round scene → final-results scene. If accepted, close and merge M5, then start M6 Event-Day Hardening & Recovery.
+On the event Mac, pull PR #15 and perform the remaining acceptance checks:
 
-## Completed
-- CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
+1. Open `/display` on the real audience screen and verify logo sizing, patronage/supervision readability, centered headings, no duplicate college in final results, 25-second timer, direct next-question 3-2-1 flow, and cumulative response time.
+2. Complete a qualification rehearsal and open `/report?print=1`.
+3. Verify Print Preview / Save as PDF on A4: Arabic text and logos render correctly, top three and full table fit cleanly, and there is no clipping.
 
-## Completed
-- M5 live audience question/reveal scene implemented with reveal-safe per-team results.
-- CI Run #61 PASS: live display/reveal contract.
-- Reveal-gated qualification ranking sidebar implemented; only revealed questions affect totals.
-- CI Run #62 PASS: ranking logic and tie/not-started behavior.
-- Dedicated fullscreen `/display` implemented.
-- CI Run #63 PASS: fullscreen audience surface.
-- Next-round and final qualification ranking scenes implemented.
-- CI Run #64 PASS: M5 end-scene UI build/runtime validation.
-
-## Completed
-- CI Run #67 PASS: category-name question import + safe append mode.
-- CI Run #68 PASS: full competition reset contract.
-- CI Run #69 PASS: clearer M3 pre-draw allocation state.
-
-## Completed
-- CI Run #72 PASS: persistent audience branding + local offline logo assets.
-- CI Run #73 PASS: revealed-only animated round totals.
-- CI Run #76 PASS: all static audience wording configurable from Setup.
-- CI Run #77 PASS: polished keyed scene transitions with reduced-motion fallback.
+If accepted:
+- mark PR #15 Ready for Review;
+- merge PR #15 into `main`;
+- resume M6 by rebuilding/retargeting PR #14 on the new `main`.
 
 ## Blockers
-No code blocker; real external-screen visual verification is pending.
+No code blocker. Only real-display and print-preview visual acceptance remain for PR #15.
 
 ## Do not repeat
 - Do not recreate the repository.
@@ -112,14 +67,6 @@ No code blocker; real external-screen visual verification is pending.
 - Do not create separate repositories for server/web/team stations.
 - Do not commit real competition questions or correct answers.
 - Do not build a knockout qualification bracket.
-- Do not auto-advance rounds or questions.
-- Do not hard-code visible Arabic event terminology.
-- Do not open speculative implementation issues unless that work is actually starting.
-
-## Checkpoint format
-Every meaningful batch should update this file with:
-- completed work;
-- verification performed;
-- commit/PR references;
-- next action;
-- blockers, if any.
+- Do not reintroduce the old 30/45-second scoring rules.
+- Do not restore the unnecessary between-question audience page.
+- Do not retarget PR #14 onto `main` until PR #15 has been accepted and merged.
