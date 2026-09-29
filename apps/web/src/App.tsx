@@ -9,6 +9,7 @@ import type {
   DrawPresentationEvent,
   LiveSnapshot,
   LiveTeamSubmissionState,
+  OperationsDiagnosticsSnapshot,
   OperationsPreflightSnapshot,
   QualificationRankingSnapshot,
   PresenceSnapshot,
@@ -2406,16 +2407,24 @@ function PresentationControlPanel() {
 function OperationsPreflightPanel() {
   const [snapshot, setSnapshot] =
     useState<OperationsPreflightSnapshot | null>(null);
+  const [diagnostics, setDiagnostics] =
+    useState<OperationsDiagnosticsSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = async () => {
     try {
-      const next =
-        await apiRequest<OperationsPreflightSnapshot>(
-          "/api/operations/preflight",
-        );
+      const [next, diagnosticSnapshot] =
+        await Promise.all([
+          apiRequest<OperationsPreflightSnapshot>(
+            "/api/operations/preflight",
+          ),
+          apiRequest<OperationsDiagnosticsSnapshot>(
+            "/api/operations/diagnostics",
+          ),
+        ]);
       setSnapshot(next);
+      setDiagnostics(diagnosticSnapshot);
       setError(null);
     } catch (caught) {
       setError(
@@ -2523,6 +2532,44 @@ function OperationsPreflightPanel() {
             snapshot.latestBackup.sizeBytes / 1024,
           )} KB
         </p>
+      ) : null}
+
+
+      {diagnostics ? (
+        <details className="network-diagnostics">
+          <summary>LAN / Network Diagnostics</summary>
+          <div className="network-diagnostics-meta">
+            <span>Host: {diagnostics.hostname}</span>
+            <span>Mode: {diagnostics.mode.toUpperCase()}</span>
+            <span>Node: {diagnostics.nodeVersion}</span>
+            <span>DB: {diagnostics.databaseFileName}</span>
+            <span>
+              OSC:{" "}
+              {diagnostics.osc.enabled
+                ? `${diagnostics.osc.host}:${diagnostics.osc.port}`
+                : "Disabled"}
+            </span>
+          </div>
+
+          <div className="network-url-list">
+            {diagnostics.interfaces.length > 0 ? (
+              diagnostics.interfaces.map((entry) => (
+                <div key={`${entry.name}:${entry.address}`}>
+                  <strong>
+                    {entry.name} · {entry.address}
+                  </strong>
+                  <code>{entry.webBaseUrl}/operator</code>
+                  <code>{entry.webBaseUrl}/display</code>
+                  <code>{entry.serverHealthUrl}</code>
+                </div>
+              ))
+            ) : (
+              <p className="muted">
+                لا توجد واجهة IPv4 LAN غير داخلية حاليًا.
+              </p>
+            )}
+          </div>
+        </details>
       ) : null}
 
       <StatusMessage error={error} message={null} />
