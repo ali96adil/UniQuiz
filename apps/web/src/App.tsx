@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -1260,7 +1260,7 @@ function RoundCard({
   return (
     <article className={isNext ? "round-card next-round" : "round-card"}>
       <div className="round-card-header">
-        <strong>{settings.roundLabel} {round.order}</strong>
+        <strong>جولة {round.order}</strong>
         {isNext ? (
           <span className="badge">
             {selectionMode === "MANUAL" ? "مختارة يدويًا" : "القادمة"}
@@ -1480,7 +1480,7 @@ function AudienceBroadcastFrame({
   children,
 }: {
   settings: AudienceDisplaySettings;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const meta = [settings.venue, settings.season]
     .filter(Boolean)
