@@ -252,3 +252,38 @@ test("enabled OSC stays NOT READY until test reception is confirmed", () => {
 
   db.close();
 });
+
+
+test("restore replaces the target only after the temp copy passes integrity", () => {
+  const root = mkdtempSync(join(tmpdir(), "uniquiz-atomic-restore-"));
+  const dbPath = join(root, "uniquiz.db");
+  const db = openDatabase(dbPath);
+
+  db.prepare(
+    "INSERT INTO colleges (name, sort_order) VALUES (?, ?)",
+  ).run("Backup College", 1);
+
+  const backup = createDatabaseBackup(db, dbPath);
+  const backupPath = join(
+    backupDirectory(dbPath),
+    backup.fileName,
+  );
+
+  db.prepare("DELETE FROM colleges").run();
+  db.close();
+
+  restoreDatabaseFromBackup(backupPath, dbPath);
+
+  assert.equal(
+    existsSync(dbPath + ".restore.tmp"),
+    false,
+  );
+
+  const reopened = openDatabase(dbPath);
+  const row = reopened.prepare(
+    "SELECT name FROM colleges LIMIT 1",
+  ).get() as { name: string };
+
+  assert.equal(row.name, "Backup College");
+  reopened.close();
+});
