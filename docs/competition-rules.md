@@ -31,7 +31,7 @@
 
 The authoritative response time is measured by the server using a monotonic clock at millisecond precision.
 
-For the cumulative response-time figure shown in the ranking and official report, a revealed question with no submitted answer counts as the full 25-second window. This cumulative time is informational and does not change rank when points are tied.
+For the cumulative response-time figure shown in the ranking and official report, a revealed question with no submitted answer counts as the full 25-second window. Ranking is ordered by accumulated points descending; when points are equal, the lower cumulative response time ranks higher. College sort order is only a deterministic final fallback.
 
 ## Reveal and transparency
 When all required stations have answered, UniQuiz closes the question immediately, emits the answered OSC cue, waits 1.5 seconds, and reveals automatically. Timeout closure retains the explicit operator Reveal action.
