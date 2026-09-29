@@ -16,6 +16,10 @@ import {
   listDatabaseBackups,
   restoreDatabaseFromBackup,
   verifyDatabaseFile,
+  confirmOscTest,
+  getOscTestState,
+  markOscTestSent,
+  resetOscTestState,
 } from "./operations.js";
 
 test("backup is integrity-checked, hashed and restorable", () => {
@@ -184,4 +188,67 @@ test("LAN diagnostics reports usable browser and health URLs", async () => {
     snapshot.interfaces[0]?.serverHealthUrl,
     "http://192.168.3.114:8787/health",
   );
+});
+
+
+test("enabled OSC stays NOT READY until test reception is confirmed", () => {
+  const root = mkdtempSync(join(tmpdir(), "uniquiz-osc-preflight-"));
+  const dbPath = join(root, "uniquiz.db");
+  const db = openDatabase(dbPath);
+
+  const presence: PresenceSnapshot = {
+    generatedAt: new Date().toISOString(),
+    stations: [],
+  };
+
+  const osc = {
+    enabled: true,
+    host: "127.0.0.1",
+    port: 9001,
+  };
+
+  let snapshot = getOperationsPreflight(
+    db,
+    dbPath,
+    osc,
+    presence,
+  );
+
+  assert.equal(
+    snapshot.checks.find((check) => check.key === "osc")?.ready,
+    false,
+  );
+
+  markOscTestSent(db);
+
+  snapshot = getOperationsPreflight(
+    db,
+    dbPath,
+    osc,
+    presence,
+  );
+
+  assert.equal(
+    snapshot.checks.find((check) => check.key === "osc")?.ready,
+    false,
+  );
+
+  confirmOscTest(db);
+
+  snapshot = getOperationsPreflight(
+    db,
+    dbPath,
+    osc,
+    presence,
+  );
+
+  assert.equal(
+    snapshot.checks.find((check) => check.key === "osc")?.ready,
+    true,
+  );
+
+  resetOscTestState(db);
+  assert.equal(getOscTestState(db).confirmedAt, null);
+
+  db.close();
 });
