@@ -17,7 +17,7 @@ Base: M5 merged on `main`
    - timeout / wrong / no answer = 0.
 6. Remove the unnecessary audience interstitial between consecutive questions so the flow advances directly to the next useful question state.
 7. Add cumulative answer time per college to the qualification ranking and final results.
-8. Add an operator export action for an official A4 PDF results statement after qualification completion.
+8. Center all principal audience-display headings consistently (including the final qualification ranking title).\n9. Add an operator export action for an official A4 PDF results statement after qualification completion.
 
 ## Official PDF statement
 
