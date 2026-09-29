@@ -343,3 +343,44 @@ test("reveal results stay hidden until reveal", async () => {
   await app.close();
   db.close();
 });
+
+
+test("round totals include only revealed question scores", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+    undefined,
+    () => true,
+    1000,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  manager.submitAnswer("team-a", "B");
+  manager.submitAnswer("team-b", "C");
+
+  let snapshot = manager.getSnapshot();
+  assert.equal(snapshot.roundTotals?.teamA, 0);
+  assert.equal(snapshot.roundTotals?.teamB, 0);
+
+  manager.revealQuestion();
+  snapshot = manager.getSnapshot();
+
+  assert.ok((snapshot.roundTotals?.teamA ?? 0) > 0);
+  assert.equal(snapshot.roundTotals?.teamB, 0);
+
+  io.close();
+  await app.close();
+  db.close();
+});

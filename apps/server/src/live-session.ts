@@ -427,6 +427,38 @@ export class LiveSessionManager {
     const pendingRoundCount = roundCounts.pending ?? 0;
     const completedRoundCount = roundCounts.completed ?? 0;
 
+    let roundTotals: LiveSnapshot["roundTotals"] = null;
+
+    if (state.roundId !== null && round !== null) {
+      const totalRows = this.db.prepare(`
+        SELECT
+          s.station,
+          COALESCE(SUM(s.score_micros), 0) AS scoreMicros
+        FROM live_submissions s
+        WHERE s.round_id = ?
+          AND EXISTS (
+            SELECT 1
+            FROM audit_events a
+            WHERE a.event_type = 'QUESTION_REVEALED'
+              AND a.round_id = s.round_id
+              AND a.position = s.question_position
+          )
+        GROUP BY s.station
+      `).all(state.roundId) as Array<{
+        station: "A" | "B";
+        scoreMicros: number;
+      }>;
+
+      const scoreFor = (station: "A" | "B") =>
+        (totalRows.find((row) => row.station === station)
+          ?.scoreMicros ?? 0) / 1_000_000;
+
+      roundTotals = {
+        teamA: scoreFor("A"),
+        teamB: round.teamB === null ? null : scoreFor("B"),
+      };
+    }
+
     return {
       phase: state.phase,
       serverNowEpochMs: Date.now(),
@@ -459,6 +491,7 @@ export class LiveSessionManager {
         teamBReceived: receivedStations.has("B"),
       },
       revealResults,
+      roundTotals,
     };
   }
 

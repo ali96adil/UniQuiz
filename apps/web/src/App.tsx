@@ -1955,6 +1955,8 @@ function AudienceLiveSurface({
   }
 
   if (snapshot.phase === "ROUND_COMPLETE") {
+    const totals = snapshot.roundTotals;
+
     if (snapshot.qualificationComplete) {
       const finalists =
         ranking?.entries
@@ -1967,6 +1969,23 @@ function AudienceLiveSurface({
           <h2 className="audience-title">
             الترتيب النهائي للتصفيات
           </h2>
+
+          {totals ? (
+            <div className="audience-round-totals compact">
+              <div>
+                <span>{round.teamA.name}</span>
+                <strong>{totals.teamA}</strong>
+                <small>نقطة</small>
+              </div>
+              {round.teamB && totals.teamB !== null ? (
+                <div>
+                  <span>{round.teamB.name}</span>
+                  <strong>{totals.teamB}</strong>
+                  <small>نقطة</small>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="audience-final-podium">
             {finalists.map((entry) => (
@@ -2007,7 +2026,27 @@ function AudienceLiveSurface({
         <div className="audience-kicker">
           انتهت {settings.roundLabel} {round.order}
         </div>
-        <h2 className="audience-title">الجولة القادمة</h2>
+        <h2 className="audience-title">نتيجة الجولة</h2>
+
+        {totals ? (
+          <div className="audience-round-totals">
+            <div>
+              <span>{round.teamA.name}</span>
+              <strong>{totals.teamA}</strong>
+              <small>نقطة</small>
+            </div>
+            {round.teamB && totals.teamB !== null ? (
+              <div>
+                <span>{round.teamB.name}</span>
+                <strong>{totals.teamB}</strong>
+                <small>نقطة</small>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="audience-next-round-block">
+          <h3>الجولة القادمة</h3>
 
         {nextRound ? (
           <div className="audience-next-match">
@@ -2023,6 +2062,7 @@ function AudienceLiveSurface({
             بانتظار تحديد الجولة القادمة
           </p>
         )}
+        </div>
       </section>
     );
   }

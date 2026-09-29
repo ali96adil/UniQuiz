@@ -188,6 +188,7 @@ export interface LiveSnapshot {
   stationReadiness: LiveStationReadiness;
   answerStatus: LiveAnswerStatus;
   revealResults: LiveRevealResults | null;
+  roundTotals: LiveRoundTotals | null;
 }
 
 export interface LiveAnswerStatus {
@@ -262,4 +263,9 @@ export interface AudienceDisplaySettings {
   universityLogoUrl: string | null;
   departmentLogoUrl: string | null;
   updatedAt: string;
+}
+
+export interface LiveRoundTotals {
+  teamA: number;
+  teamB: number | null;
 }
