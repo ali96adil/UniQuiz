@@ -157,3 +157,13 @@ Reason: Resetting a draw or replacing/importing a question bank must not erase h
 Decision: The authoritative 45-second question window is measured from the server's monotonic clock. Wall-clock timestamps are stored/published only for display and audit correlation.
 
 Reason: Browser clocks and wall-clock adjustments must not change official elapsed response time.
+
+## D-022 — Answered questions reveal automatically after OSC handoff
+Decision: When all required team stations have submitted, the server closes the question immediately, emits `/uniquiz/question/answered`, waits 1.5 seconds, and then performs the official Reveal automatically.
+
+Rules:
+- Paired round: both Team A and Team B must have submitted.
+- Solo round: Team A is the only required station, so its locked submission satisfies the same all-required-stations condition.
+- The correct answer must never be exposed while a required station can still answer.
+- Timeout closure does not use the answered-path automatic Reveal; the operator retains explicit Reveal control for timeout cases.
+- Automatic Reveal is restored after a server restart if the persisted state is an answered `QUESTION_CLOSED` awaiting its reveal delay.
