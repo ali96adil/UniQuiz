@@ -32,6 +32,13 @@ export function getQualificationRanking(
             WHERE a.event_type = 'QUESTION_REVEALED'
               AND a.round_id = s.round_id
               AND a.position = s.question_position
+              AND a.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = s.round_id
+                  AND v.position = s.question_position
+              ), 0)
           )
           THEN s.score_micros
           ELSE 0
@@ -45,6 +52,13 @@ export function getQualificationRanking(
             WHERE a.event_type = 'QUESTION_REVEALED'
               AND a.round_id = s.round_id
               AND a.position = s.question_position
+              AND a.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = s.round_id
+                  AND v.position = s.question_position
+              ), 0)
           )
           THEN s.question_position
           ELSE NULL

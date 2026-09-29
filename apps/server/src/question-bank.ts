@@ -412,6 +412,34 @@ export function registerQuestionBankRoutes(
       );
     }
 
+    const liveState = db.prepare(`
+      SELECT
+        phase,
+        round_id AS roundId,
+        question_position AS questionPosition
+      FROM live_state
+      WHERE id = 1
+    `).get() as {
+      phase: string;
+      roundId: number | null;
+      questionPosition: number | null;
+    };
+
+    if (
+      liveState.roundId === body.data.roundId &&
+      liveState.questionPosition === body.data.position &&
+      (
+        liveState.phase === "QUESTION_COUNTDOWN" ||
+        liveState.phase === "QUESTION_ACTIVE"
+      )
+    ) {
+      return conflict(
+        reply,
+        "QUESTION_STILL_LIVE",
+        "Close or recover the active question before replacing it.",
+      );
+    }
+
     const candidates = db.prepare(`
       SELECT q.id
       FROM questions q
@@ -471,6 +499,15 @@ export function registerQuestionBankRoutes(
           AND position = ?
       `).run(
         replacementQuestionId,
+        body.data.roundId,
+        body.data.position,
+      );
+
+      db.prepare(`
+        DELETE FROM live_submissions
+        WHERE round_id = ?
+          AND question_position = ?
+      `).run(
         body.data.roundId,
         body.data.position,
       );

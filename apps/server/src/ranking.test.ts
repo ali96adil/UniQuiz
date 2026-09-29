@@ -162,3 +162,74 @@ test("equal revealed scores share the same rank", () => {
 
   db.close();
 });
+
+
+test("latest void invalidates an earlier reveal until replacement is revealed", () => {
+  const db = openDatabase(":memory:");
+
+  db.exec(`
+    INSERT INTO colleges (name, sort_order) VALUES
+      ('College A', 1),
+      ('College B', 2);
+    INSERT INTO participants (college_id) VALUES (1), (2);
+    INSERT INTO qualification_rounds (
+      round_order, college_a_id, college_b_id, status
+    ) VALUES (1, 1, 2, 'ACTIVE');
+    INSERT INTO categories (category_key, name, sort_order)
+    VALUES ('general', 'General', 1);
+    INSERT INTO questions (
+      category_id, prompt, option_a, option_b, option_c, option_d, correct_option
+    ) VALUES
+      (1, 'Original', 'A', 'B', 'C', 'D', 'A'),
+      (1, 'Replacement', 'A', 'B', 'C', 'D', 'A');
+    INSERT INTO live_submissions (
+      round_id, question_position, station, question_id,
+      selected_option, submitted_at_epoch_ms, response_time_ms,
+      is_correct, score_micros
+    ) VALUES
+      (1, 1, 'A', 1, 'A', 1000, 1000, 1, 25000000);
+    INSERT INTO audit_events (
+      event_type, round_id, question_id, position, occurred_at
+    ) VALUES ('QUESTION_REVEALED', 1, 1, 1, CURRENT_TIMESTAMP);
+  `);
+
+  assert.equal(
+    getQualificationRanking(db).entries[0]?.scorePoints,
+    25,
+  );
+
+  db.exec(`
+    INSERT INTO audit_events (
+      event_type, round_id, question_id, related_question_id,
+      position, reason, occurred_at
+    ) VALUES (
+      'QUESTION_VOID_REPLACED', 1, 1, 2, 1, 'technical', CURRENT_TIMESTAMP
+    );
+    DELETE FROM live_submissions
+    WHERE round_id = 1 AND question_position = 1;
+    INSERT INTO live_submissions (
+      round_id, question_position, station, question_id,
+      selected_option, submitted_at_epoch_ms, response_time_ms,
+      is_correct, score_micros
+    ) VALUES
+      (1, 1, 'A', 2, 'A', 2000, 10000, 1, 20000000);
+  `);
+
+  assert.equal(
+    getQualificationRanking(db).entries[0]?.scorePoints,
+    0,
+  );
+
+  db.exec(`
+    INSERT INTO audit_events (
+      event_type, round_id, question_id, position, occurred_at
+    ) VALUES ('QUESTION_REVEALED', 1, 2, 1, CURRENT_TIMESTAMP);
+  `);
+
+  assert.equal(
+    getQualificationRanking(db).entries[0]?.scorePoints,
+    20,
+  );
+
+  db.close();
+});
