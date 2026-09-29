@@ -467,3 +467,415 @@ test("round totals include only revealed question scores", async () => {
   await app.close();
   db.close();
 });
+
+test("restart during countdown returns the same question to ready", () => {
+  const db = seedLiveRound();
+  db.prepare(`
+    UPDATE qualification_rounds
+    SET status = 'ACTIVE'
+    WHERE id = 1
+  `).run();
+
+  db.prepare(`
+    UPDATE live_state
+    SET
+      phase = 'QUESTION_COUNTDOWN',
+      round_id = 1,
+      question_position = 1,
+      stations_confirmed = 1,
+      countdown_started_at_epoch_ms = ?,
+      question_started_at_epoch_ms = NULL,
+      question_closed_at_epoch_ms = NULL,
+      close_reason = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `).run(Date.now() - 1000);
+
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    3000,
+    30_000,
+  );
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_READY");
+  assert.equal(snapshot.question?.position, 1);
+  assert.equal(snapshot.countdownStartedAtEpochMs, null);
+
+  const audit = db.prepare(`
+    SELECT reason, payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'LIVE_RECOVERY'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as {
+    reason: string;
+    payloadJson: string;
+  };
+
+  assert.equal(
+    audit.reason,
+    "SERVER_RESTART_DURING_COUNTDOWN",
+  );
+  assert.match(audit.payloadJson, /REQUIRE_NEW_START/);
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});
+
+test("restart during active question fail-closes and requires void replacement", () => {
+  const db = seedLiveRound();
+  db.prepare(`
+    UPDATE qualification_rounds
+    SET status = 'ACTIVE'
+    WHERE id = 1
+  `).run();
+
+  db.prepare(`
+    UPDATE live_state
+    SET
+      phase = 'QUESTION_ACTIVE',
+      round_id = 1,
+      question_position = 1,
+      stations_confirmed = 1,
+      countdown_started_at_epoch_ms = ?,
+      question_started_at_epoch_ms = ?,
+      question_closed_at_epoch_ms = NULL,
+      close_reason = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `).run(
+    Date.now() - 4000,
+    Date.now() - 1000,
+  );
+
+  const events: string[] = [];
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    3000,
+    30_000,
+    {
+      send(address) {
+        events.push(address);
+      },
+    },
+  );
+
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_CLOSED");
+  assert.equal(
+    snapshot.closeReason,
+    "SERVER_RESTART_RECOVERY",
+  );
+  assert.throws(
+    () => manager.revealQuestion(),
+    /QUESTION_REQUIRES_VOID/,
+  );
+  assert.equal(
+    events.includes(
+      "/uniquiz/question/recovery_required",
+    ),
+    true,
+  );
+
+  const audit = db.prepare(`
+    SELECT reason, payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'LIVE_RECOVERY'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as {
+    reason: string;
+    payloadJson: string;
+  };
+
+  assert.equal(
+    audit.reason,
+    "SERVER_RESTART_DURING_ACTIVE_QUESTION",
+  );
+  assert.match(
+    audit.payloadJson,
+    /VOID_REPLACEMENT_REQUIRED/,
+  );
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});
+
+
+test("replacement resets the current slot to question ready", () => {
+  const db = seedLiveRound();
+  db.prepare(`
+    UPDATE qualification_rounds
+    SET status = 'ACTIVE'
+    WHERE id = 1
+  `).run();
+
+  db.prepare(`
+    UPDATE live_state
+    SET
+      phase = 'QUESTION_CLOSED',
+      round_id = 1,
+      question_position = 1,
+      stations_confirmed = 1,
+      countdown_started_at_epoch_ms = NULL,
+      question_started_at_epoch_ms = ?,
+      question_closed_at_epoch_ms = ?,
+      close_reason = 'SERVER_RESTART_RECOVERY',
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `).run(Date.now() - 1000, Date.now());
+
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    3000,
+    30_000,
+  );
+
+  assert.equal(
+    manager.getSnapshot().closeReason,
+    "SERVER_RESTART_RECOVERY",
+  );
+
+  const reset = manager.onQuestionReplaced(1, 1);
+  assert.equal(reset?.phase, "QUESTION_READY");
+  assert.equal(reset?.question?.position, 1);
+  assert.equal(reset?.closeReason, null);
+  assert.equal(reset?.questionStartedAtEpochMs, null);
+
+  const audit = db.prepare(`
+    SELECT event_type AS eventType
+    FROM audit_events
+    WHERE event_type = 'QUESTION_REPLACEMENT_READY'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as { eventType: string };
+
+  assert.equal(
+    audit.eventType,
+    "QUESTION_REPLACEMENT_READY",
+  );
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});
+
+
+test("station readiness override is audited and allows emergency start", () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+    undefined,
+    (role) => role === "team-a",
+  );
+
+  manager.prepareRound(1);
+
+  assert.throws(
+    () => manager.confirmStations(),
+    /TEAM_B_NOT_READY/,
+  );
+
+  const overridden = manager.overrideStationReadiness(
+    "Team B browser failed immediately before round start",
+  );
+  assert.equal(overridden.stationsConfirmed, true);
+
+  const started = manager.startRound();
+  assert.equal(started.phase, "ROUND_ACTIVE");
+
+  const events = db.prepare(`
+    SELECT event_type AS eventType, reason
+    FROM audit_events
+    WHERE event_type IN (
+      'STATION_READINESS_OVERRIDE',
+      'ROUND_STARTED_WITH_READINESS_OVERRIDE'
+    )
+    ORDER BY id
+  `).all() as Array<{
+    eventType: string;
+    reason: string | null;
+  }>;
+
+  assert.deepEqual(
+    events.map((entry) => entry.eventType),
+    [
+      "STATION_READINESS_OVERRIDE",
+      "ROUND_STARTED_WITH_READINESS_OVERRIDE",
+    ],
+  );
+  assert.match(
+    events[0]?.reason ?? "",
+    /Team B browser failed/,
+  );
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});
+
+test("emergency hold during countdown returns question to ready", () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    5000,
+    30_000,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  const held = manager.emergencyHold(
+    "Audience projector issue before question reveal",
+  );
+
+  assert.equal(held.phase, "QUESTION_READY");
+  assert.equal(held.question?.position, 1);
+  assert.equal(held.countdownStartedAtEpochMs, null);
+
+  const audit = db.prepare(`
+    SELECT reason, payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'EMERGENCY_HOLD'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as {
+    reason: string;
+    payloadJson: string;
+  };
+
+  assert.match(audit.reason, /projector issue/);
+  assert.match(audit.payloadJson, /RETURN_TO_QUESTION_READY/);
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});
+
+test("emergency hold during active question requires void replacement", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  const held = manager.emergencyHold(
+    "Team station lost power during active question",
+  );
+
+  assert.equal(held.phase, "QUESTION_CLOSED");
+  assert.equal(held.closeReason, "EMERGENCY_HOLD");
+  assert.throws(
+    () => manager.revealQuestion(),
+    /QUESTION_REQUIRES_VOID/,
+  );
+
+  const audit = db.prepare(`
+    SELECT reason, payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'EMERGENCY_HOLD'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as {
+    reason: string;
+    payloadJson: string;
+  };
+
+  assert.match(audit.reason, /lost power/);
+  assert.match(audit.payloadJson, /VOID_REPLACEMENT_REQUIRED/);
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});
+
+
+test("answer audit records correctness explicitly", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  manager.submitAnswer("team-a", "B");
+
+  const audit = db.prepare(`
+    SELECT payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'TEAM_ANSWER_LOCKED'
+      AND round_id = 1
+      AND position = 1
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as { payloadJson: string };
+
+  const payload = JSON.parse(audit.payloadJson) as {
+    selectedOption: string;
+    responseTimeMs: number;
+    isCorrect: boolean;
+    scoreMicros: number;
+  };
+
+  assert.equal(payload.selectedOption, "B");
+  assert.equal(payload.isCorrect, true);
+  assert.ok(payload.responseTimeMs >= 0);
+  assert.ok(payload.scoreMicros > 0);
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});

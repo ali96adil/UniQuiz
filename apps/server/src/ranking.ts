@@ -36,6 +36,13 @@ export function getQualificationRanking(
             WHERE a.event_type = 'QUESTION_REVEALED'
               AND a.round_id = s.round_id
               AND a.position = s.question_position
+              AND a.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = s.round_id
+                  AND v.position = s.question_position
+              ), 0)
           )
           THEN s.score_micros
           ELSE 0
@@ -46,6 +53,13 @@ export function getQualificationRanking(
         FROM audit_events a
         WHERE a.event_type = 'QUESTION_REVEALED'
           AND a.round_id = r.id
+              AND a.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = r.id
+                  AND v.position = a.position
+              ), 0)
       ) AS revealedQuestions,
       (
         SELECT COALESCE(SUM(
@@ -68,6 +82,13 @@ export function getQualificationRanking(
         FROM audit_events a
         WHERE a.event_type = 'QUESTION_REVEALED'
           AND a.round_id = r.id
+              AND a.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = r.id
+                  AND v.position = a.position
+              ), 0)
       ) AS totalResponseTimeMs,
       (
         SELECT COUNT(*)
@@ -85,6 +106,13 @@ export function getQualificationRanking(
             WHERE a3.event_type = 'QUESTION_REVEALED'
               AND a3.round_id = s3.round_id
               AND a3.position = s3.question_position
+              AND a3.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = s3.round_id
+                  AND v.position = s3.question_position
+              ), 0)
           )
       ) AS correctAnswers,
       (
@@ -103,6 +131,13 @@ export function getQualificationRanking(
             WHERE a4.event_type = 'QUESTION_REVEALED'
               AND a4.round_id = s4.round_id
               AND a4.position = s4.question_position
+              AND a4.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = s4.round_id
+                  AND v.position = s4.question_position
+              ), 0)
           )
       ) AS wrongAnswers
     FROM participants p
