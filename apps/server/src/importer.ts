@@ -429,9 +429,28 @@ function existingCategoryLookup(db: AppDatabase): CategoryLookup {
   return categoryLookupFromRows(rows);
 }
 
+function tableExists(
+  db: AppDatabase,
+  tableName: string,
+): boolean {
+  const row = db.prepare(`
+    SELECT 1 AS present
+    FROM sqlite_master
+    WHERE type = 'table'
+      AND name = ?
+    LIMIT 1
+  `).get(tableName) as { present: number } | undefined;
+
+  return Boolean(row);
+}
+
 function existingQuestionCounts(
   db: AppDatabase,
 ): Map<string, number> {
+  if (!tableExists(db, "questions")) {
+    return new Map();
+  }
+
   const rows = db.prepare(`
     SELECT
       c.category_key AS categoryKey,
@@ -457,6 +476,10 @@ function existingQuestionCounts(
 function qualificationRequiredPerCategory(
   db: AppDatabase,
 ): number {
+  if (!tableExists(db, "qualification_rounds")) {
+    return 2;
+  }
+
   const roundCount = (
     db.prepare(`
       SELECT COUNT(*) AS count
