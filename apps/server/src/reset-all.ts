@@ -48,6 +48,15 @@ export function resetAllCompetitionData(
     `).run(new Date().toISOString());
 
     db.prepare(`
+      UPDATE operations_state
+      SET
+        osc_test_sent_at = NULL,
+        osc_test_confirmed_at = NULL,
+        updated_at = ?
+      WHERE id = 1
+    `).run(new Date().toISOString());
+
+    db.prepare(`
       UPDATE live_state
       SET
         phase = 'IDLE',
