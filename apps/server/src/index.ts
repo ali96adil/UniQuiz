@@ -162,6 +162,7 @@ registerResetAllRoute(
   database,
   io,
   liveSession,
+  config.databasePath,
 );
 
 registerOperationsRoutes(app, database, {

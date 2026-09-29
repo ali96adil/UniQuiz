@@ -105,7 +105,10 @@ function metadataPath(databaseBackupPath: string): string {
 export function createDatabaseBackup(
   db: AppDatabase,
   databasePath: string,
-  purpose: "manual" | "pre-restore" = "manual",
+  purpose:
+    | "manual"
+    | "pre-restore"
+    | "pre-reset" = "manual",
   now = new Date(),
 ): OperationsBackupRecord {
   if (databasePath === ":memory:") {
@@ -169,7 +172,8 @@ function readBackupMetadata(
       typeof parsed.sha256 !== "string" ||
       parsed.integrity !== "ok" ||
       (parsed.purpose !== "manual" &&
-        parsed.purpose !== "pre-restore") ||
+        parsed.purpose !== "pre-restore" &&
+        parsed.purpose !== "pre-reset") ||
       typeof parsed.databaseFileName !== "string"
     ) {
       return null;

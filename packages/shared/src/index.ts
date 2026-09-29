@@ -328,7 +328,7 @@ export interface OperationsBackupRecord {
   sizeBytes: number;
   sha256: string;
   integrity: "ok";
-  purpose: "manual" | "pre-restore";
+  purpose: "manual" | "pre-restore" | "pre-reset";
 }
 
 export interface OperationsPreflightCheck {

@@ -287,3 +287,34 @@ test("restore replaces the target only after the temp copy passes integrity", ()
   assert.equal(row.name, "Backup College");
   reopened.close();
 });
+
+
+test("pre-reset backups are recognized as verified backups", () => {
+  const root = mkdtempSync(join(tmpdir(), "uniquiz-pre-reset-"));
+  const dbPath = join(root, "uniquiz.db");
+  const db = openDatabase(dbPath);
+
+  db.prepare(
+    "INSERT INTO colleges (name, sort_order) VALUES (?, ?)",
+  ).run("Protected College", 1);
+
+  const backup = createDatabaseBackup(
+    db,
+    dbPath,
+    "pre-reset",
+  );
+
+  assert.equal(backup.purpose, "pre-reset");
+
+  const listed = listDatabaseBackups(dbPath);
+  assert.equal(
+    listed.some(
+      (entry) =>
+        entry.fileName === backup.fileName &&
+        entry.purpose === "pre-reset",
+    ),
+    true,
+  );
+
+  db.close();
+});
