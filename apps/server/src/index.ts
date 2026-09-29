@@ -107,6 +107,7 @@ app.get("/api/ranking", async () =>
 app.get("/health", async () => ({
   ok: true,
   service: "uniquiz-server",
+  mode: config.mode,
   timestamp: new Date().toISOString(),
 }));
 
@@ -183,6 +184,7 @@ io.on("connection", (socket) => {
   socket.emit("server:hello", {
     socketId: socket.id,
     role,
+    mode: config.mode,
     serverTime: new Date().toISOString(),
   });
 
@@ -290,6 +292,7 @@ app.log.info(
   {
     host: config.host,
     port: config.port,
+    mode: config.mode,
     databasePath: config.databasePath,
     oscEnabled: config.osc.enabled,
     oscHost: config.osc.host,

@@ -14,6 +14,10 @@
     "typecheck": "pnpm -r typecheck",
     "ops:backup": "pnpm --filter @uniquiz/server ops:backup",
     "ops:backups": "pnpm --filter @uniquiz/server ops:backups",
-    "ops:restore": "pnpm --filter @uniquiz/server ops:restore"
+    "ops:restore": "pnpm --filter @uniquiz/server ops:restore",
+    "dev:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm dev",
+    "ops:backup:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:backup",
+    "ops:backups:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:backups",
+    "ops:restore:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:restore"
   }
 }

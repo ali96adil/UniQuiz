@@ -72,6 +72,24 @@ The operator should receive a clear READY / NOT READY summary.
 ## Rehearsal Mode
 A rehearsal mode uses non-official data/results and cannot contaminate official competition rankings.
 
+### Isolated rehearsal database
+Run rehearsal with:
+
+```bash
+pnpm dev:rehearsal
+```
+
+Rehearsal defaults to `data/uniquiz-rehearsal.db`, while official mode defaults to `data/uniquiz.db`. The two modes therefore cannot contaminate each other's rankings, submissions, draw, questions or audit history unless an operator explicitly overrides `UNIQUIZ_DB_PATH`.
+
+Every connected browser receives the authoritative runtime mode from the server and shows a persistent **REHEARSAL · تدريب** banner when rehearsal mode is active.
+
+Backup/list/restore commands also have rehearsal variants:
+```bash
+pnpm ops:backup:rehearsal
+pnpm ops:backups:rehearsal
+pnpm ops:restore:rehearsal -- /path/to/backup.db
+```
+
 It should exercise:
 - station connectivity;
 - countdown;

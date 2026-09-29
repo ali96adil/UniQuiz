@@ -1713,3 +1713,23 @@ h2 {
 .recovery-warning strong {
   font-size: 1rem;
 }
+
+.rehearsal-banner {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  z-index: 1000;
+  transform: translateX(-50%);
+  width: min(760px, calc(100vw - 28px));
+  padding: 8px 16px;
+  border: 1px solid rgba(250, 204, 21, 0.72);
+  border-radius: 999px;
+  background: rgba(113, 63, 18, 0.93);
+  color: #fef3c7;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}

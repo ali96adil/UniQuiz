@@ -14,6 +14,7 @@ import type {
   QualificationRound,
   QuestionAllocationSummary,
   QuestionBankSummary,
+  RuntimeMode,
   StationPresence,
 } from "@uniquiz/shared";
 
@@ -3171,6 +3172,8 @@ export function App() {
     useState<ReturnType<typeof io> | null>(null);
   const [effectiveRole, setEffectiveRole] =
     useState<ClientRole>("unknown");
+  const [runtimeMode, setRuntimeMode] =
+    useState<RuntimeMode>("official");
 
   const stationToken = useMemo(() => {
     if (role !== "team-a" && role !== "team-b") {
@@ -3206,8 +3209,12 @@ export function App() {
     });
     socket.on(
       "server:hello",
-      (payload: { role: ClientRole }) => {
+      (payload: {
+        role: ClientRole;
+        mode: RuntimeMode;
+      }) => {
         setEffectiveRole(payload.role);
+        setRuntimeMode(payload.mode);
       },
     );
     socket.on("presence:snapshot", (snapshot: PresenceSnapshot) => {
@@ -3318,6 +3325,12 @@ export function App() {
           : "shell"
       }
     >
+      {runtimeMode === "rehearsal" ? (
+        <div className="rehearsal-banner">
+          REHEARSAL · تدريب — البيانات والنتائج معزولة عن الرسمي
+        </div>
+      ) : null}
+
       {surface !== "display" ? (
         <section className="hero">
           <p className="eyebrow">University Knowledge Competition</p>

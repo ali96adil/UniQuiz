@@ -354,3 +354,6 @@ export interface OperationsPreflightSnapshot {
   checks: OperationsPreflightCheck[];
   latestBackup: OperationsBackupRecord | null;
 }
+
+
+export type RuntimeMode = "official" | "rehearsal";
