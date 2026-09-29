@@ -32,3 +32,8 @@ The PDF must be print-ready and include:
 - A clean formal layout suitable for archiving and official circulation.
 
 The PDF must be generated from authoritative persisted competition results, not from a screenshot of the audience display.
+
+- Official results report surface implemented at `/report`.
+- Operator gets `تصدير بيان النتائج PDF` only after qualification completion.
+- `/report?print=1` waits for local logos, then opens the browser print dialog for A4 Save as PDF.
+- The report uses authoritative ranking/settings/live data and includes all colleges, points, cumulative response time, counted questions, top three, logos, patronage/supervision, and issue date/time.

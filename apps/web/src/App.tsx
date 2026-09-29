@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -22,6 +22,7 @@ type Surface =
   | "draw"
   | "operator"
   | "display"
+  | "report"
   | "team-a"
   | "team-b";
 
@@ -31,9 +32,15 @@ const surfaceTitles: Record<Surface, string> = {
   draw: "القرعة",
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
+  report: "بيان النتائج الرسمي",
   "team-a": "محطة المتسابق A",
   "team-b": "محطة المتسابق B",
 };
+
+const PATRONAGE_LINE =
+  "برعاية السيد رئيس جامعة بابل الأستاذ الدكتور أمين عجيل ياسر الياسري المحترم";
+const SUPERVISION_LINE =
+  "وإشراف الأستاذ الدكتور ميثاق طالب عبد الجبوري مساعد رئيس الجامعة للشؤون الإدارية المحترم";
 
 const roleTitles: Record<ClientRole, string> = {
   operator: "Operator",
@@ -47,6 +54,7 @@ function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/setup")) return "setup";
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
+  if (pathname.startsWith("/report")) return "report";
   if (pathname.startsWith("/display")) return "display";
   if (pathname.startsWith("/team/a")) return "team-a";
   if (pathname.startsWith("/team/b")) return "team-b";
@@ -58,6 +66,7 @@ function roleForSurface(surface: Surface): ClientRole {
     case "setup":
     case "draw":
     case "operator":
+    case "report":
       return "operator";
     case "display":
       return "display";
@@ -1626,12 +1635,8 @@ function AudienceBroadcastFrame({
             <span>{settings.eventSubtitle}</span>
           ) : null}
           <div className="audience-patronage">
-            <span>
-              برعاية السيد رئيس جامعة بابل الأستاذ الدكتور أمين عجيل ياسر الياسري المحترم
-            </span>
-            <span>
-              وإشراف الأستاذ الدكتور ميثاق طالب عبد الجبوري مساعد رئيس الجامعة للشؤون الإدارية المحترم
-            </span>
+            <span>{PATRONAGE_LINE}</span>
+            <span>{SUPERVISION_LINE}</span>
           </div>
           {meta ? <small>{meta}</small> : null}
         </div>
@@ -2549,6 +2554,22 @@ function OperatorLivePanel({
           </button>
         ) : null}
 
+        {snapshot.qualificationComplete ? (
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => {
+              window.open(
+                "/report?print=1",
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
+          >
+            تصدير بيان النتائج PDF
+          </button>
+        ) : null}
+
         {(snapshot.phase === "ROUND_ACTIVE" ||
           snapshot.phase === "QUESTION_REVEAL") ? (
           <button
@@ -2598,6 +2619,232 @@ function OperatorLivePanel({
     </section>
   );
 }
+
+function OfficialResultsReport({
+  ranking,
+  settings,
+  snapshot,
+}: {
+  ranking: QualificationRankingSnapshot | null;
+  settings: AudienceDisplaySettings | null;
+  snapshot: LiveSnapshot | null;
+}) {
+  const autoPrintRequested = useMemo(
+    () =>
+      new URLSearchParams(window.location.search).get("print") ===
+      "1",
+    [],
+  );
+  const autoPrintStarted = useRef(false);
+  const [exportedAt] = useState(() => new Date());
+
+  const reportReady =
+    ranking !== null &&
+    settings !== null &&
+    snapshot !== null &&
+    snapshot.qualificationComplete;
+
+  useEffect(() => {
+    document.title = "بيان النتائج الرسمي - مسابقة بنك المعلومات";
+
+    if (
+      !autoPrintRequested ||
+      autoPrintStarted.current ||
+      !reportReady
+    ) {
+      return;
+    }
+
+    autoPrintStarted.current = true;
+    let cancelled = false;
+
+    const images = Array.from(document.images);
+    const imagesReady = images.map(
+      (image) =>
+        new Promise<void>((resolve) => {
+          if (image.complete) {
+            resolve();
+            return;
+          }
+
+          const finish = () => resolve();
+          image.addEventListener("load", finish, { once: true });
+          image.addEventListener("error", finish, { once: true });
+        }),
+    );
+
+    void Promise.all(imagesReady).then(() => {
+      if (cancelled) return;
+      window.setTimeout(() => {
+        if (!cancelled) window.print();
+      }, 250);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoPrintRequested, reportReady]);
+
+  if (!ranking || !settings || !snapshot) {
+    return (
+      <section className="official-report report-loading" dir="rtl">
+        <strong>جاري تجهيز بيان النتائج الرسمي...</strong>
+      </section>
+    );
+  }
+
+  if (!snapshot.qualificationComplete) {
+    return (
+      <section className="official-report report-loading" dir="rtl">
+        <strong>بيان النتائج غير متاح قبل اكتمال جميع جولات التصفيات.</strong>
+        <a className="button-link" href="/operator">
+          العودة إلى لوحة التحكم
+        </a>
+      </section>
+    );
+  }
+
+  const finalEntries = ranking.entries.filter(
+    (entry) => entry.rank !== null,
+  );
+  const topThree = finalEntries.slice(0, 3);
+  const issuedAt = new Intl.DateTimeFormat("ar-IQ", {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(exportedAt);
+
+  return (
+    <section className="official-report" dir="rtl">
+      <div className="report-toolbar">
+        <a className="button-link" href="/operator">
+          العودة إلى لوحة التحكم
+        </a>
+        <button className="primary" onClick={() => window.print()}>
+          طباعة / حفظ PDF
+        </button>
+      </div>
+
+      <header className="report-letterhead">
+        <div className="report-logo">
+          {settings.universityLogoUrl ? (
+            <img
+              src={settings.universityLogoUrl}
+              alt="شعار جامعة بابل"
+            />
+          ) : null}
+        </div>
+
+        <div className="report-heading">
+          <h1>{settings.eventTitle}</h1>
+          {settings.eventSubtitle ? (
+            <p>{settings.eventSubtitle}</p>
+          ) : null}
+          <h2>بيان النتائج الرسمي - مرحلة التصفيات</h2>
+        </div>
+
+        <div className="report-logo">
+          {settings.departmentLogoUrl ? (
+            <img
+              src={settings.departmentLogoUrl}
+              alt="شعار قسم النشاطات الطلابية"
+            />
+          ) : null}
+        </div>
+      </header>
+
+      <div className="report-patronage">
+        <strong>{PATRONAGE_LINE}</strong>
+        <strong>{SUPERVISION_LINE}</strong>
+      </div>
+
+      <div className="report-meta">
+        <span>
+          <b>عدد الكليات:</b> {finalEntries.length}
+        </span>
+        <span>
+          <b>تاريخ ووقت إصدار البيان:</b> {issuedAt}
+        </span>
+        {settings.venue ? (
+          <span>
+            <b>المكان:</b> {settings.venue}
+          </span>
+        ) : null}
+        {settings.season ? (
+          <span>
+            <b>الموسم:</b> {settings.season}
+          </span>
+        ) : null}
+      </div>
+
+      <section className="report-top-three">
+        {topThree.map((entry) => (
+          <article
+            className={[
+              "report-podium-card",
+              entry.rank === 1 ? "first" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            key={entry.college.id}
+          >
+            <span>المركز {entry.rank}</span>
+            <strong>{entry.college.name}</strong>
+            <b>{entry.scorePoints} نقطة</b>
+            <small>
+              مجموع زمن الإجابات:{" "}
+              {(entry.totalResponseTimeMs / 1000).toFixed(3)} ثانية
+            </small>
+          </article>
+        ))}
+      </section>
+
+      <h3 className="report-table-title">
+        {settings.copy.finalRankingTitle}
+      </h3>
+
+      <table className="official-results-table">
+        <thead>
+          <tr>
+            <th>المركز</th>
+            <th>الكلية</th>
+            <th>المجموع</th>
+            <th>مجموع زمن الإجابات</th>
+            <th>الأسئلة المحتسبة</th>
+          </tr>
+        </thead>
+        <tbody>
+          {finalEntries.map((entry) => (
+            <tr
+              key={entry.college.id}
+              className={
+                (entry.rank ?? 99) <= 3
+                  ? "report-top-row"
+                  : undefined
+              }
+            >
+              <td>{entry.rank}</td>
+              <td>{entry.college.name}</td>
+              <td>{entry.scorePoints} نقطة</td>
+              <td>
+                {(entry.totalResponseTimeMs / 1000).toFixed(3)} ثانية
+              </td>
+              <td>{entry.revealedQuestions} / 10</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <footer className="report-footer">
+        <span>
+          تم إصدار هذا البيان من نظام مسابقة بنك المعلومات اعتمادًا
+          على النتائج المسجلة في النظام بعد اكتمال التصفيات.
+        </span>
+        <span>{settings.footerText}</span>
+      </footer>
+    </section>
+  );
+}
+
 
 function TeamLivePanel({
   snapshot,
@@ -3030,10 +3277,12 @@ export function App() {
       className={
         surface === "display"
           ? "display-shell"
-          : "shell"
+          : surface === "report"
+            ? "report-shell"
+            : "shell"
       }
     >
-      {surface !== "display" ? (
+      {surface !== "display" && surface !== "report" ? (
         <section className="hero">
           <p className="eyebrow">University Knowledge Competition</p>
           <h1>{surfaceTitles[surface]}</h1>
@@ -3115,6 +3364,14 @@ export function App() {
         </AudienceBroadcastFrame>
       ) : null}
 
+      {surface === "report" ? (
+        <OfficialResultsReport
+          ranking={ranking}
+          settings={audienceSettings}
+          snapshot={liveSnapshot}
+        />
+      ) : null}
+
       {surface === "operator" ? (
         <>
           <OperatorLivePanel snapshot={liveSnapshot} />
@@ -3148,6 +3405,7 @@ export function App() {
       surface !== "draw" &&
       surface !== "operator" &&
       surface !== "display" &&
+      surface !== "report" &&
       surface !== "team-a" &&
       surface !== "team-b" ? (
         <section className="panel">
