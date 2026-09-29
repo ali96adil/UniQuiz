@@ -254,3 +254,9 @@ Configurable presentation settings include:
 
 ## Safety and recovery
 The display is a read-only projection of authoritative server state. Refreshing or reconnecting the display must restore the current state without advancing the competition.
+
+
+## Persistence
+Audience branding, logos, terminology and static display copy are persisted independently from competition data. The guarded "مسح كل بيانات المسابقة" action does not delete audience branding or Station A/B credentials.
+
+Logo assets are stored locally in SQLite and served by UniQuiz, so the audience display has no Internet dependency for branding.
