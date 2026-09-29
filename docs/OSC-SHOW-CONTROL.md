@@ -23,7 +23,7 @@ All numeric arguments are OSC int32 values.
 | --- | --- | --- |
 | `/uniquiz/round/start` | `round_order` | Operator started the round |
 | `/uniquiz/question/countdown` | `round_order, question_position, value` | Prestart cue; value is 3, 2, then 1 |
-| `/uniquiz/question/start` | `round_order, question_position, duration_ms` | Question became visible and official 45s timing started |
+| `/uniquiz/question/start` | `round_order, question_position, duration_ms` | Question became visible and official 30s timing started |
 | `/uniquiz/question/answered` | `round_order, question_position, reason` | All required stations answered; result auto-reveal is scheduled after this cue |
 | `/uniquiz/question/timeout` | `round_order, question_position` | Official answer window expired |
 | `/uniquiz/question/closed` | `round_order, question_position, reason` | Question closed for any reason |
@@ -33,7 +33,7 @@ All numeric arguments are OSC int32 values.
 
 ## Ableton mapping idea
 
-Use the countdown cues for a short 3-2-1 sound sequence. Use `/uniquiz/question/start` to launch the 45-second question bed/timer cue. Stop or transition that cue on either `/uniquiz/question/answered` or `/uniquiz/question/timeout`. Use `/uniquiz/question/reveal` for the answer/reveal sting.
+Use the countdown cues for a short 3-2-1 sound sequence. Use `/uniquiz/question/start` to launch the 30-second question bed/timer cue. Stop or transition that cue on either `/uniquiz/question/answered` or `/uniquiz/question/timeout`. Use `/uniquiz/question/reveal` for the answer/reveal sting.
 
 UniQuiz does not require Ableton to acknowledge any cue.
 

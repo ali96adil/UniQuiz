@@ -68,6 +68,7 @@ PR #12 — M4: Live Session & Team Stations
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
+- Official question timing changed to 30 seconds with whole-number scoring: 25 max while timer shows 30–25, then one point per displayed second down to 1; expiry = 0.
 - M4 real-device rehearsal on the Mac plus authenticated Team A/B browsers.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.

@@ -30,7 +30,7 @@ Decision: All official questions are treated as the same difficulty level.
 Decision: Every qualification session contains 10 unique questions across 5 categories, exactly 2 questions per category.
 
 ## D-008 — Speed-weighted scoring
-Decision: A correct answer at or before 5 seconds earns 10 points. From 5 to 45 seconds, the score decreases linearly to 1 point. Wrong and unanswered responses earn 0.
+Decision: The official answer window is 30 seconds. Correct answers use whole-number speed scoring: the maximum is 25 points while the displayed timer is 30 through 25, then the score follows the displayed remaining second (24 → 24 points, …, 1 → 1 point). At expiry, wrong, unanswered or expired responses earn 0.
 
 ## D-009 — Reveal before ranking update
 Decision: Official answer, correctness, response time and awarded points are revealed after question closure. Ranking is then recalculated and published.
@@ -41,7 +41,7 @@ Reason: Transparency without leaking correctness while another team can still an
 Decision: Git contains schemas and samples only. Real competition questions and answers remain local runtime data.
 
 ## D-011 — Operator controls progression
-Decision: Sessions and questions never advance automatically. The operator explicitly prepares/starts every session and every question. The 45-second countdown is the only automatic progression inside an active question.
+Decision: Sessions and questions never advance automatically. The operator explicitly prepares/starts every session and every question. The 30-second countdown is the only automatic progression inside an active question.
 
 Reason: Live events may require pauses, announcements, technical checks or unscheduled breaks.
 
@@ -93,7 +93,7 @@ Decision: Every qualification question is multiple-choice with exactly four visi
 Reason: This keeps answer submission, automatic scoring, audience transparency and station UX consistent.
 
 ## D-016 — Three-second pre-question countdown
-Decision: Pressing Start Question first enters a server-controlled 3-2-1 presentation countdown. The question text and options remain hidden until the countdown completes. The authoritative 45-second answer timer begins only when the question becomes active after the countdown.
+Decision: Pressing Start Question first enters a server-controlled 3-2-1 presentation countdown. The question text and options remain hidden until the countdown completes. The authoritative 30-second answer timer begins only when the question becomes active after the countdown.
 
 The operator remains the only actor that initiates a question. The countdown itself runs automatically once started.
 
@@ -141,12 +141,14 @@ Importing a file never bypasses competition locks or question-bank validation. R
 Decision: Official scoring is calculated server-side using integer micro-points (1 point = 1,000,000 micro-points), while the UI converts them to normal decimal points for presentation.
 
 Rules:
-- Correct at or before 5,000 ms: 10,000,000 micro-points = 10 points
-- From 5,001 ms through 45,000 ms: subtract 225 micro-points per elapsed millisecond after 5,000 ms
-- Correct at exactly 45,000 ms: 1,000,000 micro-points = 1 point
-- Wrong, unanswered, or later than 45,000 ms: 0
+- Official question deadline: 30,000 ms
+- Maximum correct score: 25 points
+- While the displayed timer is 30, 29, 28, 27, 26 or 25: 25 points
+- From displayed 24 seconds through 1 second: points equal the displayed remaining second
+- At 30,000 ms or later: 0
+- Wrong or unanswered: 0
 
-Reason: This implements the agreed linear formula exactly at millisecond precision without floating-point accumulation affecting ranking.
+Official storage remains integer micro-points (1 point = 1,000,000 micro-points), so ranking has no floating-point ambiguity.
 
 ## D-020 — Audit history is append-only and reference-tolerant
 Decision: Audit rows preserve numeric round/question references and event payloads without foreign-key coupling to mutable setup tables.
@@ -154,7 +156,7 @@ Decision: Audit rows preserve numeric round/question references and event payloa
 Reason: Resetting a draw or replacing/importing a question bank must not erase historical audit evidence or be blocked by audit-table foreign keys.
 
 ## D-021 — Question timing uses the server monotonic clock
-Decision: The authoritative 45-second question window is measured from the server's monotonic clock. Wall-clock timestamps are stored/published only for display and audit correlation.
+Decision: The authoritative 30-second question window is measured from the server's monotonic clock. Wall-clock timestamps are stored/published only for display and audit correlation.
 
 Reason: Browser clocks and wall-clock adjustments must not change official elapsed response time.
 
@@ -167,3 +169,17 @@ Rules:
 - The correct answer must never be exposed while a required station can still answer.
 - Timeout closure does not use the answered-path automatic Reveal; the operator retains explicit Reveal control for timeout cases.
 - Automatic Reveal is restored after a server restart if the persisted state is an answered `QUESTION_CLOSED` awaiting its reveal delay.
+
+## D-023 — Thirty-second timer with whole-second scoring
+Decision: Qualification questions use a 30-second official answer window and whole-number speed scores.
+
+Scoring follows the countdown shown to competitors:
+- timer 30–25 → 25 points
+- timer 24 → 24 points
+- timer 23 → 23 points
+- …
+- timer 2 → 2 points
+- timer 1 → 1 point
+- timer 0 / expiry → 0 points
+
+The server remains authoritative at millisecond precision. The whole-number score is derived from the displayed remaining second; no fractional points are awarded.
