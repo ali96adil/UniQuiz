@@ -3,18 +3,19 @@
 Updated: 2026-09-28
 
 ## Active milestone
-Issue #5 — M4 Live Session & Team Stations
+Issue #6 — M5 Audience Display & Ranking
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m4-live-session-stations`
+`feature/m5-audience-live-display`
 
 ## Active pull request
-PR #12 — M4: Live Session & Team Stations
+Pending creation for M5 implementation
 
 ## Completed
+- M4 PR #12 merged to `main` as squash commit `ffb660561ab2c5ee8005ad1e247547656abe6a4f`.
 - M3 PR #11 merged to `main` as squash commit `3a29003c0c50d83d0f54adf41e77862e1495e971`.
 - M4 persistent operator-paced live state machine implemented.
 - Team A/B answer submissions are locked once, persisted, and restored after reconnect; paired questions auto-close when both answer and solo questions close after Team A answers.
@@ -68,7 +69,7 @@ PR #12 — M4: Live Session & Team Stations
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M4 complete and ready to merge; next milestone is M5 Audience Display & Ranking.
+- M5 live audience display: current round, countdown, question, answer-received state and reveal.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
 - Team reveal displays the full correct answer text plus option letter.
@@ -76,7 +77,7 @@ PR #12 — M4: Live Session & Team Stations
 - Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-Merge M4, then start M5 Audience Display & Ranking by binding `/display` to the live round/question state, countdown, answer-received state and reveal results.
+Bind `/display` to the authoritative live snapshot and add reveal-safe per-team results. Ranking sidebar follows after the live question/reveal scene is verified.
 
 ## Completed
 - CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
