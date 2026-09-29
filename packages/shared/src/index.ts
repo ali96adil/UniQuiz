@@ -246,6 +246,7 @@ export interface QualificationRankingEntry {
   rank: number | null;
   scorePoints: number;
   revealedQuestions: number;
+  totalResponseTimeMs: number;
 }
 
 export interface QualificationRankingSnapshot {

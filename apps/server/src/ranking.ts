@@ -12,6 +12,7 @@ interface RankingRow {
   roundStatus: "PENDING" | "ACTIVE" | "COMPLETED";
   scoreMicros: number;
   revealedQuestions: number;
+  totalResponseTimeMs: number;
 }
 
 export function getQualificationRanking(
@@ -37,7 +38,13 @@ export function getQualificationRanking(
           ELSE 0
         END
       ), 0) AS scoreMicros,
-      COUNT(DISTINCT
+      (
+        SELECT COUNT(DISTINCT a.position)
+        FROM audit_events a
+        WHERE a.event_type = 'QUESTION_REVEALED'
+          AND a.round_id = r.id
+      ) AS revealedQuestions,
+      COALESCE(SUM(
         CASE
           WHEN EXISTS (
             SELECT 1
@@ -46,10 +53,10 @@ export function getQualificationRanking(
               AND a.round_id = s.round_id
               AND a.position = s.question_position
           )
-          THEN s.question_position
-          ELSE NULL
+          THEN s.response_time_ms
+          ELSE 0
         END
-      ) AS revealedQuestions
+      ), 0) AS totalResponseTimeMs
     FROM participants p
     JOIN colleges c ON c.id = p.college_id
     JOIN qualification_rounds r
@@ -102,6 +109,7 @@ export function getQualificationRanking(
         rank,
         scorePoints: row.scoreMicros / 1_000_000,
         revealedQuestions: row.revealedQuestions,
+        totalResponseTimeMs: row.totalResponseTimeMs,
       };
     },
   );
@@ -120,6 +128,7 @@ export function getQualificationRanking(
       rank: null,
       scorePoints: 0,
       revealedQuestions: 0,
+      totalResponseTimeMs: 0,
     }));
 
   return {

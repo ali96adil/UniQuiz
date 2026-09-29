@@ -471,7 +471,7 @@ export class LiveSessionManager {
       questionDeadlineEpochMs:
         state.questionStartedAtEpochMs === null
           ? null
-          : state.questionStartedAtEpochMs + QUESTION_DURATION_MS,
+          : state.questionStartedAtEpochMs + this.questionDurationMs,
       questionClosedAtEpochMs: state.questionClosedAtEpochMs,
       closeReason: state.closeReason,
       hasPendingRound: pendingRoundCount > 0,
@@ -779,7 +779,7 @@ export class LiveSessionManager {
     return this.publish();
   }
 
-  prepareNextQuestion(): LiveSnapshot {
+  prepareNextQuestion(publish = true): LiveSnapshot {
     const state = this.stateRow();
 
     if (
@@ -820,7 +820,12 @@ export class LiveSessionManager {
       position: nextPosition,
     });
 
-    return this.publish();
+    return publish ? this.publish() : this.getSnapshot();
+  }
+
+  startNextQuestion(): LiveSnapshot {
+    this.prepareNextQuestion(false);
+    return this.startQuestion();
   }
 
   startQuestion(): LiveSnapshot {
@@ -895,7 +900,7 @@ export class LiveSessionManager {
       position,
       occurredAt: new Date(clock.startedAtEpochMs).toISOString(),
       payload: {
-        durationMs: QUESTION_DURATION_MS,
+        durationMs: this.questionDurationMs,
       },
     });
 
@@ -1178,7 +1183,7 @@ export class LiveSessionManager {
     }
 
     const clock = this.questionClock.snapshot();
-    if (clock.elapsedMs >= QUESTION_DURATION_MS) {
+    if (clock.elapsedMs >= this.questionDurationMs) {
       const current = this.stateRow();
       if (current.phase === "QUESTION_ACTIVE") {
         this.closeActiveQuestion("TIMEOUT");
@@ -1388,6 +1393,7 @@ export function registerLiveSessionRoutes(
   simple("/api/live/confirm-stations", () => manager.confirmStations());
   simple("/api/live/start-round", () => manager.startRound());
   simple("/api/live/prepare-question", () => manager.prepareNextQuestion());
+  simple("/api/live/start-next-question", () => manager.startNextQuestion());
   simple("/api/live/start-question", () => manager.startQuestion());
   simple("/api/live/reveal", () => manager.revealQuestion());
   simple("/api/live/intermission", () => manager.enterIntermission());

@@ -83,16 +83,19 @@ test("ranking includes only revealed scores and leaves not-started colleges unra
   assert.equal(a?.rank, 1);
   assert.equal(a?.scorePoints, 25);
   assert.equal(a?.revealedQuestions, 1);
+  assert.equal(a?.totalResponseTimeMs, 1000);
 
   assert.equal(b?.status, "PLAYING");
   assert.equal(b?.rank, 2);
   assert.equal(b?.scorePoints, 0);
   assert.equal(b?.revealedQuestions, 1);
+  assert.equal(b?.totalResponseTimeMs, 2000);
 
   assert.equal(c?.status, "NOT_STARTED");
   assert.equal(c?.rank, null);
   assert.equal(c?.scorePoints, 0);
   assert.equal(c?.revealedQuestions, 0);
+  assert.equal(c?.totalResponseTimeMs, 0);
 
   db.close();
 });
@@ -159,6 +162,8 @@ test("equal revealed scores share the same rank", () => {
   assert.equal(snapshot.entries[1]?.rank, 1);
   assert.equal(snapshot.entries[0]?.scorePoints, 25);
   assert.equal(snapshot.entries[1]?.scorePoints, 25);
+  assert.equal(snapshot.entries[0]?.totalResponseTimeMs, 1000);
+  assert.equal(snapshot.entries[1]?.totalResponseTimeMs, 1000);
 
   db.close();
 });

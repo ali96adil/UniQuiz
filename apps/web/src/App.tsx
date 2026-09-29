@@ -1805,6 +1805,11 @@ function AudienceRankingSidebar({
                   ? ""
                   : ` ${settings.copy.pointsLabel}`}
               </small>
+              {entry.status !== "NOT_STARTED" ? (
+                <small className="audience-rank-time">
+                  الزمن: {(entry.totalResponseTimeMs / 1000).toFixed(3)} ث
+                </small>
+              ) : null}
             </div>
           </div>
         )) ?? (
@@ -2138,6 +2143,9 @@ function AudienceLiveSurface({
                 </span>
                 <strong>{entry.college.name}</strong>
                 <b>{entry.scorePoints} {settings.copy.pointsLabel}</b>
+                <small>
+                  الزمن الإجمالي: {(entry.totalResponseTimeMs / 1000).toFixed(3)} ث
+                </small>
               </div>
             ))}
           </div>
@@ -2480,16 +2488,16 @@ function OperatorLivePanel({
         (snapshot.phase === "QUESTION_REVEAL" &&
           (snapshot.question?.position ?? 0) < 10) ? (
           <button
-            className="primary"
+            className="primary live-start-button"
             disabled={busy}
             onClick={() =>
               void run(
-                "/api/live/prepare-question",
-                "تم تجهيز السؤال التالي.",
+                "/api/live/start-next-question",
+                "بدأ السؤال التالي مباشرةً بالعد التنازلي 3-2-1.",
               )
             }
           >
-            تجهيز السؤال التالي
+            السؤال التالي — 3 · 2 · 1
           </button>
         ) : null}
 
@@ -2565,7 +2573,7 @@ function OperatorLivePanel({
 
       {snapshot.phase === "QUESTION_ACTIVE" ? (
         <p className="locked-note">
-          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 30 ثانية.
+          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 25 ثانية.
         </p>
       ) : null}
 

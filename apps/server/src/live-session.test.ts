@@ -182,6 +182,28 @@ test("solo round requires only Team A and closes on its answer", async () => {
 });
 
 
+test("startNextQuestion skips the intermediate ready screen", () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(db, io, 10_000, 25_000);
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+
+  const snapshot = manager.startNextQuestion();
+
+  assert.equal(snapshot.phase, "QUESTION_COUNTDOWN");
+  assert.equal(snapshot.question?.position, 1);
+  assert.equal(snapshot.question?.prompt, null);
+
+  io.close();
+  void app.close();
+  db.close();
+});
+
+
 test("start round rechecks station readiness after confirmation", () => {
   const db = seedLiveRound();
   const app = Fastify();

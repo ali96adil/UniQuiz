@@ -1141,6 +1141,7 @@ h2 {
 
 .audience-rank-score {
   display: grid;
+  gap: 2px;
   justify-items: end;
   font-size: 1.15rem;
   font-weight: 900;
@@ -1149,6 +1150,11 @@ h2 {
 .audience-rank-score small {
   color: #94a3b8;
   font-size: 0.7rem;
+}
+
+.audience-rank-time {
+  white-space: nowrap;
+  font-weight: 700;
 }
 
 .audience-ranking-empty {
@@ -1266,6 +1272,11 @@ h2 {
 .audience-final-card > b {
   font-size: clamp(1.25rem, 2vw, 1.8rem);
   color: #bfdbfe;
+}
+
+.audience-final-card > small {
+  color: #94a3b8;
+  font-weight: 700;
 }
 
 .audience-final-card.leader {
