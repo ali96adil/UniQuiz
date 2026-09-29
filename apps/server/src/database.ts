@@ -261,8 +261,62 @@ export function openDatabase(databasePath: string) {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS audience_presentation (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      active INTEGER NOT NULL DEFAULT 0
+        CHECK (active IN (0, 1)),
+      kind TEXT NOT NULL DEFAULT 'PLEASE_WAIT'
+        CHECK (
+          kind IN (
+            'BREAK',
+            'PLEASE_WAIT',
+            'NEXT_ROUND',
+            'PREPARE_TEAMS',
+            'FINAL_RESULTS_SOON',
+            'CUSTOM'
+          )
+        ),
+      title TEXT NOT NULL DEFAULT 'يرجى الانتظار',
+      message TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT INTO audience_presentation (
+      id,
+      active,
+      kind,
+      title,
+      message,
+      updated_at
+    )
+    VALUES (
+      1,
+      0,
+      'PLEASE_WAIT',
+      'يرجى الانتظار',
+      '',
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(id) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS operations_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      osc_test_sent_at TEXT,
+      osc_test_confirmed_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT INTO operations_state (
+      id,
+      osc_test_sent_at,
+      osc_test_confirmed_at,
+      updated_at
+    )
+    VALUES (1, NULL, NULL, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING;
+
     UPDATE app_meta
-    SET value = '10'
+    SET value = '12'
     WHERE key = 'schema_version';
   `);
 

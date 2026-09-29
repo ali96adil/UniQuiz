@@ -20,7 +20,13 @@ import {
   registerAudienceSettingsRoutes,
 } from "./audience-settings.js";
 import { registerResetAllRoute } from "./reset-all.js";
+import {
+  getAudiencePresentation,
+  registerAudiencePresentationRoutes,
+} from "./presentation.js";
 import { OscOutput } from "./osc-output.js";
+import { registerOperationsRoutes } from "./operations.js";
+import { registerResultsExportRoutes } from "./results-export.js";
 import {
   ensureStationCredentials,
   registerStationAuthRoutes,
@@ -105,6 +111,7 @@ app.get("/api/ranking", async () =>
 app.get("/health", async () => ({
   ok: true,
   service: "uniquiz-server",
+  mode: config.mode,
   timestamp: new Date().toISOString(),
 }));
 
@@ -112,9 +119,9 @@ app.get("/api/presence", async () => presenceSnapshot());
 
 registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
-registerQuestionBankRoutes(app, database, io);
 registerStationAuthRoutes(app, database);
 registerAudienceSettingsRoutes(app, database, io);
+registerAudiencePresentationRoutes(app, database, io);
 
 const oscOutput = new OscOutput(
   config.osc,
@@ -141,12 +148,39 @@ const liveSession = registerLiveSessionRoutes(
     ),
 );
 
+registerQuestionBankRoutes(
+  app,
+  database,
+  io,
+  (roundId, position) => {
+    liveSession.onQuestionReplaced(roundId, position);
+  },
+);
+
 registerResetAllRoute(
   app,
   database,
   io,
   liveSession,
+  config.databasePath,
 );
+
+registerOperationsRoutes(app, database, {
+  mode: config.mode,
+  databasePath: config.databasePath,
+  serverPort: config.port,
+  webPort: 5173,
+  osc: config.osc,
+  getPresence: presenceSnapshot,
+  sendOscTest: () => {
+    oscOutput.send(
+      "/uniquiz/system/test",
+      [new Date().toISOString()],
+    );
+  },
+});
+
+registerResultsExportRoutes(app, database);
 
 io.on("connection", (socket) => {
   const role = normalizeRole(
@@ -165,6 +199,7 @@ io.on("connection", (socket) => {
   socket.emit("server:hello", {
     socketId: socket.id,
     role,
+    mode: config.mode,
     serverTime: new Date().toISOString(),
   });
 
@@ -196,6 +231,11 @@ io.on("connection", (socket) => {
   socket.emit(
     "audience:settings",
     getAudienceDisplaySettings(database),
+  );
+
+  socket.emit(
+    "audience:presentation",
+    getAudiencePresentation(database),
   );
 
   const teamState = liveSession.getTeamSubmissionState(role);
@@ -254,6 +294,7 @@ io.on("connection", (socket) => {
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, "Shutting down UniQuiz");
+  liveSession.dispose();
   io.close();
   database.close();
   await app.close();
@@ -272,6 +313,7 @@ app.log.info(
   {
     host: config.host,
     port: config.port,
+    mode: config.mode,
     databasePath: config.databasePath,
     oscEnabled: config.osc.enabled,
     oscHost: config.osc.host,
