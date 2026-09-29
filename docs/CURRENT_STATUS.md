@@ -118,9 +118,10 @@ When the Mac and event devices are available, visually accept PR #13 on the real
 - CI Run #93 PASS: scoring-neutral audience presentation/announcement scenes.
 - CI Run #103–#105 PASS: OSC readiness send/confirm gate + reset behavior.
 - CI Run #106 PASS: opt-in safe Operator hotkeys; all M6 code paths validated.
+- CI Run #110 PASS: backup directory excluded from Git, verified-temp restore replacement, and mandatory pre-reset safety backup.
 
 ## Blockers
-No code blocker. Remaining gates require real hardware: M5 external-screen acceptance, M6 full Mac + 2 Windows + audience rehearsal, real OSC receiver confirmation, backup/restore drill, and failure simulation.
+No code blocker. M6 is code-complete on PR #14. Remaining gates require real hardware: M5 external-screen acceptance, M6 full Mac + 2 Windows + audience rehearsal, real OSC receiver confirmation, backup/restore drill, and failure simulation.
 
 ## Do not repeat
 - Do not recreate the repository.
