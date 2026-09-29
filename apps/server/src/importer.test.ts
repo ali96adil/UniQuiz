@@ -175,3 +175,39 @@ test("source_ref may stay blank without validation errors", async () => {
 
   db.close();
 });
+
+
+test("CSV question import accepts visible category names and canonicalizes them", async () => {
+  const db = testDatabase();
+  db.exec(`
+    INSERT INTO categories (category_key, name, sort_order) VALUES
+    ('sport_internal', 'رياضي', 1),
+    ('history_internal', 'تاريخ', 2),
+    ('geo_internal', 'جغرافيا', 3),
+    ('art_internal', 'فني', 4),
+    ('culture_internal', 'ثقافي', 5);
+  `);
+
+  const csv = [
+    "category_key,question,option_a,option_b,option_c,option_d,correct_option,source_ref",
+    "تاريخ,Visible-name question,A1,B1,C1,D1,C,",
+  ].join("\n");
+
+  const parsed = await parseImportBuffer(
+    db as never,
+    "questions.csv",
+    Buffer.from(csv),
+  );
+
+  assert.equal(parsed.questions?.length, 1);
+  assert.equal(
+    parsed.questions?.[0]?.categoryKey,
+    "history_internal",
+  );
+  assert.equal(
+    parsed.issues.filter((entry) => entry.level === "error").length,
+    0,
+  );
+
+  db.close();
+});

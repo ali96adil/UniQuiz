@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { io } from "socket.io-client";
 import type {
+  AudienceDisplaySettings,
   BulkImportPreview,
   ClientRole,
   CompetitionSetupSnapshot,
   DrawPresentationEvent,
   LiveSnapshot,
   LiveTeamSubmissionState,
+  QualificationRankingSnapshot,
   PresenceSnapshot,
   QualificationRound,
   QuestionAllocationSummary,
@@ -107,6 +109,17 @@ function PresenceCard({ station }: { station: StationPresence }) {
   );
 }
 
+function audienceText(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return Object.entries(values).reduce(
+    (result, [key, value]) =>
+      result.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 function StatusMessage({
   error,
   message,
@@ -134,6 +147,8 @@ function BulkImportPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [questionMode, setQuestionMode] =
+    useState<"append" | "replace">("append");
 
   const previewFile = async () => {
     if (!file) return;
@@ -179,6 +194,25 @@ function BulkImportPanel({
   const applyImport = async () => {
     if (!preview?.valid) return;
 
+    const importsQuestions =
+      preview.kinds.includes("questions");
+    const importsCategories =
+      preview.kinds.includes("categories");
+    const effectiveQuestionMode =
+      importsQuestions && importsCategories
+        ? "replace"
+        : questionMode;
+
+    if (
+      importsQuestions &&
+      effectiveQuestionMode === "replace" &&
+      !window.confirm(
+        "استبدال بنك الأسئلة الحالي بالكامل؟ سيتم حذف الأسئلة الحالية قبل إدخال أسئلة الملف.",
+      )
+    ) {
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -188,6 +222,11 @@ function BulkImportPanel({
         method: "POST",
         body: JSON.stringify({
           previewId: preview.previewId,
+          questionMode:
+            preview.kinds.includes("questions") &&
+            preview.kinds.includes("categories")
+              ? "replace"
+              : questionMode,
         }),
       });
 
@@ -252,6 +291,10 @@ function BulkImportPanel({
             category_key · question · option_a · option_b · option_c ·
             option_d · correct_option · source_ref
           </code>
+          <small className="muted">
+            category_key يقبل المفتاح الداخلي أو اسم المحور الظاهر، مثل
+            «تاريخ» أو «جغرافيا».
+          </small>
         </div>
         <div>
           <strong>Categories</strong>
@@ -273,6 +316,7 @@ function BulkImportPanel({
             setPreview(null);
             setError(null);
             setMessage(null);
+            setQuestionMode("append");
           }}
         />
         <button
@@ -343,6 +387,37 @@ function BulkImportPanel({
             </div>
           ) : null}
 
+          {preview.kinds.includes("questions") ? (
+            preview.kinds.includes("categories") ? (
+              <div className="import-mode-note">
+                هذا الملف يحتوي Categories وQuestions؛ سيتم استبدال
+                المحاور وبنك الأسئلة معًا عند الاعتماد.
+              </div>
+            ) : (
+              <div className="import-mode">
+                <strong>طريقة إدخال الأسئلة</strong>
+                <label>
+                  <input
+                    type="radio"
+                    name="question-import-mode"
+                    checked={questionMode === "append"}
+                    onChange={() => setQuestionMode("append")}
+                  />
+                  إضافة إلى بنك الأسئلة الحالي
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="question-import-mode"
+                    checked={questionMode === "replace"}
+                    onChange={() => setQuestionMode("replace")}
+                  />
+                  استبدال بنك الأسئلة بالكامل
+                </label>
+              </div>
+            )
+          ) : null}
+
           <div className="import-samples">
             {preview.samples.colleges.length > 0 ? (
               <div>
@@ -381,6 +456,7 @@ function BulkImportPanel({
             {questionBank.categories.map((category) => (
               <span key={category.key}>
                 {category.name}: {category.questionCount}
+                <small> · key: {category.key}</small>
               </span>
             ))}
           </div>
@@ -392,6 +468,447 @@ function BulkImportPanel({
   );
 }
 
+
+
+
+function AudienceSettingsPanel({
+  settings,
+}: {
+  settings: AudienceDisplaySettings | null;
+}) {
+  const [draft, setDraft] = useState<AudienceDisplaySettings | null>(
+    settings,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(settings);
+  }, [settings]);
+
+  if (!draft) {
+    return (
+      <section className="panel">
+        <h2>هوية شاشة الجمهور</h2>
+        <p>بانتظار تحميل الإعدادات...</p>
+      </section>
+    );
+  }
+
+  const setField = (
+    key:
+      | "eventTitle"
+      | "eventSubtitle"
+      | "venue"
+      | "season"
+      | "footerText"
+      | "roundLabel",
+    value: string,
+  ) => {
+    setDraft((current) =>
+      current ? { ...current, [key]: value } : current,
+    );
+  };
+
+  const setCopyField = (
+    key: keyof AudienceDisplaySettings["copy"],
+    value: string,
+  ) => {
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            copy: {
+              ...current.copy,
+              [key]: value,
+            },
+          }
+        : current,
+    );
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest<AudienceDisplaySettings>(
+        "/api/audience/settings",
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            eventTitle: draft.eventTitle,
+            eventSubtitle: draft.eventSubtitle,
+            venue: draft.venue,
+            season: draft.season,
+            footerText: draft.footerText,
+            roundLabel: draft.roundLabel,
+            copy: draft.copy,
+          }),
+        },
+      );
+      setMessage("تم حفظ إعدادات شاشة الجمهور.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر حفظ إعدادات شاشة الجمهور",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadLogo = async (
+    slot: "university" | "department",
+    file: File | null,
+  ) => {
+    if (!file) return;
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const response = await fetch(
+        `/api/audience/assets/${slot}`,
+        {
+          method: "POST",
+          body: form,
+        },
+      );
+
+      const payload = (await response.json()) as
+        | AudienceDisplaySettings
+        | { error?: string; message?: string };
+
+      if (!response.ok) {
+        const problem = payload as {
+          error?: string;
+          message?: string;
+        };
+        throw new Error(
+          problem.message ??
+            problem.error ??
+            `HTTP ${response.status}`,
+        );
+      }
+
+      setMessage("تم تحديث الشعار.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر رفع الشعار",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeLogo = async (
+    slot: "university" | "department",
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest<AudienceDisplaySettings>(
+        `/api/audience/assets/${slot}`,
+        { method: "DELETE" },
+      );
+      setMessage("تم حذف الشعار.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر حذف الشعار",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel audience-settings-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Audience Branding</p>
+          <h2>هوية شاشة الجمهور</h2>
+        </div>
+      </div>
+
+      <div className="audience-settings-grid">
+        <label>
+          <span>عنوان المسابقة</span>
+          <input
+            value={draft.eventTitle}
+            onChange={(event) =>
+              setField("eventTitle", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>العنوان الفرعي</span>
+          <input
+            value={draft.eventSubtitle}
+            onChange={(event) =>
+              setField("eventSubtitle", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>المكان</span>
+          <input
+            value={draft.venue}
+            onChange={(event) =>
+              setField("venue", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>الموسم / السنة</span>
+          <input
+            value={draft.season}
+            onChange={(event) =>
+              setField("season", event.target.value)
+            }
+          />
+        </label>
+        <label className="wide">
+          <span>نص Footer</span>
+          <input
+            value={draft.footerText}
+            onChange={(event) =>
+              setField("footerText", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>تسمية الجولة</span>
+          <input
+            value={draft.roundLabel}
+            onChange={(event) =>
+              setField("roundLabel", event.target.value)
+            }
+          />
+        </label>
+      </div>
+
+
+      <details className="audience-copy-settings">
+        <summary>نصوص شاشة الجمهور المتقدمة</summary>
+        <p className="muted">
+          يمكن استخدام المتغيرات {"{count}"} و{"{question}"} و{"{rank}"}
+          في الحقول التي تحتويها افتراضيًا.
+        </p>
+        <div className="audience-settings-grid">
+          {([
+            ["welcomeTitle", "عنوان الترحيب"],
+            ["waitingParticipantsText", "انتظار المشاركين"],
+            ["drawPhaseLabel", "تسمية مرحلة القرعة"],
+            ["drawOfficialTitle", "عنوان القرعة"],
+            ["participatingCollegeCountText", "عدد الكليات المشاركة"],
+            ["drawWaitingText", "انتظار إجراء القرعة"],
+            ["drawPresentingKicker", "أثناء إعلان القرعة"],
+            ["drawResultsKicker", "بعد إعلان القرعة"],
+            ["roundsTitle", "عنوان الجولات"],
+            ["versusLabel", "VS"],
+            ["soloLabel", "SOLO"],
+            ["soloRoundText", "الجولة الفردية"],
+            ["drawPresentingFooter", "Footer أثناء القرعة"],
+            ["drawCompleteFooter", "Footer بعد القرعة"],
+            ["rankingTitle", "عنوان الترتيب"],
+            ["rankingSubtitle", "وصف الترتيب"],
+            ["playingStatus", "حالة يلعب الآن"],
+            ["completedStatus", "حالة مكتملة"],
+            ["notStartedStatus", "حالة لم تبدأ"],
+            ["pointsLabel", "تسمية النقاط"],
+            ["waitingRoundsText", "انتظار بدء الجولات"],
+            ["waitingNextRoundText", "انتظار الجولة القادمة"],
+            ["questionLabel", "تسمية السؤال"],
+            ["questionReadyText", "رسالة السؤال الجاهز"],
+            ["intermissionText", "رسالة الاستراحة"],
+            ["roundReadyText", "رسالة الجولة الجاهزة"],
+            ["closedLabel", "تسمية مغلق"],
+            ["resultLabel", "تسمية النتيجة"],
+            ["answerPrefix", "تسمية الإجابة"],
+            ["correctStatus", "تسمية صحيحة"],
+            ["wrongStatus", "تسمية غير صحيحة"],
+            ["secondsLabel", "تسمية الثانية"],
+            ["noAnswerText", "لم تتم الإجابة"],
+            ["answerReceivedText", "تم استلام الإجابة"],
+            ["waitingAnswerText", "بانتظار الإجابة"],
+            ["correctAnswerLabel", "الإجابة الصحيحة"],
+            ["optionLabel", "تسمية الخيار"],
+            ["closedWaitingResultText", "إغلاق السؤال قبل النتيجة"],
+            ["qualificationCompleteKicker", "انتهاء التصفيات"],
+            ["finalRankingTitle", "عنوان الترتيب النهائي"],
+            ["positionLabel", "تسمية المركز"],
+            ["qualificationFinalText", "نص اعتماد نتائج التصفيات"],
+            ["roundEndedPrefix", "بادئة انتهاء الجولة"],
+            ["roundResultTitle", "عنوان نتيجة الجولة"],
+            ["nextRoundTitle", "عنوان الجولة القادمة"],
+            ["waitingNextRoundSelectionText", "انتظار تحديد الجولة القادمة"],
+            ["teamALabel", "تسمية Team A"],
+            ["teamBLabel", "تسمية Team B"],
+          ] as Array<
+            [
+              keyof AudienceDisplaySettings["copy"],
+              string,
+            ]
+          >).map(([key, label]) => (
+            <label key={key}>
+              <span>{label}</span>
+              <input
+                value={draft.copy[key]}
+                onChange={(event) =>
+                  setCopyField(key, event.target.value)
+                }
+              />
+            </label>
+          ))}
+        </div>
+      </details>
+
+      <div className="audience-logo-grid">
+        {([
+          ["university", "شعار جامعة بابل", draft.universityLogoUrl],
+          ["department", "شعار قسم النشاطات الطلابية", draft.departmentLogoUrl],
+        ] as const).map(([slot, label, url]) => (
+          <div className="audience-logo-card" key={slot}>
+            <strong>{label}</strong>
+            <div className="audience-logo-preview">
+              {url ? (
+                <img src={url} alt={label} />
+              ) : (
+                <span>لا يوجد شعار</span>
+              )}
+            </div>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={busy}
+              onChange={(event) => {
+                void uploadLogo(
+                  slot,
+                  event.target.files?.[0] ?? null,
+                );
+                event.currentTarget.value = "";
+              }}
+            />
+            {url ? (
+              <button
+                className="danger-outline"
+                disabled={busy}
+                onClick={() => void removeLogo(slot)}
+              >
+                حذف الشعار
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="actions">
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() => void save()}
+        >
+          حفظ هوية العرض
+        </button>
+      </div>
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
+function ResetAllCompetitionPanel() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const resetAll = async () => {
+    if (
+      !window.confirm(
+        "سيتم حذف جميع بيانات المسابقة الحالية: الكليات، المشاركون، القرعة، المحاور، الأسئلة، التوزيع، النتائج والترتيب. هل تريد المتابعة؟",
+      )
+    ) {
+      return;
+    }
+
+    const typed = window.prompt(
+      'للتأكيد النهائي اكتب RESET ثم اضغط موافق.',
+      "",
+    );
+
+    if (typed !== "RESET") {
+      setError("تم إلغاء المسح لأن كلمة التأكيد غير صحيحة.");
+      setMessage(null);
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/setup/reset-all", {
+        method: "POST",
+        body: JSON.stringify({
+          confirm: "RESET_ALL_COMPETITION_DATA",
+        }),
+      });
+
+      setMessage(
+        "تم مسح جميع بيانات المسابقة. النظام جاهز لإعداد مسابقة جديدة.",
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر مسح بيانات المسابقة",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel danger-zone">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Danger Zone</p>
+          <h2>بدء مسابقة من الصفر</h2>
+        </div>
+      </div>
+
+      <p className="muted">
+        يمسح الكليات والمشاركين والقرعة والمحاور والأسئلة وتوزيع الجولات
+        والإجابات والنتائج والترتيب. لا يمس توكنات Station A/B ولا إعدادات
+        تشغيل UniQuiz.
+      </p>
+
+      <button
+        className="danger-button"
+        disabled={busy}
+        onClick={() => void resetAll()}
+      >
+        مسح كل بيانات المسابقة
+      </button>
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
 
 function QuestionAllocationPanel({
   allocation,
@@ -484,7 +1001,11 @@ function QuestionAllocationPanel({
               : "preview-state invalid"
           }
         >
-          {allocation.ready ? "READY" : "NOT READY"}
+          {allocation.ready
+            ? "READY"
+            : allocation.roundCount === 0
+              ? "بانتظار القرعة"
+              : "NOT READY"}
         </span>
       </div>
 
@@ -509,8 +1030,10 @@ function QuestionAllocationPanel({
             >
               <strong>{category.name}</strong>
               <span>
-                المتوفر {category.availableQuestions} / المطلوب{" "}
-                {category.requiredQuestions}
+                المتوفر {category.availableQuestions} /{" "}
+                {allocation.roundCount === 0
+                  ? "المطلوب يتحدد بعد القرعة"
+                  : `المطلوب ${category.requiredQuestions}`}
               </span>
             </div>
           );
@@ -1056,12 +1579,81 @@ function DrawSurface({
 }
 
 
+
+
+function AudienceSceneTransition({
+  sceneKey,
+  children,
+}: {
+  sceneKey: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      key={sceneKey}
+      className="audience-scene-transition"
+    >
+      {children}
+    </div>
+  );
+}
+
+function AudienceBroadcastFrame({
+  settings,
+  children,
+}: {
+  settings: AudienceDisplaySettings;
+  children: ReactNode;
+}) {
+  const meta = [settings.venue, settings.season]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="audience-frame">
+      <header className="audience-brand-header">
+        <div className="audience-brand-logo">
+          {settings.universityLogoUrl ? (
+            <img
+              src={settings.universityLogoUrl}
+              alt="University logo"
+            />
+          ) : null}
+        </div>
+        <div className="audience-brand-copy">
+          <strong>{settings.eventTitle}</strong>
+          {settings.eventSubtitle ? (
+            <span>{settings.eventSubtitle}</span>
+          ) : null}
+          {meta ? <small>{meta}</small> : null}
+        </div>
+        <div className="audience-brand-logo">
+          {settings.departmentLogoUrl ? (
+            <img
+              src={settings.departmentLogoUrl}
+              alt="Department logo"
+            />
+          ) : null}
+        </div>
+      </header>
+
+      <div className="audience-frame-main">{children}</div>
+
+      <footer className="audience-brand-footer">
+        {settings.footerText}
+      </footer>
+    </div>
+  );
+}
+
 function AudienceDrawSurface({
   snapshot,
   presentation,
+  settings,
 }: {
   snapshot: CompetitionSetupSnapshot;
   presentation: DrawPresentationEvent | null;
+  settings: AudienceDisplaySettings;
 }) {
   const participantNames = snapshot.colleges
     .filter((college) => snapshot.participantCollegeIds.includes(college.id))
@@ -1070,9 +1662,9 @@ function AudienceDrawSurface({
   if (!snapshot.participantsLocked) {
     return (
       <section className="audience-stage">
-        <div className="audience-kicker">مسابقة بنك المعلومات</div>
-        <h2 className="audience-title">أهلاً بكم</h2>
-        <p className="audience-copy">بانتظار تثبيت الكليات المشاركة</p>
+        <div className="audience-kicker">{settings.eventTitle}</div>
+        <h2 className="audience-title">{settings.copy.welcomeTitle}</h2>
+        <p className="audience-copy">{settings.copy.waitingParticipantsText}</p>
       </section>
     );
   }
@@ -1080,17 +1672,17 @@ function AudienceDrawSurface({
   if (snapshot.rounds.length === 0) {
     return (
       <section className="audience-stage">
-        <div className="audience-kicker">مرحلة القرعة</div>
-        <h2 className="audience-title">القرعة الرسمية</h2>
+        <div className="audience-kicker">{settings.copy.drawPhaseLabel}</div>
+        <h2 className="audience-title">{settings.copy.drawOfficialTitle}</h2>
         <p className="audience-copy">
-          {participantNames.length} كلية مشاركة
+          {audienceText(settings.copy.participatingCollegeCountText, { count: participantNames.length })}
         </p>
         <div className="audience-participants">
           {participantNames.map((name) => (
             <span key={name}>{name}</span>
           ))}
         </div>
-        <div className="draw-waiting">بانتظار إجراء القرعة</div>
+        <div className="draw-waiting">{settings.copy.drawWaitingText}</div>
       </section>
     );
   }
@@ -1100,10 +1692,14 @@ function AudienceDrawSurface({
   return (
     <section className="audience-stage">
       <div className="audience-kicker">
-        {activePresentation ? "جاري إعلان القرعة" : "نتائج القرعة"}
+        {activePresentation
+          ? settings.copy.drawPresentingKicker
+          : settings.copy.drawResultsKicker}
       </div>
       <h2 className="audience-title">
-        {activePresentation ? "الجولات" : "القرعة الرسمية"}
+        {activePresentation
+          ? settings.copy.roundsTitle
+          : settings.copy.drawOfficialTitle}
       </h2>
 
       <div
@@ -1128,13 +1724,15 @@ function AudienceDrawSurface({
             }
           >
             <span className="audience-round-number">
-              جولة {round.order}
+              {settings.roundLabel} {round.order}
             </span>
             <div className="audience-matchup">
               <strong>{round.collegeA.name}</strong>
-              <b>{round.collegeB ? "VS" : "SOLO"}</b>
+              <b>{round.collegeB
+                ? settings.copy.versusLabel
+                : settings.copy.soloLabel}</b>
               <strong>
-                {round.collegeB?.name ?? "جولة فردية"}
+                {round.collegeB?.name ?? settings.copy.soloRoundText}
               </strong>
             </div>
           </article>
@@ -1143,13 +1741,488 @@ function AudienceDrawSurface({
 
       <div className="audience-footer-message">
         {activePresentation
-          ? "يتم إعلان الجولات حسب ترتيب القرعة"
-          : "تم اعتماد ترتيب الجولات"}
+          ? settings.copy.drawPresentingFooter
+          : settings.copy.drawCompleteFooter}
       </div>
     </section>
   );
 }
 
+
+
+
+function AudienceRankingSidebar({
+  ranking,
+  settings,
+}: {
+  ranking: QualificationRankingSnapshot | null;
+  settings: AudienceDisplaySettings;
+}) {
+  return (
+    <aside className="audience-ranking">
+      <div className="audience-ranking-heading">
+        <span>{settings.copy.rankingTitle}</span>
+        <small>{settings.copy.rankingSubtitle}</small>
+      </div>
+
+      <div className="audience-ranking-list">
+        {ranking?.entries.map((entry) => (
+          <div
+            className={[
+              "audience-ranking-row",
+              "ranking-motion",
+              entry.status.toLowerCase().replace("_", "-"),
+            ].join(" ")}
+            key={entry.college.id}
+          >
+            <div className="audience-rank-number">
+              {entry.rank ?? "—"}
+            </div>
+            <div className="audience-rank-college">
+              <strong>{entry.college.name}</strong>
+              <small>
+                {entry.status === "PLAYING"
+                  ? settings.copy.playingStatus
+                  : entry.status === "COMPLETED"
+                    ? settings.copy.completedStatus
+                    : settings.copy.notStartedStatus}
+              </small>
+            </div>
+            <div className="audience-rank-score">
+              {entry.status === "NOT_STARTED"
+                ? "—"
+                : entry.scorePoints}
+              <small>
+                {entry.status === "NOT_STARTED"
+                  ? ""
+                  : ` ${settings.copy.pointsLabel}`}
+              </small>
+            </div>
+          </div>
+        )) ?? (
+          <div className="audience-ranking-empty">
+            {settings.copy.waitingRoundsText}
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function AudienceLiveSurface({
+  snapshot,
+  competition,
+  ranking,
+  settings,
+}: {
+  snapshot: LiveSnapshot;
+  competition: CompetitionSetupSnapshot;
+  ranking: QualificationRankingSnapshot | null;
+  settings: AudienceDisplaySettings;
+}) {
+  const [now, setNow] = useState(Date.now());
+  const [serverOffsetMs, setServerOffsetMs] = useState(0);
+
+  useEffect(() => {
+    setServerOffsetMs(snapshot.serverNowEpochMs - Date.now());
+  }, [snapshot.serverNowEpochMs]);
+
+  useEffect(() => {
+    if (
+      snapshot.phase !== "QUESTION_COUNTDOWN" &&
+      snapshot.phase !== "QUESTION_ACTIVE"
+    ) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [snapshot.phase]);
+
+  const serverNow = now + serverOffsetMs;
+  const countdownValue =
+    snapshot.phase === "QUESTION_COUNTDOWN" &&
+    snapshot.countdownStartedAtEpochMs !== null
+      ? Math.max(
+          1,
+          Math.ceil(
+            (snapshot.countdownStartedAtEpochMs + 3000 - serverNow) /
+              1000,
+          ),
+        )
+      : null;
+
+  const remainingSeconds =
+    snapshot.phase === "QUESTION_ACTIVE" &&
+    snapshot.questionDeadlineEpochMs !== null
+      ? Math.max(
+          0,
+          Math.ceil(
+            (snapshot.questionDeadlineEpochMs - serverNow) / 1000,
+          ),
+        )
+      : null;
+
+  const round = snapshot.round;
+  const question = snapshot.question;
+
+  const resultCard = (
+    label: string,
+    collegeName: string,
+    result: LiveSnapshot["revealResults"] extends infer R
+      ? R extends { teamA: infer T } ? T : never
+      : never,
+  ) => (
+    <div
+      className={[
+        "audience-team-result",
+        result?.isCorrect === true ? "correct" : "",
+        result?.isCorrect === false ? "wrong" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span>{label}</span>
+      <strong>{collegeName}</strong>
+      {result?.answered ? (
+        <>
+          <b>
+            {settings.copy.answerPrefix}: {result.selectedOption ?? "—"}
+          </b>
+          <small>
+            {result.isCorrect
+              ? settings.copy.correctStatus
+              : settings.copy.wrongStatus}
+            {" · "}
+            {result.responseTimeMs !== null
+              ? `${(result.responseTimeMs / 1000).toFixed(3)} ${settings.copy.secondsLabel}`
+              : "—"}
+            {" · "}
+            {result.scorePoints} {settings.copy.pointsLabel}
+          </small>
+        </>
+      ) : (
+        <>
+          <b>{settings.copy.noAnswerText}</b>
+          <small>0 {settings.copy.pointsLabel}</small>
+        </>
+      )}
+    </div>
+  );
+
+  if (!round) {
+    return (
+      <section className="audience-stage">
+        <div className="audience-kicker">{settings.eventTitle}</div>
+        <h2 className="audience-title">{settings.copy.waitingNextRoundText}</h2>
+      </section>
+    );
+  }
+
+  if (snapshot.phase === "QUESTION_COUNTDOWN") {
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-round-strip">
+          <span>{settings.roundLabel} {round.order}</span>
+          <strong>{round.teamA.name}</strong>
+          <b>{round.teamB
+            ? settings.copy.versusLabel
+            : settings.copy.soloLabel}</b>
+          <strong>{round.teamB?.name ?? settings.copy.soloRoundText}</strong>
+        </div>
+        <div className="audience-countdown">{countdownValue}</div>
+      </section>
+    );
+  }
+
+  if (
+    snapshot.phase === "QUESTION_READY" ||
+    snapshot.phase === "ROUND_READY" ||
+    snapshot.phase === "ROUND_ACTIVE" ||
+    snapshot.phase === "INTERMISSION"
+  ) {
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-kicker">
+          {settings.roundLabel} {round.order}
+        </div>
+        <h2 className="audience-title">
+          {round.teamA.name}
+          <span className="audience-vs">
+            {round.teamB
+              ? ` ${settings.copy.versusLabel} `
+              : " — "}
+          </span>
+          {round.teamB?.name ?? settings.copy.soloRoundText}
+        </h2>
+        <p className="audience-copy">
+          {snapshot.phase === "QUESTION_READY"
+            ? audienceText(settings.copy.questionReadyText, {
+                question: question?.position ?? "—",
+              })
+            : snapshot.phase === "INTERMISSION"
+              ? settings.copy.intermissionText
+              : settings.copy.roundReadyText}
+        </p>
+      </section>
+    );
+  }
+
+  if (
+    snapshot.phase === "QUESTION_ACTIVE" ||
+    snapshot.phase === "QUESTION_CLOSED" ||
+    snapshot.phase === "QUESTION_REVEAL"
+  ) {
+    const reveal = snapshot.phase === "QUESTION_REVEAL";
+    const correctOption = question?.correctOption;
+
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-question-header">
+          <div>
+            <span>{settings.roundLabel} {round.order}</span>
+            <strong>
+              {settings.copy.questionLabel} {question?.position ?? "—"} / 10
+            </strong>
+          </div>
+          <span>{question?.categoryName ?? ""}</span>
+          <div className="audience-timer">
+            {remainingSeconds !== null
+              ? remainingSeconds
+              : snapshot.phase === "QUESTION_CLOSED"
+                ? settings.copy.closedLabel
+                : settings.copy.resultLabel}
+          </div>
+        </div>
+
+        <h2 className="audience-question-text">
+          {question?.prompt ?? ""}
+        </h2>
+
+        <div className="audience-options">
+          {(["A", "B", "C", "D"] as const).map((option) => (
+            <div
+              className={[
+                "audience-option",
+                reveal && correctOption === option ? "correct reveal-correct" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              key={option}
+            >
+              <b>{option}</b>
+              <span>{question?.options?.[option] ?? ""}</span>
+            </div>
+          ))}
+        </div>
+
+        {!reveal ? (
+          <div className="audience-answer-status">
+            <div
+              className={
+                snapshot.answerStatus.teamAReceived
+                  ? "received"
+                  : ""
+              }
+            >
+              <strong>{round.teamA.name}</strong>
+              <span>
+                {snapshot.answerStatus.teamAReceived
+                  ? "تم استلام الإجابة"
+                  : "بانتظار الإجابة"}
+              </span>
+            </div>
+            {round.teamB ? (
+              <div
+                className={
+                  snapshot.answerStatus.teamBReceived
+                    ? "received"
+                    : ""
+                }
+              >
+                <strong>{round.teamB.name}</strong>
+                <span>
+                  {snapshot.answerStatus.teamBReceived
+                    ? "تم استلام الإجابة"
+                    : "بانتظار الإجابة"}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <div className="audience-correct-answer">
+              <span>{settings.copy.correctAnswerLabel}</span>
+              <strong>
+                {correctOption && question?.options
+                  ? question.options[correctOption]
+                  : "—"}
+              </strong>
+              <small>
+                {correctOption
+                  ? `${settings.copy.optionLabel} ${correctOption}`
+                  : ""}
+              </small>
+            </div>
+
+            <div className="audience-results-grid">
+              {snapshot.revealResults
+                ? resultCard(
+                    settings.copy.teamALabel,
+                    round.teamA.name,
+                    snapshot.revealResults.teamA,
+                  )
+                : null}
+              {snapshot.revealResults?.teamB && round.teamB
+                ? resultCard(
+                    settings.copy.teamBLabel,
+                    round.teamB.name,
+                    snapshot.revealResults.teamB,
+                  )
+                : null}
+            </div>
+          </>
+        )}
+
+        {snapshot.phase === "QUESTION_CLOSED" ? (
+          <div className="audience-closed-note">
+            {settings.copy.closedWaitingResultText}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  if (snapshot.phase === "ROUND_COMPLETE") {
+    const totals = snapshot.roundTotals;
+
+    if (snapshot.qualificationComplete) {
+      const finalists =
+        ranking?.entries
+          .filter((entry) => entry.rank !== null)
+          .slice(0, 3) ?? [];
+
+      return (
+        <section className="audience-stage audience-live-stage final-results-stage">
+          <div className="audience-kicker">{settings.copy.qualificationCompleteKicker}</div>
+          <h2 className="audience-title">
+            {settings.copy.finalRankingTitle}
+          </h2>
+
+          {totals ? (
+            <div className="audience-round-totals compact">
+              <div>
+                <span>{round.teamA.name}</span>
+                <strong>{totals.teamA}</strong>
+                <small>{settings.copy.pointsLabel}</small>
+              </div>
+              {round.teamB && totals.teamB !== null ? (
+                <div>
+                  <span>{round.teamB.name}</span>
+                  <strong>{totals.teamB}</strong>
+                  <small>{settings.copy.pointsLabel}</small>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="audience-final-podium">
+            {finalists.map((entry) => (
+              <div
+                className={[
+                  "audience-final-card",
+                  entry.rank === 1 ? "leader" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                key={entry.college.id}
+              >
+                <span>
+                  {audienceText(settings.copy.positionLabel, {
+                    rank: entry.rank ?? "—",
+                  })}
+                </span>
+                <strong>{entry.college.name}</strong>
+                <b>{entry.scorePoints} {settings.copy.pointsLabel}</b>
+              </div>
+            ))}
+          </div>
+
+          <p className="audience-copy">
+            {settings.copy.qualificationFinalText}
+          </p>
+        </section>
+      );
+    }
+
+    const nextRound =
+      competition.rounds.find(
+        (candidate) => candidate.id === competition.nextRoundId,
+      ) ??
+      competition.rounds.find(
+        (candidate) => candidate.status === "PENDING",
+      ) ??
+      null;
+
+    return (
+      <section className="audience-stage audience-live-stage">
+        <div className="audience-kicker">
+          {settings.copy.roundEndedPrefix} {settings.roundLabel} {round.order}
+        </div>
+        <h2 className="audience-title">{settings.copy.roundResultTitle}</h2>
+
+        {totals ? (
+          <div className="audience-round-totals">
+            <div>
+              <span>{round.teamA.name}</span>
+              <strong>{totals.teamA}</strong>
+              <small>{settings.copy.pointsLabel}</small>
+            </div>
+            {round.teamB && totals.teamB !== null ? (
+              <div>
+                <span>{round.teamB.name}</span>
+                <strong>{totals.teamB}</strong>
+                <small>{settings.copy.pointsLabel}</small>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="audience-next-round-block">
+          <h3>{settings.copy.nextRoundTitle}</h3>
+
+        {nextRound ? (
+          <div className="audience-next-match">
+            <span>{settings.roundLabel} {nextRound.order}</span>
+            <strong>{nextRound.collegeA.name}</strong>
+            <b>{nextRound.collegeB
+              ? settings.copy.versusLabel
+              : settings.copy.soloLabel}</b>
+            <strong>
+              {nextRound.collegeB?.name ?? settings.copy.soloRoundText}
+            </strong>
+          </div>
+        ) : (
+          <p className="audience-copy">
+            {settings.copy.waitingNextRoundSelectionText}
+          </p>
+        )}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="audience-stage">
+      <h2 className="audience-title">
+        {settings.copy.waitingNextRoundText}
+      </h2>
+    </section>
+  );
+}
 
 function phaseLabel(phase: LiveSnapshot["phase"]): string {
   const labels: Record<LiveSnapshot["phase"], string> = {
@@ -1806,6 +2879,10 @@ export function App() {
     useState<LiveSnapshot | null>(null);
   const [teamSubmission, setTeamSubmission] =
     useState<LiveTeamSubmissionState | null>(null);
+  const [ranking, setRanking] =
+    useState<QualificationRankingSnapshot | null>(null);
+  const [audienceSettings, setAudienceSettings] =
+    useState<AudienceDisplaySettings | null>(null);
   const [liveSocket, setLiveSocket] =
     useState<ReturnType<typeof io> | null>(null);
   const [effectiveRole, setEffectiveRole] =
@@ -1877,6 +2954,18 @@ export function App() {
       },
     );
     socket.on(
+      "ranking:snapshot",
+      (snapshot: QualificationRankingSnapshot) => {
+        setRanking(snapshot);
+      },
+    );
+    socket.on(
+      "audience:settings",
+      (settings: AudienceDisplaySettings) => {
+        setAudienceSettings(settings);
+      },
+    );
+    socket.on(
       "live:team-submission",
       (state: LiveTeamSubmissionState) => {
         setTeamSubmission(state);
@@ -1938,26 +3027,42 @@ export function App() {
   };
 
   return (
-    <main className="shell">
-      <section className="hero">
-        <p className="eyebrow">University Knowledge Competition</p>
-        <h1>{surfaceTitles[surface]}</h1>
-        <p className="subtitle">
-          {surface === "setup" || surface === "draw"
-            ? "M2 — Participants & Draw"
-            : "Realtime Competition Runtime"}
-        </p>
-        <div className="connection">
-          <span className={connected ? "dot online-bg" : "dot offline-bg"} />
-          {connected ? "متصل بالسيرفر" : "جاري الاتصال بالسيرفر"}
-        </div>
-      </section>
+    <main
+      className={
+        surface === "display"
+          ? "display-shell"
+          : "shell"
+      }
+    >
+      {surface !== "display" ? (
+        <section className="hero">
+          <p className="eyebrow">University Knowledge Competition</p>
+          <h1>{surfaceTitles[surface]}</h1>
+          <p className="subtitle">
+            {surface === "setup" || surface === "draw"
+              ? "M2 — Participants & Draw"
+              : "Realtime Competition Runtime"}
+          </p>
+          <div className="connection">
+            <span
+              className={
+                connected ? "dot online-bg" : "dot offline-bg"
+              }
+            />
+            {connected
+              ? "متصل بالسيرفر"
+              : "جاري الاتصال بالسيرفر"}
+          </div>
+        </section>
+      ) : null}
 
       {surface === "setup" && competition ? (
         <>
+          <AudienceSettingsPanel settings={audienceSettings} />
           <BulkImportPanel questionBank={questionBank} />
           <QuestionAllocationPanel allocation={questionAllocation} />
           <SetupSurface snapshot={competition} />
+          <ResetAllCompetitionPanel />
         </>
       ) : null}
 
@@ -1965,11 +3070,50 @@ export function App() {
         <DrawSurface snapshot={competition} />
       ) : null}
 
-      {surface === "display" && competition ? (
-        <AudienceDrawSurface
-          snapshot={competition}
-          presentation={drawPresentation}
-        />
+      {surface === "display" &&
+      competition &&
+      audienceSettings ? (
+        <AudienceBroadcastFrame settings={audienceSettings}>
+          {liveSnapshot &&
+          liveSnapshot.phase !== "IDLE" ? (
+            <AudienceSceneTransition
+              sceneKey={[
+                "live",
+                liveSnapshot.phase,
+                liveSnapshot.round?.id ?? 0,
+                liveSnapshot.question?.position ?? 0,
+              ].join(":")}
+            >
+              <div className="audience-broadcast-layout">
+                <AudienceLiveSurface
+                  snapshot={liveSnapshot}
+                  competition={competition}
+                  ranking={ranking}
+                  settings={audienceSettings}
+                />
+                <AudienceRankingSidebar
+                  ranking={ranking}
+                  settings={audienceSettings}
+                />
+              </div>
+            </AudienceSceneTransition>
+          ) : (
+            <AudienceSceneTransition
+              sceneKey={[
+                "draw",
+                competition.participantsLocked ? "locked" : "open",
+                competition.rounds.length,
+                drawPresentation?.startedAt ?? "stable",
+              ].join(":")}
+            >
+              <AudienceDrawSurface
+                snapshot={competition}
+                presentation={drawPresentation}
+                settings={audienceSettings}
+              />
+            </AudienceSceneTransition>
+          )}
+        </AudienceBroadcastFrame>
       ) : null}
 
       {surface === "operator" ? (

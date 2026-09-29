@@ -1,20 +1,21 @@
 # Current Status
 
-Updated: 2026-09-28
+Updated: 2026-09-29
 
 ## Active milestone
-Issue #5 — M4 Live Session & Team Stations
+Issue #6 — M5 Audience Display & Ranking
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m4-live-session-stations`
+`feature/m5-audience-live-display`
 
 ## Active pull request
-PR #12 — M4: Live Session & Team Stations
+PR #13 — M5: Audience Display & Ranking
 
 ## Completed
+- M4 PR #12 merged to `main` as squash commit `ffb660561ab2c5ee8005ad1e247547656abe6a4f`.
 - M3 PR #11 merged to `main` as squash commit `3a29003c0c50d83d0f54adf41e77862e1495e971`.
 - M4 persistent operator-paced live state machine implemented.
 - Team A/B answer submissions are locked once, persisted, and restored after reconnect; paired questions auto-close when both answer and solo questions close after Team A answers.
@@ -68,7 +69,7 @@ PR #12 — M4: Live Session & Team Stations
 - CI Run #20 PASS: official draw remained byte-equivalent at the round payload level after server restart using the same SQLite database.
 
 ## In progress
-- M4 complete and ready to merge; next milestone is M5 Audience Display & Ranking.
+- M5 is code-complete on PR #13. The only remaining gate is real external-screen/projector visual verification.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
 - Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
 - Team reveal displays the full correct answer text plus option letter.
@@ -76,13 +77,34 @@ PR #12 — M4: Live Session & Team Stations
 - Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
-Merge M4, then start M5 Audience Display & Ranking by binding `/display` to the live round/question state, countdown, answer-received state and reveal results.
+Pull PR #13 on the Mac and visually verify `/display` on the target external screen through: draw → branded live scene → 3-2-1 → 30-second question → answer-received only → automatic Reveal → ranking update → animated round totals → next-round scene → final-results scene. If accepted, close and merge M5, then start M6 Event-Day Hardening & Recovery.
 
 ## Completed
 - CI Run #58 PASS: final M4 UI polish; system wording and correct/wrong reveal colors verified by CI.
 
+## Completed
+- M5 live audience question/reveal scene implemented with reveal-safe per-team results.
+- CI Run #61 PASS: live display/reveal contract.
+- Reveal-gated qualification ranking sidebar implemented; only revealed questions affect totals.
+- CI Run #62 PASS: ranking logic and tie/not-started behavior.
+- Dedicated fullscreen `/display` implemented.
+- CI Run #63 PASS: fullscreen audience surface.
+- Next-round and final qualification ranking scenes implemented.
+- CI Run #64 PASS: M5 end-scene UI build/runtime validation.
+
+## Completed
+- CI Run #67 PASS: category-name question import + safe append mode.
+- CI Run #68 PASS: full competition reset contract.
+- CI Run #69 PASS: clearer M3 pre-draw allocation state.
+
+## Completed
+- CI Run #72 PASS: persistent audience branding + local offline logo assets.
+- CI Run #73 PASS: revealed-only animated round totals.
+- CI Run #76 PASS: all static audience wording configurable from Setup.
+- CI Run #77 PASS: polished keyed scene transitions with reduced-motion fallback.
+
 ## Blockers
-No current blocker.
+No code blocker; real external-screen visual verification is pending.
 
 ## Do not repeat
 - Do not recreate the repository.

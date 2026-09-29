@@ -187,6 +187,8 @@ export interface LiveSnapshot {
   qualificationComplete: boolean;
   stationReadiness: LiveStationReadiness;
   answerStatus: LiveAnswerStatus;
+  revealResults: LiveRevealResults | null;
+  roundTotals: LiveRoundTotals | null;
 }
 
 export interface LiveAnswerStatus {
@@ -217,4 +219,105 @@ export interface LiveStationReadiness {
   teamAConnected: boolean;
   teamBRequired: boolean;
   teamBConnected: boolean;
+}
+
+export interface LiveRevealTeamResult {
+  station: "A" | "B";
+  answered: boolean;
+  selectedOption: "A" | "B" | "C" | "D" | null;
+  isCorrect: boolean | null;
+  responseTimeMs: number | null;
+  scorePoints: number;
+}
+
+export interface LiveRevealResults {
+  teamA: LiveRevealTeamResult;
+  teamB: LiveRevealTeamResult | null;
+}
+
+export type QualificationRankingStatus =
+  | "PLAYING"
+  | "COMPLETED"
+  | "NOT_STARTED";
+
+export interface QualificationRankingEntry {
+  college: College;
+  status: QualificationRankingStatus;
+  rank: number | null;
+  scorePoints: number;
+  revealedQuestions: number;
+}
+
+export interface QualificationRankingSnapshot {
+  generatedAt: string;
+  entries: QualificationRankingEntry[];
+}
+
+export interface AudienceDisplayCopy {
+  welcomeTitle: string;
+  waitingParticipantsText: string;
+  drawPhaseLabel: string;
+  drawOfficialTitle: string;
+  participatingCollegeCountText: string;
+  drawWaitingText: string;
+  drawPresentingKicker: string;
+  drawResultsKicker: string;
+  roundsTitle: string;
+  versusLabel: string;
+  soloLabel: string;
+  soloRoundText: string;
+  drawPresentingFooter: string;
+  drawCompleteFooter: string;
+  rankingTitle: string;
+  rankingSubtitle: string;
+  playingStatus: string;
+  completedStatus: string;
+  notStartedStatus: string;
+  pointsLabel: string;
+  waitingRoundsText: string;
+  waitingNextRoundText: string;
+  questionLabel: string;
+  questionReadyText: string;
+  intermissionText: string;
+  roundReadyText: string;
+  closedLabel: string;
+  resultLabel: string;
+  answerPrefix: string;
+  correctStatus: string;
+  wrongStatus: string;
+  secondsLabel: string;
+  noAnswerText: string;
+  answerReceivedText: string;
+  waitingAnswerText: string;
+  correctAnswerLabel: string;
+  optionLabel: string;
+  closedWaitingResultText: string;
+  qualificationCompleteKicker: string;
+  finalRankingTitle: string;
+  positionLabel: string;
+  qualificationFinalText: string;
+  roundEndedPrefix: string;
+  roundResultTitle: string;
+  nextRoundTitle: string;
+  waitingNextRoundSelectionText: string;
+  teamALabel: string;
+  teamBLabel: string;
+}
+
+export interface AudienceDisplaySettings {
+  eventTitle: string;
+  eventSubtitle: string;
+  venue: string;
+  season: string;
+  footerText: string;
+  roundLabel: string;
+  copy: AudienceDisplayCopy;
+  universityLogoUrl: string | null;
+  departmentLogoUrl: string | null;
+  updatedAt: string;
+}
+
+export interface LiveRoundTotals {
+  teamA: number;
+  teamB: number | null;
 }

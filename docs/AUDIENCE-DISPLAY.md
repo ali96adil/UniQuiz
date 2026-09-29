@@ -119,7 +119,7 @@ Main Stage:
 
 Behavior:
 - question text/options remain hidden
-- authoritative 45-second question timer has not started yet
+- authoritative 30-second question timer has not started yet
 - OSC prestart cues may be emitted
 
 ### QUESTION_ACTIVE
@@ -130,7 +130,7 @@ Main Stage:
 - category
 - question text
 - four answer options: A, B, C, D
-- authoritative countdown timer from 45 seconds
+- authoritative countdown timer from 30 seconds
 
 Team status:
 - waiting / answer received for each active team
@@ -227,7 +227,7 @@ Sidebar:
 - The question and options are not shown during QUESTION_COUNTDOWN.
 - The authoritative question clock starts when the state changes to QUESTION_ACTIVE, immediately after the 3-2-1 countdown.
 - Every question is started explicitly by the operator.
-- Reveal is also operator-controlled.
+- When all required stations answer, the server closes the question, emits the answered OSC cue, waits 1.5 seconds, then reveals automatically. Timeout closure keeps an explicit operator Reveal action.
 
 ## Ranking behavior
 - The ranking is recalculated after each committed question reveal.
@@ -254,3 +254,9 @@ Configurable presentation settings include:
 
 ## Safety and recovery
 The display is a read-only projection of authoritative server state. Refreshing or reconnecting the display must restore the current state without advancing the competition.
+
+
+## Persistence
+Audience branding, logos, terminology and static display copy are persisted independently from competition data. The guarded "مسح كل بيانات المسابقة" action does not delete audience branding or Station A/B credentials.
+
+Logo assets are stored locally in SQLite and served by UniQuiz, so the audience display has no Internet dependency for branding.

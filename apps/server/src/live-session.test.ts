@@ -291,3 +291,96 @@ test("automatically reveals only after all required teams answer", async () => {
   await app.close();
   db.close();
 });
+
+
+test("reveal results stay hidden until reveal", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+    undefined,
+    () => true,
+    1000,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  manager.submitAnswer("team-a", "B");
+  let snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_ACTIVE");
+  assert.equal(snapshot.revealResults, null);
+
+  manager.submitAnswer("team-b", "C");
+  snapshot = manager.getSnapshot();
+  assert.equal(snapshot.phase, "QUESTION_CLOSED");
+  assert.equal(snapshot.revealResults, null);
+
+  manager.revealQuestion();
+  snapshot = manager.getSnapshot();
+
+  assert.equal(snapshot.phase, "QUESTION_REVEAL");
+  assert.equal(snapshot.revealResults?.teamA.answered, true);
+  assert.equal(snapshot.revealResults?.teamA.selectedOption, "B");
+  assert.equal(snapshot.revealResults?.teamA.isCorrect, true);
+  assert.ok((snapshot.revealResults?.teamA.scorePoints ?? 0) > 0);
+
+  assert.equal(snapshot.revealResults?.teamB?.answered, true);
+  assert.equal(snapshot.revealResults?.teamB?.selectedOption, "C");
+  assert.equal(snapshot.revealResults?.teamB?.isCorrect, false);
+  assert.equal(snapshot.revealResults?.teamB?.scorePoints, 0);
+
+  io.close();
+  await app.close();
+  db.close();
+});
+
+
+test("round totals include only revealed question scores", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+    undefined,
+    () => true,
+    1000,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  manager.submitAnswer("team-a", "B");
+  manager.submitAnswer("team-b", "C");
+
+  let snapshot = manager.getSnapshot();
+  assert.equal(snapshot.roundTotals?.teamA, 0);
+  assert.equal(snapshot.roundTotals?.teamB, 0);
+
+  manager.revealQuestion();
+  snapshot = manager.getSnapshot();
+
+  assert.ok((snapshot.roundTotals?.teamA ?? 0) > 0);
+  assert.equal(snapshot.roundTotals?.teamB, 0);
+
+  io.close();
+  await app.close();
+  db.close();
+});

@@ -55,10 +55,15 @@ interface StagedImport {
 
 const applySchema = z.object({
   previewId: z.string().uuid(),
+  questionMode: z.enum(["append", "replace"]).default("append"),
 });
 
 const previews = new Map<string, StagedImport>();
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
+
+export function clearImportPreviews(): void {
+  previews.clear();
+}
 
 function cleanupExpiredPreviews() {
   const cutoff = Date.now() - PREVIEW_TTL_MS;
@@ -204,7 +209,7 @@ function validateQuestions(
   records: RawRecord[],
   sheet: string,
   issues: ImportIssue[],
-  allowedCategoryKeys: Set<string>,
+  categoryLookup: CategoryLookup,
 ): ImportedQuestion[] {
   const rows: ImportedQuestion[] = [];
   const prompts = new Set<string>();
@@ -222,7 +227,13 @@ function validateQuestions(
 
   records.forEach((record, index) => {
     const row = index + 2;
-    const categoryKey = text(record.category_key);
+    const categoryReference = text(record.category_key);
+    const resolvedCategoryKey =
+      categoryLookup.aliases.get(
+        normalizeKey(categoryReference),
+      ) ?? null;
+    const categoryKey =
+      resolvedCategoryKey ?? categoryReference;
     const question = text(record.question);
     const optionA = text(record.option_a);
     const optionB = text(record.option_b);
@@ -232,7 +243,7 @@ function validateQuestions(
     const sourceRef = text(record.source_ref) || null;
 
     if (
-      !categoryKey ||
+      !categoryReference ||
       !question ||
       !optionA ||
       !optionB ||
@@ -249,13 +260,13 @@ function validateQuestions(
       return;
     }
 
-    if (!allowedCategoryKeys.has(normalizeKey(categoryKey))) {
+    if (!resolvedCategoryKey) {
       issue(
         issues,
         "error",
         sheet,
         row,
-        `Unknown category_key: ${categoryKey}`,
+        `Unknown category_key or category name: ${categoryReference}`,
       );
     }
 
@@ -389,13 +400,98 @@ function detectCsvKind(record: RawRecord): ImportDataKind | null {
   return null;
 }
 
-function existingCategoryKeys(db: AppDatabase): Set<string> {
-  const rows = db.prepare(`
-    SELECT category_key AS categoryKey
-    FROM categories
-  `).all() as Array<{ categoryKey: string }>;
+interface CategoryLookup {
+  canonicalKeys: Set<string>;
+  aliases: Map<string, string>;
+}
 
-  return new Set(rows.map((row) => normalizeKey(row.categoryKey)));
+function categoryLookupFromRows(
+  rows: Array<{ key: string; name: string }>,
+): CategoryLookup {
+  const canonicalKeys = new Set<string>();
+  const aliases = new Map<string, string>();
+
+  for (const row of rows) {
+    const normalizedKey = normalizeKey(row.key);
+    canonicalKeys.add(normalizedKey);
+    aliases.set(normalizedKey, row.key);
+    aliases.set(normalizeKey(row.name), row.key);
+  }
+
+  return { canonicalKeys, aliases };
+}
+
+function existingCategoryLookup(db: AppDatabase): CategoryLookup {
+  const rows = db.prepare(`
+    SELECT
+      category_key AS key,
+      name
+    FROM categories
+    ORDER BY sort_order, id
+  `).all() as Array<{ key: string; name: string }>;
+
+  return categoryLookupFromRows(rows);
+}
+
+function tableExists(
+  db: AppDatabase,
+  tableName: string,
+): boolean {
+  const row = db.prepare(`
+    SELECT 1 AS present
+    FROM sqlite_master
+    WHERE type = 'table'
+      AND name = ?
+    LIMIT 1
+  `).get(tableName) as { present: number } | undefined;
+
+  return Boolean(row);
+}
+
+function existingQuestionCounts(
+  db: AppDatabase,
+): Map<string, number> {
+  if (!tableExists(db, "questions")) {
+    return new Map();
+  }
+
+  const rows = db.prepare(`
+    SELECT
+      c.category_key AS categoryKey,
+      COUNT(q.id) AS questionCount
+    FROM categories c
+    LEFT JOIN questions q
+      ON q.category_id = c.id
+      AND q.active = 1
+    GROUP BY c.id
+  `).all() as Array<{
+    categoryKey: string;
+    questionCount: number;
+  }>;
+
+  return new Map(
+    rows.map((row) => [
+      normalizeKey(row.categoryKey),
+      row.questionCount,
+    ]),
+  );
+}
+
+function qualificationRequiredPerCategory(
+  db: AppDatabase,
+): number {
+  if (!tableExists(db, "qualification_rounds")) {
+    return 2;
+  }
+
+  const roundCount = (
+    db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM qualification_rounds
+    `).get() as { count: number }
+  ).count;
+
+  return Math.max(2, roundCount * 2);
 }
 
 export async function parseImportBuffer(
@@ -493,9 +589,9 @@ export async function parseImportBuffer(
     ? validateCategories(categoryRecords, "Categories", issues)
     : null;
 
-  const allowedCategoryKeys = categories
-    ? new Set(categories.map((row) => normalizeKey(row.key)))
-    : existingCategoryKeys(db);
+  const categoryLookup = categories
+    ? categoryLookupFromRows(categories)
+    : existingCategoryLookup(db);
 
   const colleges = collegeRecords
     ? validateColleges(collegeRecords, "Colleges", issues)
@@ -506,11 +602,11 @@ export async function parseImportBuffer(
         questionRecords,
         "Questions",
         issues,
-        allowedCategoryKeys,
+        categoryLookup,
       )
     : null;
 
-  if (questions && allowedCategoryKeys.size !== 5) {
+  if (questions && categoryLookup.canonicalKeys.size !== 5) {
     issue(
       issues,
       "error",
@@ -521,20 +617,33 @@ export async function parseImportBuffer(
   }
 
   if (questions) {
-    const counts = new Map<string, number>();
+    const importedCounts = new Map<string, number>();
     for (const question of questions) {
       const key = normalizeKey(question.categoryKey);
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      importedCounts.set(
+        key,
+        (importedCounts.get(key) ?? 0) + 1,
+      );
     }
 
-    for (const categoryKey of allowedCategoryKeys) {
-      if ((counts.get(categoryKey) ?? 0) < 2) {
+    const baseCounts = categories
+      ? new Map<string, number>()
+      : existingQuestionCounts(db);
+    const requiredPerCategory =
+      qualificationRequiredPerCategory(db);
+
+    for (const categoryKey of categoryLookup.canonicalKeys) {
+      const combinedCount =
+        (baseCounts.get(categoryKey) ?? 0) +
+        (importedCounts.get(categoryKey) ?? 0);
+
+      if (combinedCount < requiredPerCategory) {
         issue(
           issues,
           "warning",
           "Questions",
           null,
-          `Category ${categoryKey} has fewer than 2 questions.`,
+          `Category ${categoryKey} will have ${combinedCount} questions after append; ${requiredPerCategory} are required for the current qualification draw.`,
         );
       }
     }
@@ -962,6 +1071,11 @@ export function registerImportRoutes(
       });
     }
 
+    const questionMode =
+      staged.parsed.categories && staged.parsed.questions
+        ? "replace"
+        : parsedBody.data.questionMode;
+
     const apply = db.transaction(() => {
       if (staged.parsed.colleges) {
         db.prepare("DELETE FROM participants").run();
@@ -989,7 +1103,10 @@ export function registerImportRoutes(
         });
       }
 
-      if (staged.parsed.questions) {
+      if (
+        staged.parsed.questions &&
+        questionMode === "replace"
+      ) {
         db.prepare("DELETE FROM questions").run();
       }
 
@@ -1073,6 +1190,8 @@ export function registerImportRoutes(
         staged.parsed,
       ).counts,
       questionBank,
+      questionMode:
+        staged.parsed.questions ? questionMode : null,
     };
   });
 }
