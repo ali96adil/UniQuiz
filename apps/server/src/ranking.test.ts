@@ -158,10 +158,14 @@ test("latest void invalidates an earlier reveal until replacement is revealed", 
       (1, 1, 'A', 2, 'A', 2000, 10000, 1, 20000000);
   `);
 
-  assert.equal(
-    getQualificationRanking(db).entries[0]?.scorePoints,
-    0,
-  );
+  {
+    const entry = getQualificationRanking(db).entries[0];
+    assert.equal(entry?.scorePoints, 0);
+    assert.equal(entry?.revealedQuestions, 0);
+    assert.equal(entry?.totalResponseTimeMs, 0);
+    assert.equal(entry?.correctAnswers, 0);
+    assert.equal(entry?.wrongAnswers, 0);
+  }
 
   db.exec(`
     INSERT INTO audit_events (
@@ -169,10 +173,14 @@ test("latest void invalidates an earlier reveal until replacement is revealed", 
     ) VALUES ('QUESTION_REVEALED', 1, 2, 1, CURRENT_TIMESTAMP);
   `);
 
-  assert.equal(
-    getQualificationRanking(db).entries[0]?.scorePoints,
-    20,
-  );
+  {
+    const entry = getQualificationRanking(db).entries[0];
+    assert.equal(entry?.scorePoints, 20);
+    assert.equal(entry?.revealedQuestions, 1);
+    assert.equal(entry?.totalResponseTimeMs, 10_000);
+    assert.equal(entry?.correctAnswers, 1);
+    assert.equal(entry?.wrongAnswers, 0);
+  }
 
   db.close();
 });
