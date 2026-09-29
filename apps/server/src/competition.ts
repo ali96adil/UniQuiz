@@ -21,7 +21,7 @@ const replaceCollegesSchema = z.object({
 });
 
 const participantsSchema = z.object({
-  collegeIds: z.array(z.number().int().positive()).min(2).max(20),
+  collegeIds: z.array(z.number().int().positive()).max(20),
 });
 
 const unlockSchema = z.object({

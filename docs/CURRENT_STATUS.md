@@ -84,3 +84,11 @@ No code blocker. Only real-display and print-preview visual acceptance remain fo
 - Next-round preview ignores the current/non-pending round, fixing the transition into a final solo round.
 - Official report label changed to `عدد الكليات المشاركة`.
 - Official report replaces counted-question column with correct-answer and wrong-answer counts.
+
+## Setup / contestant layout refinement
+- Contestant Station A/B surfaces now use a dedicated full-screen 100dvh layout with the generic app hero removed, giving the question and four answer choices the available screen area.
+- Setup cards reordered into one dependency flow: data import → college list → participant selection → official draw → question allocation → audience branding.
+- Official draw is embedded directly in `/setup`; the standalone `/draw` route remains available.
+- Participant selection persists immediately on every checkbox change instead of requiring a separate Save Participants action.
+- The server now accepts incremental participant lists before lock; the existing lock operation still enforces at least two participants.
+- Before participant lock, the audience display now shows the currently selected colleges and updates from the authoritative competition snapshot in real time.

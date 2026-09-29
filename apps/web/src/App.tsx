@@ -263,8 +263,8 @@ function BulkImportPanel({
     <section className="panel import-panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">إدخال جماعي</p>
-          <h2>استيراد Excel / CSV</h2>
+          <p className="step-label">الخطوة 1</p>
+          <h2>إدخال البيانات</h2>
         </div>
         <div className="actions compact-actions">
           <a
@@ -651,7 +651,7 @@ function AudienceSettingsPanel({
     <section className="panel audience-settings-panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">Audience Branding</p>
+          <p className="step-label">الخطوة 6</p>
           <h2>هوية شاشة الجمهور</h2>
         </div>
       </div>
@@ -1003,7 +1003,7 @@ function QuestionAllocationPanel({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">M3</p>
+          <p className="step-label">الخطوة 5</p>
           <h2>توزيع أسئلة الجولات</h2>
         </div>
         <span
@@ -1180,17 +1180,30 @@ function SetupSurface({
       "تم حفظ قائمة الكليات.",
     );
 
-  const saveParticipants = () =>
-    run(
-      () =>
-        apiRequest("/api/setup/participants", {
-          method: "PUT",
-          body: JSON.stringify({
-            collegeIds: [...selectedIds],
-          }),
+  const persistParticipants = async (nextIds: Set<number>) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/setup/participants", {
+        method: "PUT",
+        body: JSON.stringify({
+          collegeIds: [...nextIds],
         }),
-      "تم حفظ الكليات المشاركة.",
-    );
+      });
+      setMessage("تم تحديث الكليات المشاركة مباشرةً على شاشة الجمهور.");
+    } catch (caught) {
+      setSelectedIds(new Set(snapshot.participantCollegeIds));
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تحديث الكليات المشاركة",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const lockParticipants = () =>
     run(
@@ -1224,12 +1237,14 @@ function SetupSurface({
   };
 
   const toggleParticipant = (collegeId: number) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(collegeId)) next.delete(collegeId);
-      else next.add(collegeId);
-      return next;
-    });
+    if (snapshot.participantsLocked || busy) return;
+
+    const next = new Set(selectedIds);
+    if (next.has(collegeId)) next.delete(collegeId);
+    else next.add(collegeId);
+
+    setSelectedIds(next);
+    void persistParticipants(next);
   };
 
   return (
@@ -1237,7 +1252,7 @@ function SetupSurface({
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="step-label">الخطوة 1</p>
+            <p className="step-label">الخطوة 2</p>
             <h2>قائمة الكليات</h2>
           </div>
           <span className="counter">
@@ -1282,8 +1297,8 @@ function SetupSurface({
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="step-label">الخطوة 2</p>
-            <h2>اختيار المشاركين</h2>
+            <p className="step-label">الخطوة 3</p>
+            <h2>تحديد الكليات المشاركة</h2>
           </div>
           <span className="counter">{selectedIds.size} مختارة</span>
         </div>
@@ -1315,23 +1330,19 @@ function SetupSurface({
           </div>
         )}
 
-        <div className="actions">
-          <button
-            disabled={
-              snapshot.participantsLocked ||
-              snapshot.colleges.length === 0 ||
-              busy
-            }
-            onClick={() => void saveParticipants()}
-          >
-            حفظ المشاركين
-          </button>
+        {!snapshot.participantsLocked &&
+        snapshot.colleges.length > 0 ? (
+          <p className="live-sync-note">
+            كل تحديد أو إلغاء تحديد يُحفظ فورًا ويظهر مباشرةً على شاشة الجمهور.
+          </p>
+        ) : null}
 
+        <div className="actions">
           {!snapshot.participantsLocked ? (
             <button
               className="primary"
               disabled={
-                snapshot.participantCollegeIds.length < 2 || busy
+                selectedIds.size < 2 || busy
               }
               onClick={() => void lockParticipants()}
             >
@@ -1495,7 +1506,7 @@ function DrawSurface({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">M2</p>
+          <p className="step-label">الخطوة 4</p>
           <h2>القرعة الرسمية</h2>
         </div>
         <span className="counter">
@@ -1681,6 +1692,25 @@ function AudienceDrawSurface({
         <div className="audience-kicker">{settings.eventTitle}</div>
         <h2 className="audience-title">{settings.copy.welcomeTitle}</h2>
         <p className="audience-copy">{settings.copy.waitingParticipantsText}</p>
+
+        {participantNames.length > 0 ? (
+          <>
+            <p className="audience-live-participant-count">
+              {audienceText(
+                settings.copy.participatingCollegeCountText,
+                { count: participantNames.length },
+              )}
+            </p>
+            <div className="audience-participants live-selection">
+              {participantNames.map((name) => (
+                <span key={name}>{name}</span>
+              ))}
+            </div>
+            <div className="draw-waiting">
+              بانتظار تثبيت قائمة الكليات المشاركة
+            </div>
+          </>
+        ) : null}
       </section>
     );
   }
@@ -3278,6 +3308,8 @@ export function App() {
 
   useEffect(() => {
     const displayMode = surface === "display";
+    const teamMode = surface === "team-a" || surface === "team-b";
+
     document.documentElement.classList.toggle(
       "display-mode",
       displayMode,
@@ -3286,10 +3318,20 @@ export function App() {
       "display-mode",
       displayMode,
     );
+    document.documentElement.classList.toggle(
+      "team-mode",
+      teamMode,
+    );
+    document.body.classList.toggle(
+      "team-mode",
+      teamMode,
+    );
 
     return () => {
       document.documentElement.classList.remove("display-mode");
       document.body.classList.remove("display-mode");
+      document.documentElement.classList.remove("team-mode");
+      document.body.classList.remove("team-mode");
     };
   }, [surface]);
 
@@ -3438,10 +3480,15 @@ export function App() {
           ? "display-shell"
           : surface === "report"
             ? "report-shell"
-            : "shell"
+            : surface === "team-a" || surface === "team-b"
+              ? "team-shell"
+              : "shell"
       }
     >
-      {surface !== "display" && surface !== "report" ? (
+      {surface !== "display" &&
+      surface !== "report" &&
+      surface !== "team-a" &&
+      surface !== "team-b" ? (
         <section className="hero">
           <p className="eyebrow">University Knowledge Competition</p>
           <h1>{surfaceTitles[surface]}</h1>
@@ -3494,10 +3541,11 @@ export function App() {
 
       {surface === "setup" && competition ? (
         <>
-          <AudienceSettingsPanel settings={audienceSettings} />
           <BulkImportPanel questionBank={questionBank} />
-          <QuestionAllocationPanel allocation={questionAllocation} />
           <SetupSurface snapshot={competition} />
+          <DrawSurface snapshot={competition} />
+          <QuestionAllocationPanel allocation={questionAllocation} />
+          <AudienceSettingsPanel settings={audienceSettings} />
           <ResetAllCompetitionPanel />
         </>
       ) : null}
