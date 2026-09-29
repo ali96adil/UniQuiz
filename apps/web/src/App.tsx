@@ -2298,20 +2298,34 @@ export function App() {
   };
 
   return (
-    <main className="shell">
-      <section className="hero">
-        <p className="eyebrow">University Knowledge Competition</p>
-        <h1>{surfaceTitles[surface]}</h1>
-        <p className="subtitle">
-          {surface === "setup" || surface === "draw"
-            ? "M2 — Participants & Draw"
-            : "Realtime Competition Runtime"}
-        </p>
-        <div className="connection">
-          <span className={connected ? "dot online-bg" : "dot offline-bg"} />
-          {connected ? "متصل بالسيرفر" : "جاري الاتصال بالسيرفر"}
-        </div>
-      </section>
+    <main
+      className={
+        surface === "display"
+          ? "display-shell"
+          : "shell"
+      }
+    >
+      {surface !== "display" ? (
+        <section className="hero">
+          <p className="eyebrow">University Knowledge Competition</p>
+          <h1>{surfaceTitles[surface]}</h1>
+          <p className="subtitle">
+            {surface === "setup" || surface === "draw"
+              ? "M2 — Participants & Draw"
+              : "Realtime Competition Runtime"}
+          </p>
+          <div className="connection">
+            <span
+              className={
+                connected ? "dot online-bg" : "dot offline-bg"
+              }
+            />
+            {connected
+              ? "متصل بالسيرفر"
+              : "جاري الاتصال بالسيرفر"}
+          </div>
+        </section>
+      ) : null}
 
       {surface === "setup" && competition ? (
         <>

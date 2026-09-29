@@ -1164,3 +1164,47 @@ h2 {
     margin-top: 0;
   }
 }
+
+.display-shell {
+  width: 100%;
+  min-width: 100vw;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.display-shell .audience-stage {
+  margin-top: 0;
+  min-height: 100vh;
+  border-radius: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.display-shell .audience-broadcast-layout {
+  min-height: 100vh;
+  padding: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  background: #070d1b;
+}
+
+.display-shell .audience-broadcast-layout > .audience-stage {
+  min-height: calc(100vh - 36px);
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.display-shell .audience-ranking {
+  margin-top: 0;
+  min-height: calc(100vh - 36px);
+}
+
+@media (max-width: 980px) {
+  .display-shell .audience-broadcast-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .display-shell .audience-ranking {
+    min-height: auto;
+  }
+}
