@@ -171,6 +171,12 @@ registerOperationsRoutes(app, database, {
   webPort: 5173,
   osc: config.osc,
   getPresence: presenceSnapshot,
+  sendOscTest: () => {
+    oscOutput.send(
+      "/uniquiz/system/test",
+      [new Date().toISOString()],
+    );
+  },
 });
 
 registerResultsExportRoutes(app, database);
