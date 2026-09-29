@@ -1532,6 +1532,7 @@ export class LiveSessionManager {
         station,
         selectedOption,
         responseTimeMs: clock.elapsedMs,
+        isCorrect,
         scoreMicros,
       },
       occurredAt: new Date(submittedAtEpochMs).toISOString(),

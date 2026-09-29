@@ -742,3 +742,51 @@ test("emergency hold during active question requires void replacement", async ()
   void app.close();
   db.close();
 });
+
+
+test("answer audit records correctness explicitly", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  manager.submitAnswer("team-a", "B");
+
+  const audit = db.prepare(`
+    SELECT payload_json AS payloadJson
+    FROM audit_events
+    WHERE event_type = 'TEAM_ANSWER_LOCKED'
+      AND round_id = 1
+      AND position = 1
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as { payloadJson: string };
+
+  const payload = JSON.parse(audit.payloadJson) as {
+    selectedOption: string;
+    responseTimeMs: number;
+    isCorrect: boolean;
+    scoreMicros: number;
+  };
+
+  assert.equal(payload.selectedOption, "B");
+  assert.equal(payload.isCorrect, true);
+  assert.ok(payload.responseTimeMs >= 0);
+  assert.ok(payload.scoreMicros > 0);
+
+  io.close();
+  void app.close();
+  db.close();
+});
