@@ -15,6 +15,10 @@ import {
 } from "./question-bank.js";
 import { registerLiveSessionRoutes } from "./live-session.js";
 import { getQualificationRanking } from "./ranking.js";
+import {
+  getAudienceDisplaySettings,
+  registerAudienceSettingsRoutes,
+} from "./audience-settings.js";
 import { registerResetAllRoute } from "./reset-all.js";
 import { OscOutput } from "./osc-output.js";
 import {
@@ -110,6 +114,7 @@ registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
 registerQuestionBankRoutes(app, database, io);
 registerStationAuthRoutes(app, database);
+registerAudienceSettingsRoutes(app, database, io);
 
 const oscOutput = new OscOutput(
   config.osc,
@@ -186,6 +191,11 @@ io.on("connection", (socket) => {
   socket.emit(
     "ranking:snapshot",
     getQualificationRanking(database),
+  );
+
+  socket.emit(
+    "audience:settings",
+    getAudienceDisplaySettings(database),
   );
 
   const teamState = liveSession.getTeamSubmissionState(role);

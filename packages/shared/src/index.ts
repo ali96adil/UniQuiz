@@ -251,3 +251,15 @@ export interface QualificationRankingSnapshot {
   generatedAt: string;
   entries: QualificationRankingEntry[];
 }
+
+export interface AudienceDisplaySettings {
+  eventTitle: string;
+  eventSubtitle: string;
+  venue: string;
+  season: string;
+  footerText: string;
+  roundLabel: string;
+  universityLogoUrl: string | null;
+  departmentLogoUrl: string | null;
+  updatedAt: string;
+}

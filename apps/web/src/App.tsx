@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
 import type {
+  AudienceDisplaySettings,
   BulkImportPreview,
   ClientRole,
   CompetitionSetupSnapshot,
@@ -457,6 +458,273 @@ function BulkImportPanel({
 }
 
 
+
+
+function AudienceSettingsPanel({
+  settings,
+}: {
+  settings: AudienceDisplaySettings | null;
+}) {
+  const [draft, setDraft] = useState<AudienceDisplaySettings | null>(
+    settings,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(settings);
+  }, [settings]);
+
+  if (!draft) {
+    return (
+      <section className="panel">
+        <h2>هوية شاشة الجمهور</h2>
+        <p>بانتظار تحميل الإعدادات...</p>
+      </section>
+    );
+  }
+
+  const setField = (
+    key:
+      | "eventTitle"
+      | "eventSubtitle"
+      | "venue"
+      | "season"
+      | "footerText"
+      | "roundLabel",
+    value: string,
+  ) => {
+    setDraft((current) =>
+      current ? { ...current, [key]: value } : current,
+    );
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest<AudienceDisplaySettings>(
+        "/api/audience/settings",
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            eventTitle: draft.eventTitle,
+            eventSubtitle: draft.eventSubtitle,
+            venue: draft.venue,
+            season: draft.season,
+            footerText: draft.footerText,
+            roundLabel: draft.roundLabel,
+          }),
+        },
+      );
+      setMessage("تم حفظ إعدادات شاشة الجمهور.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر حفظ إعدادات شاشة الجمهور",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const uploadLogo = async (
+    slot: "university" | "department",
+    file: File | null,
+  ) => {
+    if (!file) return;
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const response = await fetch(
+        `/api/audience/assets/${slot}`,
+        {
+          method: "POST",
+          body: form,
+        },
+      );
+
+      const payload = (await response.json()) as
+        | AudienceDisplaySettings
+        | { error?: string; message?: string };
+
+      if (!response.ok) {
+        const problem = payload as {
+          error?: string;
+          message?: string;
+        };
+        throw new Error(
+          problem.message ??
+            problem.error ??
+            `HTTP ${response.status}`,
+        );
+      }
+
+      setMessage("تم تحديث الشعار.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر رفع الشعار",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeLogo = async (
+    slot: "university" | "department",
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest<AudienceDisplaySettings>(
+        `/api/audience/assets/${slot}`,
+        { method: "DELETE" },
+      );
+      setMessage("تم حذف الشعار.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر حذف الشعار",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel audience-settings-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Audience Branding</p>
+          <h2>هوية شاشة الجمهور</h2>
+        </div>
+      </div>
+
+      <div className="audience-settings-grid">
+        <label>
+          <span>عنوان المسابقة</span>
+          <input
+            value={draft.eventTitle}
+            onChange={(event) =>
+              setField("eventTitle", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>العنوان الفرعي</span>
+          <input
+            value={draft.eventSubtitle}
+            onChange={(event) =>
+              setField("eventSubtitle", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>المكان</span>
+          <input
+            value={draft.venue}
+            onChange={(event) =>
+              setField("venue", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>الموسم / السنة</span>
+          <input
+            value={draft.season}
+            onChange={(event) =>
+              setField("season", event.target.value)
+            }
+          />
+        </label>
+        <label className="wide">
+          <span>نص Footer</span>
+          <input
+            value={draft.footerText}
+            onChange={(event) =>
+              setField("footerText", event.target.value)
+            }
+          />
+        </label>
+        <label>
+          <span>تسمية الجولة</span>
+          <input
+            value={draft.roundLabel}
+            onChange={(event) =>
+              setField("roundLabel", event.target.value)
+            }
+          />
+        </label>
+      </div>
+
+      <div className="audience-logo-grid">
+        {([
+          ["university", "شعار جامعة بابل", draft.universityLogoUrl],
+          ["department", "شعار قسم النشاطات الطلابية", draft.departmentLogoUrl],
+        ] as const).map(([slot, label, url]) => (
+          <div className="audience-logo-card" key={slot}>
+            <strong>{label}</strong>
+            <div className="audience-logo-preview">
+              {url ? (
+                <img src={url} alt={label} />
+              ) : (
+                <span>لا يوجد شعار</span>
+              )}
+            </div>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={busy}
+              onChange={(event) => {
+                void uploadLogo(
+                  slot,
+                  event.target.files?.[0] ?? null,
+                );
+                event.currentTarget.value = "";
+              }}
+            />
+            {url ? (
+              <button
+                className="danger-outline"
+                disabled={busy}
+                onClick={() => void removeLogo(slot)}
+              >
+                حذف الشعار
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="actions">
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() => void save()}
+        >
+          حفظ هوية العرض
+        </button>
+      </div>
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
 
 function ResetAllCompetitionPanel() {
   const [busy, setBusy] = useState(false);
@@ -992,7 +1260,7 @@ function RoundCard({
   return (
     <article className={isNext ? "round-card next-round" : "round-card"}>
       <div className="round-card-header">
-        <strong>جولة {round.order}</strong>
+        <strong>{settings.roundLabel} {round.order}</strong>
         {isNext ? (
           <span className="badge">
             {selectionMode === "MANUAL" ? "مختارة يدويًا" : "القادمة"}
@@ -1206,12 +1474,63 @@ function DrawSurface({
 }
 
 
+
+function AudienceBroadcastFrame({
+  settings,
+  children,
+}: {
+  settings: AudienceDisplaySettings;
+  children: React.ReactNode;
+}) {
+  const meta = [settings.venue, settings.season]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="audience-frame">
+      <header className="audience-brand-header">
+        <div className="audience-brand-logo">
+          {settings.universityLogoUrl ? (
+            <img
+              src={settings.universityLogoUrl}
+              alt="University logo"
+            />
+          ) : null}
+        </div>
+        <div className="audience-brand-copy">
+          <strong>{settings.eventTitle}</strong>
+          {settings.eventSubtitle ? (
+            <span>{settings.eventSubtitle}</span>
+          ) : null}
+          {meta ? <small>{meta}</small> : null}
+        </div>
+        <div className="audience-brand-logo">
+          {settings.departmentLogoUrl ? (
+            <img
+              src={settings.departmentLogoUrl}
+              alt="Department logo"
+            />
+          ) : null}
+        </div>
+      </header>
+
+      <div className="audience-frame-main">{children}</div>
+
+      <footer className="audience-brand-footer">
+        {settings.footerText}
+      </footer>
+    </div>
+  );
+}
+
 function AudienceDrawSurface({
   snapshot,
   presentation,
+  settings,
 }: {
   snapshot: CompetitionSetupSnapshot;
   presentation: DrawPresentationEvent | null;
+  settings: AudienceDisplaySettings;
 }) {
   const participantNames = snapshot.colleges
     .filter((college) => snapshot.participantCollegeIds.includes(college.id))
@@ -1278,7 +1597,7 @@ function AudienceDrawSurface({
             }
           >
             <span className="audience-round-number">
-              جولة {round.order}
+              {settings.roundLabel} {round.order}
             </span>
             <div className="audience-matchup">
               <strong>{round.collegeA.name}</strong>
@@ -1362,10 +1681,12 @@ function AudienceLiveSurface({
   snapshot,
   competition,
   ranking,
+  settings,
 }: {
   snapshot: LiveSnapshot;
   competition: CompetitionSetupSnapshot;
   ranking: QualificationRankingSnapshot | null;
+  settings: AudienceDisplaySettings;
 }) {
   const [now, setNow] = useState(Date.now());
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
@@ -1471,7 +1792,7 @@ function AudienceLiveSurface({
     return (
       <section className="audience-stage audience-live-stage">
         <div className="audience-round-strip">
-          <span>جولة {round.order}</span>
+          <span>{settings.roundLabel} {round.order}</span>
           <strong>{round.teamA.name}</strong>
           <b>{round.teamB ? "VS" : "SOLO"}</b>
           <strong>{round.teamB?.name ?? "جولة فردية"}</strong>
@@ -1490,7 +1811,7 @@ function AudienceLiveSurface({
     return (
       <section className="audience-stage audience-live-stage">
         <div className="audience-kicker">
-          جولة {round.order}
+          {settings.roundLabel} {round.order}
         </div>
         <h2 className="audience-title">
           {round.teamA.name}
@@ -1522,7 +1843,7 @@ function AudienceLiveSurface({
       <section className="audience-stage audience-live-stage">
         <div className="audience-question-header">
           <div>
-            <span>جولة {round.order}</span>
+            <span>{settings.roundLabel} {round.order}</span>
             <strong>
               سؤال {question?.position ?? "—"} / 10
             </strong>
@@ -1684,13 +2005,13 @@ function AudienceLiveSurface({
     return (
       <section className="audience-stage audience-live-stage">
         <div className="audience-kicker">
-          انتهت جولة {round.order}
+          انتهت {settings.roundLabel} {round.order}
         </div>
         <h2 className="audience-title">الجولة القادمة</h2>
 
         {nextRound ? (
           <div className="audience-next-match">
-            <span>جولة {nextRound.order}</span>
+            <span>{settings.roundLabel} {nextRound.order}</span>
             <strong>{nextRound.collegeA.name}</strong>
             <b>{nextRound.collegeB ? "VS" : "SOLO"}</b>
             <strong>
@@ -2370,6 +2691,8 @@ export function App() {
     useState<LiveTeamSubmissionState | null>(null);
   const [ranking, setRanking] =
     useState<QualificationRankingSnapshot | null>(null);
+  const [audienceSettings, setAudienceSettings] =
+    useState<AudienceDisplaySettings | null>(null);
   const [liveSocket, setLiveSocket] =
     useState<ReturnType<typeof io> | null>(null);
   const [effectiveRole, setEffectiveRole] =
@@ -2444,6 +2767,12 @@ export function App() {
       "ranking:snapshot",
       (snapshot: QualificationRankingSnapshot) => {
         setRanking(snapshot);
+      },
+    );
+    socket.on(
+      "audience:settings",
+      (settings: AudienceDisplaySettings) => {
+        setAudienceSettings(settings);
       },
     );
     socket.on(
@@ -2539,6 +2868,7 @@ export function App() {
 
       {surface === "setup" && competition ? (
         <>
+          <AudienceSettingsPanel settings={audienceSettings} />
           <BulkImportPanel questionBank={questionBank} />
           <QuestionAllocationPanel allocation={questionAllocation} />
           <SetupSurface snapshot={competition} />
@@ -2550,23 +2880,29 @@ export function App() {
         <DrawSurface snapshot={competition} />
       ) : null}
 
-      {surface === "display" && competition ? (
-        liveSnapshot &&
-        liveSnapshot.phase !== "IDLE" ? (
-          <div className="audience-broadcast-layout">
-            <AudienceLiveSurface
-              snapshot={liveSnapshot}
-              competition={competition}
-              ranking={ranking}
+      {surface === "display" &&
+      competition &&
+      audienceSettings ? (
+        <AudienceBroadcastFrame settings={audienceSettings}>
+          {liveSnapshot &&
+          liveSnapshot.phase !== "IDLE" ? (
+            <div className="audience-broadcast-layout">
+              <AudienceLiveSurface
+                snapshot={liveSnapshot}
+                competition={competition}
+                ranking={ranking}
+                settings={audienceSettings}
+              />
+              <AudienceRankingSidebar ranking={ranking} />
+            </div>
+          ) : (
+            <AudienceDrawSurface
+              snapshot={competition}
+              presentation={drawPresentation}
+              settings={audienceSettings}
             />
-            <AudienceRankingSidebar ranking={ranking} />
-          </div>
-        ) : (
-          <AudienceDrawSurface
-            snapshot={competition}
-            presentation={drawPresentation}
-          />
-        )
+          )}
+        </AudienceBroadcastFrame>
       ) : null}
 
       {surface === "operator" ? (

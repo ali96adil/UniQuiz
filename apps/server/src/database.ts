@@ -214,8 +214,49 @@ export function openDatabase(databasePath: string) {
       rotated_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS audience_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      event_title TEXT NOT NULL,
+      event_subtitle TEXT NOT NULL,
+      venue TEXT NOT NULL,
+      season TEXT NOT NULL,
+      footer_text TEXT NOT NULL,
+      round_label TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT INTO audience_settings (
+      id,
+      event_title,
+      event_subtitle,
+      venue,
+      season,
+      footer_text,
+      round_label,
+      updated_at
+    )
+    VALUES (
+      1,
+      'مسابقة بنك المعلومات',
+      'جامعة بابل · قسم النشاطات الطلابية',
+      '',
+      '',
+      'جامعة بابل — قسم النشاطات الطلابية',
+      'جولة',
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT(id) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS audience_assets (
+      slot TEXT PRIMARY KEY
+        CHECK (slot IN ('university', 'department')),
+      mime_type TEXT NOT NULL,
+      bytes BLOB NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     UPDATE app_meta
-    SET value = '8'
+    SET value = '9'
     WHERE key = 'schema_version';
   `);
 
