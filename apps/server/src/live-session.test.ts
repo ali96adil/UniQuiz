@@ -494,7 +494,7 @@ test("restart during active question fail-closes and requires void replacement",
   );
   assert.throws(
     () => manager.revealQuestion(),
-    /RECOVERY_QUESTION_REQUIRES_VOID/,
+    /QUESTION_REQUIRES_VOID/,
   );
   assert.equal(
     events.includes(
