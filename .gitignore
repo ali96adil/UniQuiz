@@ -6,6 +6,7 @@ dist/
 *.log
 .DS_Store
 data/private/
+data/backups/
 data/*.db
 data/*.sqlite
 data/*.sqlite3
