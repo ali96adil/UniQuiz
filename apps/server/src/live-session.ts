@@ -633,7 +633,7 @@ export class LiveSessionManager {
     return this.publish();
   }
 
-  resetForNewCompetition(): LiveSnapshot {
+  dispose(): void {
     if (this.countdownTimer) {
       clearTimeout(this.countdownTimer);
       this.countdownTimer = null;
@@ -652,6 +652,10 @@ export class LiveSessionManager {
     }
 
     this.questionClock.clear();
+  }
+
+  resetForNewCompetition(): LiveSnapshot {
+    this.dispose();
 
     this.db.prepare(`
       UPDATE live_state

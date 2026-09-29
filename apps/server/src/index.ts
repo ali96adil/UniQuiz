@@ -287,6 +287,7 @@ io.on("connection", (socket) => {
 
 const shutdown = async (signal: string) => {
   app.log.info({ signal }, "Shutting down UniQuiz");
+  liveSession.dispose();
   io.close();
   database.close();
   await app.close();

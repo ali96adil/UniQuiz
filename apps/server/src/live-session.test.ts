@@ -138,6 +138,7 @@ test("team answers lock once and paired round closes after both submit", async (
   assert.equal(recovered?.locked, true);
   assert.equal(recovered?.selectedOption, "B");
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -176,6 +177,7 @@ test("solo round requires only Team A and closes on its answer", async () => {
   assert.equal(snapshot.answerStatus.teamARequired, true);
   assert.equal(snapshot.answerStatus.teamBRequired, false);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -225,6 +227,7 @@ test("start round rechecks station readiness after confirmation", () => {
 
   assert.equal(manager.getSnapshot().phase, "ROUND_ACTIVE");
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -287,6 +290,7 @@ test("automatically reveals only after all required teams answer", async () => {
   );
   assert.ok(revealIndex > answeredIndex);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -339,6 +343,7 @@ test("reveal results stay hidden until reveal", async () => {
   assert.equal(snapshot.revealResults?.teamB?.isCorrect, false);
   assert.equal(snapshot.revealResults?.teamB?.scorePoints, 0);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -380,6 +385,7 @@ test("round totals include only revealed question scores", async () => {
   assert.ok((snapshot.roundTotals?.teamA ?? 0) > 0);
   assert.equal(snapshot.roundTotals?.teamB, 0);
 
+  manager.dispose();
   io.close();
   await app.close();
   db.close();
@@ -440,6 +446,7 @@ test("restart during countdown returns the same question to ready", () => {
   );
   assert.match(audit.payloadJson, /REQUIRE_NEW_START/);
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -523,6 +530,7 @@ test("restart during active question fail-closes and requires void replacement",
     /VOID_REPLACEMENT_REQUIRED/,
   );
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -585,6 +593,7 @@ test("replacement resets the current slot to question ready", () => {
     "QUESTION_REPLACEMENT_READY",
   );
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -645,6 +654,7 @@ test("station readiness override is audited and allows emergency start", () => {
     /Team B browser failed/,
   );
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -689,6 +699,7 @@ test("emergency hold during countdown returns question to ready", () => {
   assert.match(audit.reason, /projector issue/);
   assert.match(audit.payloadJson, /RETURN_TO_QUESTION_READY/);
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -738,6 +749,7 @@ test("emergency hold during active question requires void replacement", async ()
   assert.match(audit.reason, /lost power/);
   assert.match(audit.payloadJson, /VOID_REPLACEMENT_REQUIRED/);
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
@@ -786,6 +798,7 @@ test("answer audit records correctness explicitly", async () => {
   assert.ok(payload.responseTimeMs >= 0);
   assert.ok(payload.scoreMicros > 0);
 
+  manager.dispose();
   io.close();
   void app.close();
   db.close();
