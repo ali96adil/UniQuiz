@@ -262,7 +262,8 @@ export async function buildResultsWorkbook(
     sheet.views = [{ state: "frozen", ySplit: 1 }];
     sheet.getRow(1).font = { bold: true };
     sheet.columns.forEach((column) => {
-      const lengths = column.values
+      const values = column.values ?? [];
+      const lengths = values
         .slice(1)
         .map((value) => String(value ?? "").length + 2);
       column.width = Math.min(
