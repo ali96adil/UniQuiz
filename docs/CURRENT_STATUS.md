@@ -92,3 +92,5 @@ No code blocker. Only real-display and print-preview visual acceptance remain fo
 - Participant selection persists immediately on every checkbox change instead of requiring a separate Save Participants action.
 - The server now accepts incremental participant lists before lock; the existing lock operation still enforces at least two participants.
 - Before participant lock, the audience display now shows the currently selected colleges and updates from the authoritative competition snapshot in real time.
+
+- Contestant answer-choice cards rebalanced after visual review: shorter card height, larger answer text, and larger A/B/C/D badges while preserving the full-screen station layout.
