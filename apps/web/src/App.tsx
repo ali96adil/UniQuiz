@@ -3318,18 +3318,32 @@ function OperatorLivePanel({
 
         {snapshot.phase === "ROUND_READY" &&
         !snapshot.stationsConfirmed ? (
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() =>
-              void run(
-                "/api/live/confirm-stations",
-                "تم تأكيد توزيع المحطات.",
-              )
-            }
-          >
-            تأكيد Station A / B
-          </button>
+          <>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  "/api/live/confirm-stations",
+                  "تم تأكيد توزيع المحطات.",
+                )
+              }
+            >
+              تأكيد Station A / B
+            </button>
+
+            {(!snapshot.stationReadiness.teamAConnected ||
+              (snapshot.stationReadiness.teamBRequired &&
+                !snapshot.stationReadiness.teamBConnected)) ? (
+              <button
+                className="danger-outline"
+                disabled={busy}
+                onClick={() => void overrideStations()}
+              >
+                تجاوز جاهزية المحطات — طارئ
+              </button>
+            ) : null}
+          </>
         ) : null}
 
         {snapshot.phase === "ROUND_READY" &&
