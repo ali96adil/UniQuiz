@@ -387,14 +387,6 @@ function BulkImportPanel({
         </div>
       ) : null}
 
-      {snapshot.phase === "ROUND_COMPLETE" &&
-      snapshot.qualificationComplete ? (
-        <div className="reveal-answer">
-          <strong>انتهت جميع جولات التصفيات</strong>
-          <span>لا توجد جولة أخرى بانتظار التجهيز.</span>
-        </div>
-      ) : null}
-
       <StatusMessage error={error} message={message} />
     </section>
   );
@@ -1520,6 +1512,14 @@ function OperatorLivePanel({
           اكتملت الإجابات المطلوبة. تم إرسال OSC وسيتم إعلان النتيجة
           تلقائيًا بعد لحظة قصيرة.
         </p>
+      ) : null}
+
+      {snapshot.phase === "ROUND_COMPLETE" &&
+      snapshot.qualificationComplete ? (
+        <div className="reveal-answer">
+          <strong>انتهت جميع جولات التصفيات</strong>
+          <span>لا توجد جولة أخرى بانتظار التجهيز.</span>
+        </div>
       ) : null}
 
       <StatusMessage error={error} message={message} />
