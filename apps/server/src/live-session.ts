@@ -662,26 +662,7 @@ export class LiveSessionManager {
     return this.publish();
   }
 
-  dispose(): void {
-    if (this.countdownTimer) {
-      clearTimeout(this.countdownTimer);
-      this.countdownTimer = null;
-    }
 
-    this.clearCountdownCueTimers();
-
-    if (this.questionTimer) {
-      clearTimeout(this.questionTimer);
-      this.questionTimer = null;
-    }
-
-    if (this.autoRevealTimer) {
-      clearTimeout(this.autoRevealTimer);
-      this.autoRevealTimer = null;
-    }
-
-    this.questionClock.clear();
-  }
 
   resetForNewCompetition(): LiveSnapshot {
     this.dispose();
