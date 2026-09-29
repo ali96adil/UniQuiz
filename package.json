@@ -18,6 +18,8 @@
     "dev:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm dev",
     "ops:backup:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:backup",
     "ops:backups:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:backups",
-    "ops:restore:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:restore"
+    "ops:restore:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:restore",
+    "event:start": "pnpm ops:backup && pnpm dev",
+    "event:start:rehearsal": "pnpm ops:backup:rehearsal && pnpm dev:rehearsal"
   }
 }
