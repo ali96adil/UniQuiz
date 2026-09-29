@@ -22,6 +22,7 @@ import {
 import { registerResetAllRoute } from "./reset-all.js";
 import { OscOutput } from "./osc-output.js";
 import { registerOperationsRoutes } from "./operations.js";
+import { registerResultsExportRoutes } from "./results-export.js";
 import {
   ensureStationCredentials,
   registerStationAuthRoutes,
@@ -162,6 +163,8 @@ registerOperationsRoutes(app, database, {
   osc: config.osc,
   getPresence: presenceSnapshot,
 });
+
+registerResultsExportRoutes(app, database);
 
 io.on("connection", (socket) => {
   const role = normalizeRole(

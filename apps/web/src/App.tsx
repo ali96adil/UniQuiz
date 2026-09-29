@@ -2353,6 +2353,13 @@ function OperationsPreflightPanel() {
         >
           إعادة فحص الجاهزية
         </button>
+        <a
+          className="button-link"
+          href="/api/export/results.xlsx"
+          download
+        >
+          تصدير النتائج + Audit
+        </a>
       </div>
 
       {snapshot?.latestBackup ? (
