@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -263,10 +264,15 @@ export function restoreDatabaseFromBackup(
 
   const temp = target + ".restore.tmp";
   copyFileSync(source, temp);
-  copyFileSync(temp, target);
-  rmSync(temp, { force: true });
+  verifyDatabaseFile(temp);
+
   rmSync(target + "-wal", { force: true });
   rmSync(target + "-shm", { force: true });
+
+  // The authoritative runtime is macOS. Renaming a fully verified
+  // temp file in the same directory minimizes the window where the
+  // target database could be partially replaced.
+  renameSync(temp, target);
 
   verifyDatabaseFile(target);
 
