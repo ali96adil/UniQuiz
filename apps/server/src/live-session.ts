@@ -13,6 +13,7 @@ import type {
   LiveTeamSubmissionState,
 } from "@uniquiz/shared";
 import { appendAuditEvent } from "./audit.js";
+import { getCompetitionSnapshot } from "./competition.js";
 import type { AppDatabase } from "./database.js";
 import {
   QUESTION_DURATION_MS,
@@ -567,6 +568,10 @@ export class LiveSessionManager {
     this.io.emit(
       "ranking:snapshot",
       getQualificationRanking(this.db),
+    );
+    this.io.emit(
+      "competition:snapshot",
+      getCompetitionSnapshot(this.db),
     );
 
     const teamAState = this.getTeamSubmissionState("team-a");

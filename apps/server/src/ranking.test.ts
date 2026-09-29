@@ -91,8 +91,6 @@ test("ranking includes only revealed scores and leaves not-started colleges unra
   assert.equal(b?.rank, 2);
   assert.equal(b?.scorePoints, 0);
   assert.equal(b?.revealedQuestions, 1);
-  assert.equal(b?.correctAnswers, 0);
-  assert.equal(b?.wrongAnswers, 0);
   assert.equal(b?.totalResponseTimeMs, 2000);
   assert.equal(b?.correctAnswers, 0);
   assert.equal(b?.wrongAnswers, 1);
@@ -246,6 +244,8 @@ test("revealed unanswered question counts the full 25 seconds in cumulative time
   assert.equal(b?.totalResponseTimeMs, 25_000);
   assert.equal(b?.scorePoints, 0);
   assert.equal(b?.revealedQuestions, 1);
+  assert.equal(b?.correctAnswers, 0);
+  assert.equal(b?.wrongAnswers, 0);
 
   db.close();
 });
