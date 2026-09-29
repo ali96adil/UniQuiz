@@ -387,6 +387,14 @@ function BulkImportPanel({
         </div>
       ) : null}
 
+      {snapshot.phase === "ROUND_COMPLETE" &&
+      snapshot.qualificationComplete ? (
+        <div className="reveal-answer">
+          <strong>انتهت جميع جولات التصفيات</strong>
+          <span>لا توجد جولة أخرى بانتظار التجهيز.</span>
+        </div>
+      ) : null}
+
       <StatusMessage error={error} message={message} />
     </section>
   );
@@ -1362,8 +1370,9 @@ function OperatorLivePanel({
       ) : null}
 
       <div className="actions live-actions">
-        {snapshot.phase === "IDLE" ||
-        snapshot.phase === "ROUND_COMPLETE" ? (
+        {(snapshot.phase === "IDLE" ||
+          snapshot.phase === "ROUND_COMPLETE") &&
+        snapshot.hasPendingRound ? (
           <button
             className="primary"
             disabled={busy}
@@ -1443,7 +1452,9 @@ function OperatorLivePanel({
           </button>
         ) : null}
 
-        {snapshot.phase === "QUESTION_CLOSED" ? (
+        {snapshot.phase === "QUESTION_CLOSED" &&
+        snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
+        snapshot.closeReason !== "SOLO_ANSWERED" ? (
           <button
             className="primary"
             disabled={busy}
@@ -1499,6 +1510,15 @@ function OperatorLivePanel({
       {snapshot.phase === "QUESTION_ACTIVE" ? (
         <p className="locked-note">
           السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 45 ثانية.
+        </p>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_CLOSED" &&
+      (snapshot.closeReason === "ALL_TEAMS_ANSWERED" ||
+        snapshot.closeReason === "SOLO_ANSWERED") ? (
+        <p className="locked-note">
+          اكتملت الإجابات المطلوبة. تم إرسال OSC وسيتم إعلان النتيجة
+          تلقائيًا بعد لحظة قصيرة.
         </p>
       ) : null}
 
@@ -1627,7 +1647,7 @@ function TeamLivePanel({
       {snapshot.phase === "QUESTION_READY" ? (
         <div className="team-waiting-card">
           السؤال {snapshot.question?.position ?? "—"} جاهز
-          <strong>بانتظار START من الأوبريتر</strong>
+          <strong>بانتظار START من النظام</strong>
         </div>
       ) : null}
 
@@ -1700,7 +1720,20 @@ function TeamLivePanel({
 
       {snapshot.phase === "QUESTION_REVEAL" ? (
         <div className="reveal-answer">
-          الإجابة الصحيحة: {snapshot.question?.correctOption ?? "—"}
+          <span>الإجابة الصحيحة</span>
+          <strong>
+            {snapshot.question?.correctOption &&
+            snapshot.question?.options
+              ? snapshot.question.options[
+                  snapshot.question.correctOption
+                ]
+              : "—"}
+          </strong>
+          {snapshot.question?.correctOption ? (
+            <small>
+              الخيار {snapshot.question.correctOption}
+            </small>
+          ) : null}
         </div>
       ) : null}
 

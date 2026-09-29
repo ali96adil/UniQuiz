@@ -70,6 +70,10 @@ PR #12 — M4: Live Session & Team Stations
 ## In progress
 - M4 real-device rehearsal on the Mac plus authenticated Team A/B browsers.
 - App-generated Excel import sample verified successfully on the isolated rehearsal database.
+- Answered questions now auto-reveal 1.5s after all required teams submit; OSC answered cue precedes the automatic reveal cue.
+- Team reveal displays the full correct answer text plus option letter.
+- Team waiting copy now says "بانتظار START من النظام".
+- Final-round handling no longer offers a nonexistent next round; stale manual round selection falls back to the next pending round and completed qualification shows a terminal message.
 
 ## Next action
 On the isolated rehearsal database, create the 5-college official draw, lock the 30 imported questions into three rounds, verify the solo round is last, then open the tokenized Team A/B links and run the live flow. Station readiness is rechecked again at Start Round so a disconnect after confirmation cannot start a stale round.

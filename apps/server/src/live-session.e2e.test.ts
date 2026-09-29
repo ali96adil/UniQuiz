@@ -101,6 +101,7 @@ test("complete paired round runs 10 operator-paced questions end-to-end", async 
     45_000,
     showControl,
     () => true,
+    5,
   );
 
   manager.prepareRound(1);
@@ -146,16 +147,24 @@ test("complete paired round runs 10 operator-paced questions end-to-end", async 
     assert.equal(closed.phase, "QUESTION_CLOSED");
     assert.equal(closed.closeReason, "ALL_TEAMS_ANSWERED");
 
-    // Closure must not auto-reveal.
     assert.equal(closed.question?.correctOption, null);
 
-    const reveal = manager.revealQuestion();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const reveal = manager.getSnapshot();
     assert.equal(reveal.phase, "QUESTION_REVEAL");
     assert.ok(reveal.question?.correctOption);
   }
 
   const completed = manager.completeRound();
   assert.equal(completed.phase, "ROUND_COMPLETE");
+  assert.equal(completed.hasPendingRound, false);
+  assert.equal(completed.qualificationComplete, true);
+
+  assert.throws(
+    () => manager.prepareRound(),
+    /QUALIFICATION_COMPLETE/,
+  );
 
   const round = db.prepare(`
     SELECT status

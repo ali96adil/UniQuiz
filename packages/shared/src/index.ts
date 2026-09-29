@@ -183,6 +183,8 @@ export interface LiveSnapshot {
   questionDeadlineEpochMs: number | null;
   questionClosedAtEpochMs: number | null;
   closeReason: string | null;
+  hasPendingRound: boolean;
+  qualificationComplete: boolean;
   stationReadiness: LiveStationReadiness;
   answerStatus: LiveAnswerStatus;
 }

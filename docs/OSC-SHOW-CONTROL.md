@@ -24,7 +24,7 @@ All numeric arguments are OSC int32 values.
 | `/uniquiz/round/start` | `round_order` | Operator started the round |
 | `/uniquiz/question/countdown` | `round_order, question_position, value` | Prestart cue; value is 3, 2, then 1 |
 | `/uniquiz/question/start` | `round_order, question_position, duration_ms` | Question became visible and official 45s timing started |
-| `/uniquiz/question/answered` | `round_order, question_position, reason` | All required stations answered; reason is `ALL_TEAMS_ANSWERED` or `SOLO_ANSWERED` |
+| `/uniquiz/question/answered` | `round_order, question_position, reason` | All required stations answered; result auto-reveal is scheduled after this cue |
 | `/uniquiz/question/timeout` | `round_order, question_position` | Official answer window expired |
 | `/uniquiz/question/closed` | `round_order, question_position, reason` | Question closed for any reason |
 | `/uniquiz/question/reveal` | `round_order, question_position` | Operator triggered Reveal |
@@ -36,3 +36,10 @@ All numeric arguments are OSC int32 values.
 Use the countdown cues for a short 3-2-1 sound sequence. Use `/uniquiz/question/start` to launch the 45-second question bed/timer cue. Stop or transition that cue on either `/uniquiz/question/answered` or `/uniquiz/question/timeout`. Use `/uniquiz/question/reveal` for the answer/reveal sting.
 
 UniQuiz does not require Ableton to acknowledge any cue.
+
+
+## Automatic reveal delay
+
+When all required stations have answered, UniQuiz closes the question immediately and emits `/uniquiz/question/answered`. The result is then revealed automatically after **1.5 seconds**, at which point `/uniquiz/question/reveal` is emitted.
+
+This prevents the correct answer from appearing while another required team can still answer. Timeout closure does **not** use this automatic answered-path reveal; the operator retains the explicit Reveal action for timeout cases.

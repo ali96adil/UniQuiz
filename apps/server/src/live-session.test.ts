@@ -229,3 +229,65 @@ test("start round rechecks station readiness after confirmation", () => {
   void app.close();
   db.close();
 });
+
+
+test("automatically reveals only after all required teams answer", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+
+  const events: string[] = [];
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    45_000,
+    {
+      send(address) {
+        events.push(address);
+      },
+    },
+    () => true,
+    10,
+  );
+
+  manager.prepareRound(1);
+  manager.confirmStations();
+  manager.startRound();
+  manager.prepareNextQuestion();
+  manager.startQuestion();
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  manager.submitAnswer("team-a", "B");
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(manager.getSnapshot().phase, "QUESTION_ACTIVE");
+  assert.equal(
+    events.includes("/uniquiz/question/reveal"),
+    false,
+  );
+
+  manager.submitAnswer("team-b", "C");
+  assert.equal(manager.getSnapshot().phase, "QUESTION_CLOSED");
+
+  const answeredIndex = events.lastIndexOf(
+    "/uniquiz/question/answered",
+  );
+  assert.ok(answeredIndex >= 0);
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  const revealed = manager.getSnapshot();
+  assert.equal(revealed.phase, "QUESTION_REVEAL");
+  assert.equal(revealed.question?.correctOption, "B");
+
+  const revealIndex = events.lastIndexOf(
+    "/uniquiz/question/reveal",
+  );
+  assert.ok(revealIndex > answeredIndex);
+
+  io.close();
+  await app.close();
+  db.close();
+});

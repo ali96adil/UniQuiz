@@ -90,6 +90,7 @@ export class LiveSessionManager {
   private countdownTimer: NodeJS.Timeout | null = null;
   private countdownCueTimers: NodeJS.Timeout[] = [];
   private questionTimer: NodeJS.Timeout | null = null;
+  private autoRevealTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly db: AppDatabase,
@@ -100,7 +101,66 @@ export class LiveSessionManager {
     private readonly isStationConnected: (
       role: "team-a" | "team-b",
     ) => boolean = () => true,
-  ) {}
+    private readonly autoRevealDelayMs = 1_500,
+  ) {
+    this.restoreAutomaticReveal();
+  }
+
+
+  private isAnsweredCloseReason(reason: string | null): boolean {
+    return (
+      reason === "ALL_TEAMS_ANSWERED" ||
+      reason === "SOLO_ANSWERED"
+    );
+  }
+
+  private scheduleAutomaticReveal(
+    roundId: number,
+    position: number,
+    delayMs = this.autoRevealDelayMs,
+  ): void {
+    if (this.autoRevealTimer) {
+      clearTimeout(this.autoRevealTimer);
+    }
+
+    this.autoRevealTimer = setTimeout(() => {
+      const current = this.stateRow();
+
+      if (
+        current.phase !== "QUESTION_CLOSED" ||
+        current.roundId !== roundId ||
+        current.questionPosition !== position ||
+        !this.isAnsweredCloseReason(current.closeReason)
+      ) {
+        return;
+      }
+
+      this.revealQuestion();
+    }, Math.max(0, delayMs));
+
+    this.autoRevealTimer.unref?.();
+  }
+
+  private restoreAutomaticReveal(): void {
+    const state = this.stateRow();
+
+    if (
+      state.phase !== "QUESTION_CLOSED" ||
+      state.roundId === null ||
+      state.questionPosition === null ||
+      state.questionClosedAtEpochMs === null ||
+      !this.isAnsweredCloseReason(state.closeReason)
+    ) {
+      return;
+    }
+
+    const elapsed = Date.now() - state.questionClosedAtEpochMs;
+    this.scheduleAutomaticReveal(
+      state.roundId,
+      state.questionPosition,
+      Math.max(0, this.autoRevealDelayMs - elapsed),
+    );
+  }
 
   private sendShowControl(
     address: string,
@@ -305,6 +365,21 @@ export class LiveSessionManager {
       submissionRows.map((submission) => submission.station),
     );
 
+    const roundCounts = this.db.prepare(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
+      FROM qualification_rounds
+    `).get() as {
+      total: number;
+      pending: number | null;
+      completed: number | null;
+    };
+
+    const pendingRoundCount = roundCounts.pending ?? 0;
+    const completedRoundCount = roundCounts.completed ?? 0;
+
     return {
       phase: state.phase,
       serverNowEpochMs: Date.now(),
@@ -320,6 +395,10 @@ export class LiveSessionManager {
           : state.questionStartedAtEpochMs + QUESTION_DURATION_MS,
       questionClosedAtEpochMs: state.questionClosedAtEpochMs,
       closeReason: state.closeReason,
+      hasPendingRound: pendingRoundCount > 0,
+      qualificationComplete:
+        roundCounts.total > 0 &&
+        completedRoundCount === roundCounts.total,
       stationReadiness: {
         teamARequired: round !== null,
         teamAConnected: this.isStationConnected("team-a"),
@@ -418,12 +497,15 @@ export class LiveSessionManager {
 
     if (targetRoundId === null) {
       const selected = this.db.prepare(`
-        SELECT selected_round_id AS selectedRoundId
-        FROM competition_state
-        WHERE id = 1
-      `).get() as { selectedRoundId: number | null };
+        SELECT r.id
+        FROM competition_state cs
+        JOIN qualification_rounds r
+          ON r.id = cs.selected_round_id
+        WHERE cs.id = 1
+          AND r.status = 'PENDING'
+      `).get() as { id: number } | undefined;
 
-      targetRoundId = selected.selectedRoundId;
+      targetRoundId = selected?.id ?? null;
     }
 
     if (targetRoundId === null) {
@@ -439,7 +521,7 @@ export class LiveSessionManager {
     }
 
     if (targetRoundId === null) {
-      throw new Error("NO_PENDING_ROUND");
+      throw new Error("QUALIFICATION_COMPLETE");
     }
 
     const round = this.roundRow(targetRoundId);
@@ -764,13 +846,15 @@ export class LiveSessionManager {
       );
     }
 
-    if (
-      reason === "ALL_TEAMS_ANSWERED" ||
-      reason === "SOLO_ANSWERED"
-    ) {
+    if (this.isAnsweredCloseReason(reason)) {
       this.sendShowControl(
         "/uniquiz/question/answered",
         [roundOrder, state.questionPosition, reason],
+      );
+
+      this.scheduleAutomaticReveal(
+        state.roundId,
+        state.questionPosition,
       );
     }
 
@@ -779,6 +863,11 @@ export class LiveSessionManager {
 
   revealQuestion(): LiveSnapshot {
     const state = this.stateRow();
+
+    if (this.autoRevealTimer) {
+      clearTimeout(this.autoRevealTimer);
+      this.autoRevealTimer = null;
+    }
 
     if (
       state.phase !== "QUESTION_CLOSED" ||
@@ -1068,11 +1157,22 @@ export class LiveSessionManager {
       throw new Error("ROUND_NOT_READY_TO_COMPLETE");
     }
 
-    this.db.prepare(`
-      UPDATE qualification_rounds
-      SET status = 'COMPLETED'
-      WHERE id = ?
-    `).run(state.roundId);
+    const complete = this.db.transaction(() => {
+      this.db.prepare(`
+        UPDATE qualification_rounds
+        SET status = 'COMPLETED'
+        WHERE id = ?
+      `).run(state.roundId);
+
+      this.db.prepare(`
+        UPDATE competition_state
+        SET selected_round_id = NULL
+        WHERE id = 1
+          AND selected_round_id = ?
+      `).run(state.roundId);
+    });
+
+    complete();
 
     this.updateState({
       phase: "ROUND_COMPLETE",
@@ -1124,10 +1224,15 @@ export function registerLiveSessionRoutes(
     try {
       return manager.prepareRound(body.data.roundId);
     } catch (error) {
+      const code =
+        error instanceof Error ? error.message : "LIVE_ERROR";
+
       return conflict(
         reply,
-        error instanceof Error ? error.message : "LIVE_ERROR",
-        "Unable to prepare the selected round.",
+        code,
+        code === "QUALIFICATION_COMPLETE"
+          ? "All qualification rounds are completed."
+          : "Unable to prepare the selected round.",
       );
     }
   });
