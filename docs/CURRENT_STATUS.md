@@ -32,9 +32,9 @@ Run #36555351727 — PASS
 - Normal operator flow moves directly from Reveal to the next 3-2-1 countdown without exposing a separate QUESTION_READY audience page.
 - Qualification ranking includes cumulative response time per college.
 - A revealed unanswered question counts as the full 25-second window in cumulative response time.
-- Cumulative response time is informational only; tied ranks remain tied on points.
+- Ranking order is points descending, then cumulative response time ascending; lower total time wins a point tie.
 - Official A4 results statement implemented at `/report`.
-- After qualification completion, Operator shows `تصدير بيان النتائج PDF`; it opens `/report?print=1`, waits for logos, then opens browser Print / Save as PDF.
+- After qualification completion, Operator shows `تصدير بيان النتائج PDF`; `/report?print=1` waits for logos, decoded images, web fonts and completed browser paint before opening Print / Save as PDF, including repeated exports.
 - Official report includes both logos, competition identity, patronage/supervision, issue date/time, top three, full ranking, points, cumulative answer time and counted questions.
 - Live-session timer cleanup added for application shutdown and tests.
 - Active documentation synchronized to the 25-second scoring rule and direct next-question flow.
