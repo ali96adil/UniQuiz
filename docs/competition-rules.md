@@ -22,27 +22,20 @@
 - Category ordering may be shuffled while preserving the 2-per-category rule.
 
 ## Timing and scoring
-- Each question has a 45-second answer window.
-- Correct answers submitted in 5 seconds or less earn 10 points.
-- Correct answers submitted after 5 seconds decrease continuously to 1 point at 45 seconds.
+- Each question has a 30-second answer window.
+- Correct answers while the displayed timer shows 30 through 25 earn 25 points.
+- After that, the awarded whole-number score follows the displayed remaining second: 24 → 24 points, …, 1 → 1 point.
+- At 30,000 ms / timer 0, the answer window has expired and the score is 0.
 - Wrong answers earn 0 points.
 - Unanswered questions earn 0 points.
+- No fractional points are awarded.
 
-For a correct answer with response time t in seconds:
-
-```
-if t <= 5:
-  score = 10
-else if t <= 45:
-  score = 10 - ((t - 5) * 9 / 40)
-else:
-  score = 0
-```
-
-The authoritative response time is measured by the server using a monotonic clock.
+The authoritative response time is measured by the server using a monotonic clock at millisecond precision.
 
 ## Reveal and transparency
-After each question is closed, the audience display reveals for each active college:
+When all required stations have answered, UniQuiz closes the question immediately, emits the answered OSC cue, waits 1.5 seconds, and reveals automatically. Timeout closure retains the explicit operator Reveal action.
+
+After Reveal, the audience display shows for each active college:
 - submitted answer;
 - correct or wrong state;
 - response time;
