@@ -141,6 +141,10 @@ export function registerQuestionBankRoutes(
   app: FastifyInstance,
   db: AppDatabase,
   io: SocketIOServer,
+  onQuestionReplaced?: (
+    roundId: number,
+    position: number,
+  ) => void,
 ) {
   const publish = () => {
     const summary = getQuestionAllocationSummary(db);
@@ -527,6 +531,11 @@ export function registerQuestionBankRoutes(
     });
 
     replace();
+
+    onQuestionReplaced?.(
+      body.data.roundId,
+      body.data.position,
+    );
 
     return {
       ok: true,

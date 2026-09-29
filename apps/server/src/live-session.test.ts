@@ -527,3 +527,65 @@ test("restart during active question fail-closes and requires void replacement",
   void app.close();
   db.close();
 });
+
+
+test("replacement resets the current slot to question ready", () => {
+  const db = seedLiveRound();
+  db.prepare(`
+    UPDATE qualification_rounds
+    SET status = 'ACTIVE'
+    WHERE id = 1
+  `).run();
+
+  db.prepare(`
+    UPDATE live_state
+    SET
+      phase = 'QUESTION_CLOSED',
+      round_id = 1,
+      question_position = 1,
+      stations_confirmed = 1,
+      countdown_started_at_epoch_ms = NULL,
+      question_started_at_epoch_ms = ?,
+      question_closed_at_epoch_ms = ?,
+      close_reason = 'SERVER_RESTART_RECOVERY',
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `).run(Date.now() - 1000, Date.now());
+
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    3000,
+    30_000,
+  );
+
+  assert.equal(
+    manager.getSnapshot().closeReason,
+    "SERVER_RESTART_RECOVERY",
+  );
+
+  const reset = manager.onQuestionReplaced(1, 1);
+  assert.equal(reset?.phase, "QUESTION_READY");
+  assert.equal(reset?.question?.position, 1);
+  assert.equal(reset?.closeReason, null);
+  assert.equal(reset?.questionStartedAtEpochMs, null);
+
+  const audit = db.prepare(`
+    SELECT event_type AS eventType
+    FROM audit_events
+    WHERE event_type = 'QUESTION_REPLACEMENT_READY'
+    ORDER BY id DESC
+    LIMIT 1
+  `).get() as { eventType: string };
+
+  assert.equal(
+    audit.eventType,
+    "QUESTION_REPLACEMENT_READY",
+  );
+
+  io.close();
+  void app.close();
+  db.close();
+});

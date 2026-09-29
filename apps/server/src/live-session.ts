@@ -513,6 +513,13 @@ export class LiveSessionManager {
             WHERE a.event_type = 'QUESTION_REVEALED'
               AND a.round_id = s.round_id
               AND a.position = s.question_position
+              AND a.id > COALESCE((
+                SELECT MAX(v.id)
+                FROM audit_events v
+                WHERE v.event_type = 'QUESTION_VOID_REPLACED'
+                  AND v.round_id = s.round_id
+                  AND v.position = s.question_position
+              ), 0)
           )
         GROUP BY s.station
       `).all(state.roundId) as Array<{
@@ -564,6 +571,62 @@ export class LiveSessionManager {
       revealResults,
       roundTotals,
     };
+  }
+
+  onQuestionReplaced(
+    roundId: number,
+    position: number,
+  ): LiveSnapshot | null {
+    const state = this.stateRow();
+
+    if (
+      state.roundId !== roundId ||
+      state.questionPosition !== position
+    ) {
+      return null;
+    }
+
+    if (
+      state.phase === "QUESTION_COUNTDOWN" ||
+      state.phase === "QUESTION_ACTIVE"
+    ) {
+      throw new Error("QUESTION_STILL_LIVE");
+    }
+
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+    this.clearCountdownCueTimers();
+
+    if (this.questionTimer) {
+      clearTimeout(this.questionTimer);
+      this.questionTimer = null;
+    }
+
+    if (this.autoRevealTimer) {
+      clearTimeout(this.autoRevealTimer);
+      this.autoRevealTimer = null;
+    }
+
+    this.questionClock.clear();
+
+    this.updateState({
+      phase: "QUESTION_READY",
+      countdownStartedAtEpochMs: null,
+      questionStartedAtEpochMs: null,
+      questionClosedAtEpochMs: null,
+      closeReason: null,
+    });
+
+    appendAuditEvent(this.db, {
+      eventType: "QUESTION_REPLACEMENT_READY",
+      roundId,
+      position,
+      reason: "VOID_REPLACEMENT",
+    });
+
+    return this.publish();
   }
 
   resetForNewCompetition(): LiveSnapshot {
@@ -1079,9 +1142,15 @@ export class LiveSessionManager {
       phase: "QUESTION_REVEAL",
     });
 
+    const revealedQuestion = this.questionRow(
+      state.roundId,
+      state.questionPosition,
+    );
+
     appendAuditEvent(this.db, {
       eventType: "QUESTION_REVEALED",
       roundId: state.roundId,
+      questionId: revealedQuestion?.questionId,
       position: state.questionPosition,
     });
 

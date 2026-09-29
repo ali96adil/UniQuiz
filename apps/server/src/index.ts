@@ -113,7 +113,6 @@ app.get("/api/presence", async () => presenceSnapshot());
 
 registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
-registerQuestionBankRoutes(app, database, io);
 registerStationAuthRoutes(app, database);
 registerAudienceSettingsRoutes(app, database, io);
 
@@ -140,6 +139,15 @@ const liveSession = registerLiveSessionRoutes(
     [...roles.values()].some(
       (connectedRole) => connectedRole === role,
     ),
+);
+
+registerQuestionBankRoutes(
+  app,
+  database,
+  io,
+  (roundId, position) => {
+    liveSession.onQuestionReplaced(roundId, position);
+  },
 );
 
 registerResetAllRoute(
