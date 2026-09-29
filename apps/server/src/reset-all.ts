@@ -40,6 +40,14 @@ export function resetAllCompetitionData(
     `).run();
 
     db.prepare(`
+      UPDATE audience_presentation
+      SET
+        active = 0,
+        updated_at = ?
+      WHERE id = 1
+    `).run(new Date().toISOString());
+
+    db.prepare(`
       UPDATE live_state
       SET
         phase = 'IDLE',

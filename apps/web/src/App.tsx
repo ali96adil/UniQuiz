@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
+  AudiencePresentationSnapshot,
   BulkImportPreview,
   ClientRole,
   CompetitionSetupSnapshot,
@@ -2250,6 +2251,158 @@ interface StationCredentialResponse {
 }
 
 
+
+function AudienceAnnouncementSurface({
+  presentation,
+}: {
+  presentation: AudiencePresentationSnapshot;
+}) {
+  return (
+    <section className="audience-stage audience-announcement">
+      <div className="audience-kicker">UniQuiz</div>
+      <h2 className="audience-title">
+        {presentation.title}
+      </h2>
+      {presentation.message ? (
+        <p className="audience-copy">
+          {presentation.message}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function PresentationControlPanel() {
+  const [customTitle, setCustomTitle] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const show = async (
+    kind:
+      | "BREAK"
+      | "PLEASE_WAIT"
+      | "NEXT_ROUND"
+      | "PREPARE_TEAMS"
+      | "FINAL_RESULTS_SOON"
+      | "CUSTOM",
+    title?: string,
+    text?: string,
+  ) => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/presentation/show", {
+        method: "POST",
+        body: JSON.stringify({
+          kind,
+          title,
+          message: text,
+        }),
+      });
+      setMessage("تم عرض المشهد على شاشة الجمهور.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر عرض المشهد",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clear = async () => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await apiRequest("/api/presentation/clear", {
+        method: "POST",
+        body: "{}",
+      });
+      setMessage("تم الرجوع إلى المشهد الحي.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إغلاق المشهد",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel presentation-control-panel">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Audience Presentation</p>
+          <h2>مشاهد شاشة الجمهور</h2>
+        </div>
+      </div>
+
+      <div className="presentation-presets">
+        <button disabled={busy} onClick={() => void show("BREAK")}>
+          استراحة قصيرة
+        </button>
+        <button disabled={busy} onClick={() => void show("PLEASE_WAIT")}>
+          يرجى الانتظار
+        </button>
+        <button disabled={busy} onClick={() => void show("PREPARE_TEAMS")}>
+          استعداد الفرق
+        </button>
+        <button disabled={busy} onClick={() => void show("NEXT_ROUND")}>
+          الجولة القادمة
+        </button>
+        <button disabled={busy} onClick={() => void show("FINAL_RESULTS_SOON")}>
+          النتائج قريبًا
+        </button>
+      </div>
+
+      <div className="presentation-custom">
+        <input
+          value={customTitle}
+          placeholder="عنوان رسالة مخصصة"
+          onChange={(event) => setCustomTitle(event.target.value)}
+        />
+        <input
+          value={customMessage}
+          placeholder="نص الرسالة"
+          onChange={(event) => setCustomMessage(event.target.value)}
+        />
+        <button
+          disabled={busy || customTitle.trim().length === 0}
+          onClick={() =>
+            void show(
+              "CUSTOM",
+              customTitle.trim(),
+              customMessage.trim(),
+            )
+          }
+        >
+          عرض الرسالة المخصصة
+        </button>
+      </div>
+
+      <div className="actions">
+        <button
+          className="danger-outline"
+          disabled={busy}
+          onClick={() => void clear()}
+        >
+          إغلاق المشهد والرجوع للبث الحي
+        </button>
+      </div>
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
 function OperationsPreflightPanel() {
   const [snapshot, setSnapshot] =
     useState<OperationsPreflightSnapshot | null>(null);
@@ -3168,6 +3321,8 @@ export function App() {
     useState<QualificationRankingSnapshot | null>(null);
   const [audienceSettings, setAudienceSettings] =
     useState<AudienceDisplaySettings | null>(null);
+  const [audiencePresentation, setAudiencePresentation] =
+    useState<AudiencePresentationSnapshot | null>(null);
   const [liveSocket, setLiveSocket] =
     useState<ReturnType<typeof io> | null>(null);
   const [effectiveRole, setEffectiveRole] =
@@ -3254,6 +3409,12 @@ export function App() {
       "audience:settings",
       (settings: AudienceDisplaySettings) => {
         setAudienceSettings(settings);
+      },
+    );
+    socket.on(
+      "audience:presentation",
+      (presentation: AudiencePresentationSnapshot) => {
+        setAudiencePresentation(presentation);
       },
     );
     socket.on(
@@ -3371,7 +3532,15 @@ export function App() {
       competition &&
       audienceSettings ? (
         <AudienceBroadcastFrame settings={audienceSettings}>
-          {liveSnapshot &&
+          {audiencePresentation?.active ? (
+            <AudienceSceneTransition
+              sceneKey={`presentation:${audiencePresentation.updatedAt}`}
+            >
+              <AudienceAnnouncementSurface
+                presentation={audiencePresentation}
+              />
+            </AudienceSceneTransition>
+          ) : liveSnapshot &&
           liveSnapshot.phase !== "IDLE" ? (
             <AudienceSceneTransition
               sceneKey={[
@@ -3415,6 +3584,7 @@ export function App() {
 
       {surface === "operator" ? (
         <>
+          <PresentationControlPanel />
           <OperationsPreflightPanel />
           <OperatorLivePanel snapshot={liveSnapshot} />
           <StationAccessPanel />

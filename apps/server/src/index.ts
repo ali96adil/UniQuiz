@@ -20,6 +20,10 @@ import {
   registerAudienceSettingsRoutes,
 } from "./audience-settings.js";
 import { registerResetAllRoute } from "./reset-all.js";
+import {
+  getAudiencePresentation,
+  registerAudiencePresentationRoutes,
+} from "./presentation.js";
 import { OscOutput } from "./osc-output.js";
 import { registerOperationsRoutes } from "./operations.js";
 import { registerResultsExportRoutes } from "./results-export.js";
@@ -117,6 +121,7 @@ registerCompetitionRoutes(app, database, io);
 registerImportRoutes(app, database, io);
 registerStationAuthRoutes(app, database);
 registerAudienceSettingsRoutes(app, database, io);
+registerAudiencePresentationRoutes(app, database, io);
 
 const oscOutput = new OscOutput(
   config.osc,
@@ -216,6 +221,11 @@ io.on("connection", (socket) => {
   socket.emit(
     "audience:settings",
     getAudienceDisplaySettings(database),
+  );
+
+  socket.emit(
+    "audience:presentation",
+    getAudiencePresentation(database),
   );
 
   const teamState = liveSession.getTeamSubmissionState(role);

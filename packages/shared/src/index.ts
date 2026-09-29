@@ -357,3 +357,20 @@ export interface OperationsPreflightSnapshot {
 
 
 export type RuntimeMode = "official" | "rehearsal";
+
+
+export type AudiencePresentationKind =
+  | "BREAK"
+  | "PLEASE_WAIT"
+  | "NEXT_ROUND"
+  | "PREPARE_TEAMS"
+  | "FINAL_RESULTS_SOON"
+  | "CUSTOM";
+
+export interface AudiencePresentationSnapshot {
+  active: boolean;
+  kind: AudiencePresentationKind;
+  title: string;
+  message: string;
+  updatedAt: string;
+}
