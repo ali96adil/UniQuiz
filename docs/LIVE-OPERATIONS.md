@@ -72,6 +72,24 @@ The operator should receive a clear READY / NOT READY summary.
 ## Rehearsal Mode
 A rehearsal mode uses non-official data/results and cannot contaminate official competition rankings.
 
+### Isolated rehearsal database
+Run rehearsal with:
+
+```bash
+pnpm dev:rehearsal
+```
+
+Rehearsal defaults to `data/uniquiz-rehearsal.db`, while official mode defaults to `data/uniquiz.db`. The two modes therefore cannot contaminate each other's rankings, submissions, draw, questions or audit history unless an operator explicitly overrides `UNIQUIZ_DB_PATH`.
+
+Every connected browser receives the authoritative runtime mode from the server and shows a persistent **REHEARSAL · تدريب** banner when rehearsal mode is active.
+
+Backup/list/restore commands also have rehearsal variants:
+```bash
+pnpm ops:backup:rehearsal
+pnpm ops:backups:rehearsal
+pnpm ops:restore:rehearsal -- /path/to/backup.db
+```
+
 It should exercise:
 - station connectivity;
 - countdown;
@@ -94,7 +112,17 @@ The operator can put the audience display into manual presentation scenes such a
 These presentation states must not mutate competition scoring/state.
 
 ## Hotkeys
-Operator hotkeys may be added for speed, but dangerous actions require confirmation or deliberately safe key combinations.
+Operator hotkeys are available but remain **OFF by default for every browser session**.
+
+### Implemented operator hotkeys
+- `Alt+N` — context-aware prepare/next action.
+- `Alt+S` — start round or question; requires confirmation.
+- `Alt+R` — Reveal when manual Reveal is allowed; requires confirmation.
+- `Alt+H` — Emergency Hold; still requires a reason and confirmation.
+- `Alt+V` — VOID + same-category replacement; still requires a reason and confirmation.
+- `Alt+C` — complete the round after question 10 Reveal; requires confirmation.
+
+Hotkeys do not fire while focus is in an input, textarea, select, or editable field. They are intentionally session-only and do not persist as enabled after reopening the page.
 
 ## OSC Reliability
 OSC is show-control output only. OSC failure never changes official state.

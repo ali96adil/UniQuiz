@@ -54,6 +54,12 @@ test("full competition reset clears user data and preserves station credentials"
         round_id = 1,
         stations_confirmed = 1
     WHERE id = 1;
+
+    UPDATE operations_state
+    SET
+      osc_test_sent_at = '2026-09-29T00:00:00.000Z',
+      osc_test_confirmed_at = '2026-09-29T00:00:01.000Z'
+    WHERE id = 1;
   `);
 
   const credentialsBefore = db.prepare(`
@@ -116,6 +122,20 @@ test("full competition reset clears user data and preserves station credentials"
   assert.equal(live.phase, "IDLE");
   assert.equal(live.roundId, null);
   assert.equal(live.stationsConfirmed, 0);
+
+  const operations = db.prepare(`
+    SELECT
+      osc_test_sent_at AS sentAt,
+      osc_test_confirmed_at AS confirmedAt
+    FROM operations_state
+    WHERE id = 1
+  `).get() as {
+    sentAt: string | null;
+    confirmedAt: string | null;
+  };
+
+  assert.equal(operations.sentAt, null);
+  assert.equal(operations.confirmedAt, null);
 
   const credentialsAfter = db.prepare(`
     SELECT station, access_token AS token

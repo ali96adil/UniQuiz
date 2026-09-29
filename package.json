@@ -11,6 +11,15 @@
     "dev": "pnpm --filter @uniquiz/shared build && pnpm --parallel --filter @uniquiz/server --filter @uniquiz/web dev",
     "build": "pnpm -r build",
     "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "ops:backup": "pnpm --filter @uniquiz/server ops:backup",
+    "ops:backups": "pnpm --filter @uniquiz/server ops:backups",
+    "ops:restore": "pnpm --filter @uniquiz/server ops:restore",
+    "dev:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm dev",
+    "ops:backup:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:backup",
+    "ops:backups:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:backups",
+    "ops:restore:rehearsal": "UNIQUIZ_MODE=rehearsal pnpm ops:restore",
+    "event:start": "pnpm ops:backup && pnpm dev",
+    "event:start:rehearsal": "pnpm ops:backup:rehearsal && pnpm dev:rehearsal"
   }
 }

@@ -324,3 +324,80 @@ export interface LiveRoundTotals {
   teamA: number;
   teamB: number | null;
 }
+
+export interface OperationsBackupRecord {
+  fileName: string;
+  createdAt: string;
+  sizeBytes: number;
+  sha256: string;
+  integrity: "ok";
+  purpose: "manual" | "pre-restore" | "pre-reset";
+}
+
+export interface OperationsPreflightCheck {
+  key:
+    | "server"
+    | "database"
+    | "draw"
+    | "question_allocation"
+    | "display"
+    | "team_a"
+    | "team_b"
+    | "osc"
+    | "backup";
+  label: string;
+  required: boolean;
+  ready: boolean;
+  detail: string;
+}
+
+export interface OperationsPreflightSnapshot {
+  generatedAt: string;
+  ready: boolean;
+  checks: OperationsPreflightCheck[];
+  latestBackup: OperationsBackupRecord | null;
+}
+
+
+export type RuntimeMode = "official" | "rehearsal";
+
+
+export type AudiencePresentationKind =
+  | "BREAK"
+  | "PLEASE_WAIT"
+  | "NEXT_ROUND"
+  | "PREPARE_TEAMS"
+  | "FINAL_RESULTS_SOON"
+  | "CUSTOM";
+
+export interface AudiencePresentationSnapshot {
+  active: boolean;
+  kind: AudiencePresentationKind;
+  title: string;
+  message: string;
+  updatedAt: string;
+}
+
+
+export interface OperationsDiagnosticsSnapshot {
+  generatedAt: string;
+  mode: RuntimeMode;
+  hostname: string;
+  platform: string;
+  nodeVersion: string;
+  serverPort: number;
+  webPort: number;
+  databaseFileName: string;
+  osc: {
+    enabled: boolean;
+    host: string;
+    port: number;
+  };
+  interfaces: Array<{
+    name: string;
+    address: string;
+    webBaseUrl: string;
+    serverHealthUrl: string;
+  }>;
+  presence: PresenceSnapshot;
+}
