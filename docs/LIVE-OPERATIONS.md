@@ -115,7 +115,7 @@ These presentation states must not mutate competition scoring/state.
 Operator hotkeys are available but remain **OFF by default for every browser session**.
 
 ### Implemented operator hotkeys
-- `Alt+N` — context-aware prepare/next action.
+- `Alt+N` — context-aware next action; during an active/intermission/revealed round it starts the next question directly with the 3-2-1 countdown.
 - `Alt+S` — start round or question; requires confirmation.
 - `Alt+R` — Reveal when manual Reveal is allowed; requires confirmation.
 - `Alt+H` — Emergency Hold; still requires a reason and confirmation.
