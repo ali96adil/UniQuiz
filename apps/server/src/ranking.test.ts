@@ -144,8 +144,8 @@ test("equal scores are ordered by lower cumulative response time", () => {
       score_micros
     )
     VALUES
-      (1, 1, 'A', 1, 'A', 51774, 51774, 1, 144000000),
-      (1, 1, 'B', 1, 'A', 56505, 56505, 1, 144000000);
+      (1, 1, 'A', 1, 'A', 1000, 1000, 1, 25000000),
+      (1, 1, 'B', 1, 'A', 2000, 2000, 1, 25000000);
 
     INSERT INTO audit_events (
       event_type,
@@ -160,13 +160,13 @@ test("equal scores are ordered by lower cumulative response time", () => {
 
   assert.equal(snapshot.entries[0]?.college.name, "College A");
   assert.equal(snapshot.entries[0]?.rank, 1);
-  assert.equal(snapshot.entries[0]?.scorePoints, 144);
-  assert.equal(snapshot.entries[0]?.totalResponseTimeMs, 51774);
+  assert.equal(snapshot.entries[0]?.scorePoints, 25);
+  assert.equal(snapshot.entries[0]?.totalResponseTimeMs, 1000);
 
   assert.equal(snapshot.entries[1]?.college.name, "College B");
   assert.equal(snapshot.entries[1]?.rank, 2);
-  assert.equal(snapshot.entries[1]?.scorePoints, 144);
-  assert.equal(snapshot.entries[1]?.totalResponseTimeMs, 56505);
+  assert.equal(snapshot.entries[1]?.scorePoints, 25);
+  assert.equal(snapshot.entries[1]?.totalResponseTimeMs, 2000);
 
   db.close();
 });
