@@ -457,6 +457,86 @@ function BulkImportPanel({
 }
 
 
+
+function ResetAllCompetitionPanel() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const resetAll = async () => {
+    if (
+      !window.confirm(
+        "سيتم حذف جميع بيانات المسابقة الحالية: الكليات، المشاركون، القرعة، المحاور، الأسئلة، التوزيع، النتائج والترتيب. هل تريد المتابعة؟",
+      )
+    ) {
+      return;
+    }
+
+    const typed = window.prompt(
+      'للتأكيد النهائي اكتب RESET ثم اضغط موافق.',
+      "",
+    );
+
+    if (typed !== "RESET") {
+      setError("تم إلغاء المسح لأن كلمة التأكيد غير صحيحة.");
+      setMessage(null);
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/setup/reset-all", {
+        method: "POST",
+        body: JSON.stringify({
+          confirm: "RESET_ALL_COMPETITION_DATA",
+        }),
+      });
+
+      setMessage(
+        "تم مسح جميع بيانات المسابقة. النظام جاهز لإعداد مسابقة جديدة.",
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر مسح بيانات المسابقة",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel danger-zone">
+      <div className="section-heading">
+        <div>
+          <p className="step-label">Danger Zone</p>
+          <h2>بدء مسابقة من الصفر</h2>
+        </div>
+      </div>
+
+      <p className="muted">
+        يمسح الكليات والمشاركين والقرعة والمحاور والأسئلة وتوزيع الجولات
+        والإجابات والنتائج والترتيب. لا يمس توكنات Station A/B ولا إعدادات
+        تشغيل UniQuiz.
+      </p>
+
+      <button
+        className="danger-button"
+        disabled={busy}
+        onClick={() => void resetAll()}
+      >
+        مسح كل بيانات المسابقة
+      </button>
+
+      <StatusMessage error={error} message={message} />
+    </section>
+  );
+}
+
 function QuestionAllocationPanel({
   allocation,
 }: {
@@ -2456,6 +2536,7 @@ export function App() {
           <BulkImportPanel questionBank={questionBank} />
           <QuestionAllocationPanel allocation={questionAllocation} />
           <SetupSurface snapshot={competition} />
+          <ResetAllCompetitionPanel />
         </>
       ) : null}
 

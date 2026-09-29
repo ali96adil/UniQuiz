@@ -462,6 +462,44 @@ export class LiveSessionManager {
     };
   }
 
+  resetForNewCompetition(): LiveSnapshot {
+    if (this.countdownTimer) {
+      clearTimeout(this.countdownTimer);
+      this.countdownTimer = null;
+    }
+
+    this.clearCountdownCueTimers();
+
+    if (this.questionTimer) {
+      clearTimeout(this.questionTimer);
+      this.questionTimer = null;
+    }
+
+    if (this.autoRevealTimer) {
+      clearTimeout(this.autoRevealTimer);
+      this.autoRevealTimer = null;
+    }
+
+    this.questionClock.clear();
+
+    this.db.prepare(`
+      UPDATE live_state
+      SET
+        phase = 'IDLE',
+        round_id = NULL,
+        question_position = NULL,
+        stations_confirmed = 0,
+        countdown_started_at_epoch_ms = NULL,
+        question_started_at_epoch_ms = NULL,
+        question_closed_at_epoch_ms = NULL,
+        close_reason = NULL,
+        updated_at = ?
+      WHERE id = 1
+    `).run(new Date().toISOString());
+
+    return this.publish();
+  }
+
   publish(): LiveSnapshot {
     const snapshot = this.getSnapshot();
     this.io.emit("live:snapshot", snapshot);

@@ -15,6 +15,7 @@ import {
 } from "./question-bank.js";
 import { registerLiveSessionRoutes } from "./live-session.js";
 import { getQualificationRanking } from "./ranking.js";
+import { registerResetAllRoute } from "./reset-all.js";
 import { OscOutput } from "./osc-output.js";
 import {
   ensureStationCredentials,
@@ -133,6 +134,13 @@ const liveSession = registerLiveSessionRoutes(
     [...roles.values()].some(
       (connectedRole) => connectedRole === role,
     ),
+);
+
+registerResetAllRoute(
+  app,
+  database,
+  io,
+  liveSession,
 );
 
 io.on("connection", (socket) => {

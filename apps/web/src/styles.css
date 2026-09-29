@@ -1303,3 +1303,24 @@ h2 {
 .question-bank-summary small {
   color: #64748b;
 }
+
+.danger-zone {
+  border-color: rgba(239, 68, 68, 0.35);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(127, 29, 29, 0.08),
+      rgba(8, 15, 31, 0.94)
+    );
+}
+
+.danger-button {
+  border: 1px solid rgba(239, 68, 68, 0.72);
+  background: rgba(127, 29, 29, 0.26);
+  color: #fecaca;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.34);
+  border-color: rgba(248, 113, 113, 0.9);
+}

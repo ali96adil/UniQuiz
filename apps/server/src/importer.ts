@@ -61,6 +61,10 @@ const applySchema = z.object({
 const previews = new Map<string, StagedImport>();
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
 
+export function clearImportPreviews(): void {
+  previews.clear();
+}
+
 function cleanupExpiredPreviews() {
   const cutoff = Date.now() - PREVIEW_TTL_MS;
   for (const [id, preview] of previews.entries()) {
