@@ -100,7 +100,7 @@ test("ranking includes only revealed scores and leaves not-started colleges unra
   db.close();
 });
 
-test("equal revealed scores share the same rank", () => {
+test("equal scores are ordered by lower cumulative response time", () => {
   const db = openDatabase(":memory:");
 
   db.exec(`
@@ -144,8 +144,8 @@ test("equal revealed scores share the same rank", () => {
       score_micros
     )
     VALUES
-      (1, 1, 'A', 1, 'A', 1000, 1000, 1, 25000000),
-      (1, 1, 'B', 1, 'A', 1000, 1000, 1, 25000000);
+      (1, 1, 'A', 1, 'A', 51774, 51774, 1, 144000000),
+      (1, 1, 'B', 1, 'A', 56505, 56505, 1, 144000000);
 
     INSERT INTO audit_events (
       event_type,
@@ -158,12 +158,15 @@ test("equal revealed scores share the same rank", () => {
 
   const snapshot = getQualificationRanking(db);
 
+  assert.equal(snapshot.entries[0]?.college.name, "College A");
   assert.equal(snapshot.entries[0]?.rank, 1);
-  assert.equal(snapshot.entries[1]?.rank, 1);
-  assert.equal(snapshot.entries[0]?.scorePoints, 25);
-  assert.equal(snapshot.entries[1]?.scorePoints, 25);
-  assert.equal(snapshot.entries[0]?.totalResponseTimeMs, 1000);
-  assert.equal(snapshot.entries[1]?.totalResponseTimeMs, 1000);
+  assert.equal(snapshot.entries[0]?.scorePoints, 144);
+  assert.equal(snapshot.entries[0]?.totalResponseTimeMs, 51774);
+
+  assert.equal(snapshot.entries[1]?.college.name, "College B");
+  assert.equal(snapshot.entries[1]?.rank, 2);
+  assert.equal(snapshot.entries[1]?.scorePoints, 144);
+  assert.equal(snapshot.entries[1]?.totalResponseTimeMs, 56505);
 
   db.close();
 });
