@@ -374,17 +374,21 @@ h2 {
 }
 
 .audience-kicker {
+  width: 100%;
   margin-bottom: 10px;
   color: #93c5fd;
   font-size: clamp(0.9rem, 1.4vw, 1.2rem);
   font-weight: 800;
   letter-spacing: 0.04em;
+  text-align: center;
 }
 
 .audience-title {
+  width: 100%;
   margin: 0;
   font-size: clamp(2.5rem, 6vw, 5.5rem);
   line-height: 1.05;
+  text-align: center;
 }
 
 .audience-copy {
@@ -1334,11 +1338,11 @@ h2 {
 
 .audience-brand-header {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) 96px;
-  gap: 20px;
+  grid-template-columns: 132px minmax(0, 1fr) 132px;
+  gap: 24px;
   align-items: center;
-  min-height: 116px;
-  padding: 14px 28px;
+  min-height: 158px;
+  padding: 14px 30px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.16);
   background: rgba(8, 15, 31, 0.98);
 }
@@ -1346,18 +1350,18 @@ h2 {
 .audience-brand-logo {
   display: grid;
   place-items: center;
-  min-height: 82px;
+  min-height: 118px;
 }
 
 .audience-brand-logo img {
-  width: 78px;
-  height: 78px;
+  width: 108px;
+  height: 108px;
   object-fit: contain;
 }
 
 .audience-brand-copy {
   display: grid;
-  gap: 3px;
+  gap: 5px;
   text-align: center;
 }
 
@@ -1365,9 +1369,20 @@ h2 {
   font-size: clamp(1.35rem, 2.4vw, 2.2rem);
 }
 
-.audience-brand-copy span {
+.audience-brand-copy > span {
   color: #cbd5e1;
   font-size: clamp(0.9rem, 1.5vw, 1.15rem);
+}
+
+.audience-patronage {
+  display: grid;
+  gap: 2px;
+  margin-top: 3px;
+  color: #cbd5e1;
+  font-size: clamp(0.72rem, 1vw, 0.95rem);
+  font-weight: 650;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .audience-brand-copy small {
@@ -1454,13 +1469,18 @@ h2 {
   }
 
   .audience-brand-header {
-    grid-template-columns: 64px minmax(0, 1fr) 64px;
-    padding-inline: 14px;
+    grid-template-columns: 72px minmax(0, 1fr) 72px;
+    gap: 10px;
+    padding-inline: 12px;
   }
 
   .audience-brand-logo img {
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
+  }
+
+  .audience-patronage {
+    font-size: 0.7rem;
   }
 }
 
