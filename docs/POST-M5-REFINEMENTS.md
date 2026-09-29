@@ -37,3 +37,6 @@ The PDF must be generated from authoritative persisted competition results, not 
 - Operator gets `تصدير بيان النتائج PDF` only after qualification completion.
 - `/report?print=1` waits for local logos, then opens the browser print dialog for A4 Save as PDF.
 - The report uses authoritative ranking/settings/live data and includes all colleges, points, cumulative response time, counted questions, top three, logos, patronage/supervision, and issue date/time.
+
+- Cumulative answer time now treats a revealed unanswered question as the full 25-second window, so the official time total cannot be artificially reduced by not answering.
+- README and competition/display/project documentation synchronized to the 25-second scoring rule and direct next-question flow.

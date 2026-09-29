@@ -167,3 +167,70 @@ test("equal revealed scores share the same rank", () => {
 
   db.close();
 });
+
+
+test("revealed unanswered question counts the full 25 seconds in cumulative time", () => {
+  const db = openDatabase(":memory:");
+
+  db.exec(`
+    INSERT INTO colleges (name, sort_order) VALUES
+      ('College A', 1),
+      ('College B', 2);
+
+    INSERT INTO participants (college_id) VALUES (1), (2);
+
+    INSERT INTO qualification_rounds (
+      round_order,
+      college_a_id,
+      college_b_id,
+      status
+    )
+    VALUES (1, 1, 2, 'COMPLETED');
+
+    INSERT INTO categories (category_key, name, sort_order)
+    VALUES ('general', 'General', 1);
+
+    INSERT INTO questions (
+      category_id,
+      prompt,
+      option_a,
+      option_b,
+      option_c,
+      option_d,
+      correct_option
+    )
+    VALUES (1, 'Q1', 'A', 'B', 'C', 'D', 'A');
+
+    INSERT INTO live_submissions (
+      round_id,
+      question_position,
+      station,
+      question_id,
+      selected_option,
+      submitted_at_epoch_ms,
+      response_time_ms,
+      is_correct,
+      score_micros
+    )
+    VALUES (1, 1, 'A', 1, 'A', 1200, 1200, 1, 24000000);
+
+    INSERT INTO audit_events (
+      event_type,
+      round_id,
+      position,
+      occurred_at
+    )
+    VALUES ('QUESTION_REVEALED', 1, 1, CURRENT_TIMESTAMP);
+  `);
+
+  const snapshot = getQualificationRanking(db);
+  const a = snapshot.entries.find((entry) => entry.college.id === 1);
+  const b = snapshot.entries.find((entry) => entry.college.id === 2);
+
+  assert.equal(a?.totalResponseTimeMs, 1200);
+  assert.equal(b?.totalResponseTimeMs, 25_000);
+  assert.equal(b?.scorePoints, 0);
+  assert.equal(b?.revealedQuestions, 1);
+
+  db.close();
+});

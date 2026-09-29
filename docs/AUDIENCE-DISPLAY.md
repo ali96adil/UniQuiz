@@ -98,16 +98,7 @@ Sidebar:
 - overall ranking or next-round information
 
 ### QUESTION_READY
-Operator has prepared the next question, but it is not visible to competitors/audience yet.
-
-Main Stage:
-- configurable ready message
-- question number
-- category
-- "استعدوا" style prompt
-
-Sidebar:
-- current ranking
+Internal transient state only. In the normal operator flow, pressing the next-question action prepares the question and immediately enters the 3-2-1 countdown, so the audience does not see a separate ready page.
 
 ### QUESTION_COUNTDOWN
 Three-second presentation countdown.
@@ -119,7 +110,7 @@ Main Stage:
 
 Behavior:
 - question text/options remain hidden
-- authoritative 30-second question timer has not started yet
+- authoritative 25-second question timer has not started yet
 - OSC prestart cues may be emitted
 
 ### QUESTION_ACTIVE
@@ -130,7 +121,7 @@ Main Stage:
 - category
 - question text
 - four answer options: A, B, C, D
-- authoritative countdown timer from 30 seconds
+- authoritative countdown timer from 25 seconds
 
 Team status:
 - waiting / answer received for each active team
@@ -167,15 +158,7 @@ Sidebar:
 - rank movement may be animated
 
 ### BETWEEN_QUESTIONS
-Hold state controlled by the operator.
-
-Main Stage:
-- previous result summary, next-question message, or custom announcement
-
-Sidebar:
-- current ranking
-
-No automatic transition to the next question.
+Not used in the normal qualification flow. The operator moves directly from the revealed result to the next 3-2-1 countdown. A deliberate Hold/Intermission remains available when needed.
 
 ### ROUND_COMPLETE
 Shown after question 10.

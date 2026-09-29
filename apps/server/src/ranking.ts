@@ -3,6 +3,7 @@ import type {
   QualificationRankingSnapshot,
 } from "@uniquiz/shared";
 import type { AppDatabase } from "./database.js";
+import { QUESTION_DURATION_MS } from "./question-clock.js";
 
 interface RankingRow {
   collegeId: number;
@@ -44,19 +45,28 @@ export function getQualificationRanking(
         WHERE a.event_type = 'QUESTION_REVEALED'
           AND a.round_id = r.id
       ) AS revealedQuestions,
-      COALESCE(SUM(
-        CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM audit_events a
-            WHERE a.event_type = 'QUESTION_REVEALED'
-              AND a.round_id = s.round_id
-              AND a.position = s.question_position
+      (
+        SELECT COALESCE(SUM(
+          COALESCE(
+            (
+              SELECT s2.response_time_ms
+              FROM live_submissions s2
+              WHERE s2.round_id = r.id
+                AND s2.question_position = a.position
+                AND (
+                  (r.college_a_id = c.id AND s2.station = 'A')
+                  OR
+                  (r.college_b_id = c.id AND s2.station = 'B')
+                )
+              LIMIT 1
+            ),
+            ${QUESTION_DURATION_MS}
           )
-          THEN s.response_time_ms
-          ELSE 0
-        END
-      ), 0) AS totalResponseTimeMs
+        ), 0)
+        FROM audit_events a
+        WHERE a.event_type = 'QUESTION_REVEALED'
+          AND a.round_id = r.id
+      ) AS totalResponseTimeMs
     FROM participants p
     JOIN colleges c ON c.id = p.college_id
     JOIN qualification_rounds r

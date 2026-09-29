@@ -12,8 +12,8 @@ Realtime university knowledge competition platform.
 - Every session uses 10 unique questions.
 - Each session contains 5 categories with 2 questions from each category.
 - All questions are treated as one common difficulty level.
-- Every question has a 45-second answer window.
-- A correct answer earns 10 points when submitted within the first 5 seconds, then decreases continuously to 1 point at 45 seconds.
+- Every question has a 25-second answer window.
+- A correct answer earns the displayed whole-number second remaining: 25 points at 25 seconds, decreasing by one point each second down to 1.
 - Wrong or unanswered answers earn 0 points.
 - The audience display reveals correctness, response time, and awarded points after each question.
 - The overall ranking updates after each reveal.

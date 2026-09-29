@@ -49,14 +49,13 @@ Deliverables:
 - exactly 2 questions per category
 - no repeated qualification question
 - session question-set lock
-- 30-second authoritative timer
+- 25-second authoritative timer
 - scoring formula
 - answer validation
 - audit records
 
 Scoring:
-- timer 30–25: 25 points
-- timer 24–1: points equal the displayed remaining second
+- timer 25–1: points equal the displayed remaining second
 - timer 0 / wrong / no answer: 0 points
 - whole-number scores only
 
