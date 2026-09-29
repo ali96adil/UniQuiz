@@ -1375,10 +1375,8 @@ function RoundCard({
 
       <div className="versus">
         <span>{round.collegeA.name}</span>
-        <b>{round.collegeB
-                ? settings.copy.versusLabel
-                : settings.copy.soloLabel}</b>
-        <span>{round.collegeB?.name ?? settings.copy.soloRoundText}</span>
+        <b>{round.collegeB ? "VS" : "SOLO"}</b>
+        <span>{round.collegeB?.name ?? "جولة فردية"}</span>
       </div>
 
       <button
@@ -1646,7 +1644,7 @@ function AudienceDrawSurface({
   if (!snapshot.participantsLocked) {
     return (
       <section className="audience-stage">
-        <div className="audience-kicker">مسابقة بنك المعلومات</div>
+        <div className="audience-kicker">{settings.eventTitle}</div>
         <h2 className="audience-title">{settings.copy.welcomeTitle}</h2>
         <p className="audience-copy">{settings.copy.waitingParticipantsText}</p>
       </section>
@@ -1899,7 +1897,7 @@ function AudienceLiveSurface({
   if (!round) {
     return (
       <section className="audience-stage">
-        <div className="audience-kicker">مسابقة بنك المعلومات</div>
+        <div className="audience-kicker">{settings.eventTitle}</div>
         <h2 className="audience-title">{settings.copy.waitingNextRoundText}</h2>
       </section>
     );
@@ -1935,7 +1933,9 @@ function AudienceLiveSurface({
         <h2 className="audience-title">
           {round.teamA.name}
           <span className="audience-vs">
-            {round.teamB ? " VS " : " — "}
+            {round.teamB
+              ? ` ${settings.copy.versusLabel} `
+              : " — "}
           </span>
           {round.teamB?.name ?? settings.copy.soloRoundText}
         </h2>
@@ -2012,8 +2012,8 @@ function AudienceLiveSurface({
               <strong>{round.teamA.name}</strong>
               <span>
                 {snapshot.answerStatus.teamAReceived
-                  ? settings.copy.answerReceivedText
-                  : settings.copy.waitingAnswerText}
+                  ? "تم استلام الإجابة"
+                  : "بانتظار الإجابة"}
               </span>
             </div>
             {round.teamB ? (
@@ -2198,7 +2198,9 @@ function AudienceLiveSurface({
 
   return (
     <section className="audience-stage">
-      <h2 className="audience-title">{phaseLabel(snapshot.phase)}</h2>
+      <h2 className="audience-title">
+        {settings.copy.waitingNextRoundText}
+      </h2>
     </section>
   );
 }
