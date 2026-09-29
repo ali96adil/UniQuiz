@@ -2694,6 +2694,249 @@ function StationAccessPanel() {
   );
 }
 
+
+function OperatorHotkeys({
+  snapshot,
+  busy,
+  run,
+  emergencyHold,
+  voidAndReplace,
+}: {
+  snapshot: LiveSnapshot;
+  busy: boolean;
+  run: (path: string, successMessage: string) => Promise<void>;
+  emergencyHold: () => Promise<void>;
+  voidAndReplace: () => Promise<void>;
+}) {
+  const [enabled, setEnabled] = useState(false);
+  const [lastAction, setLastAction] = useState<string | null>(null);
+
+  const confirmAndRun = async (
+    message: string,
+    path: string,
+    successMessage: string,
+  ) => {
+    if (!window.confirm(message)) {
+      return;
+    }
+    await run(path, successMessage);
+  };
+
+  useEffect(() => {
+    if (!enabled || busy) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable
+        )
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const consume = () => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+
+      if (key === "n") {
+        if (
+          snapshot.phase === "IDLE" ||
+          (snapshot.phase === "ROUND_COMPLETE" &&
+            snapshot.hasPendingRound)
+        ) {
+          consume();
+          setLastAction("Alt+N · تجهيز الجولة القادمة");
+          void run(
+            "/api/live/prepare-round",
+            "تم تجهيز الجولة القادمة.",
+          );
+          return;
+        }
+
+        if (
+          snapshot.phase === "ROUND_READY" &&
+          !snapshot.stationsConfirmed
+        ) {
+          consume();
+          setLastAction("Alt+N · تأكيد المحطات");
+          void run(
+            "/api/live/confirm-stations",
+            "تم تأكيد توزيع المحطات.",
+          );
+          return;
+        }
+
+        if (
+          snapshot.phase === "ROUND_ACTIVE" ||
+          snapshot.phase === "INTERMISSION" ||
+          (
+            snapshot.phase === "QUESTION_REVEAL" &&
+            (snapshot.question?.position ?? 0) < 10
+          )
+        ) {
+          consume();
+          setLastAction("Alt+N · تجهيز السؤال التالي");
+          void run(
+            "/api/live/prepare-question",
+            "تم تجهيز السؤال التالي.",
+          );
+        }
+        return;
+      }
+
+      if (key === "s") {
+        if (
+          snapshot.phase === "ROUND_READY" &&
+          snapshot.stationsConfirmed
+        ) {
+          consume();
+          setLastAction("Alt+S · بدء الجولة");
+          void confirmAndRun(
+            "بدء الجولة الآن؟",
+            "/api/live/start-round",
+            "بدأت الجولة.",
+          );
+          return;
+        }
+
+        if (snapshot.phase === "QUESTION_READY") {
+          consume();
+          setLastAction("Alt+S · START السؤال");
+          void confirmAndRun(
+            "بدء العد 3-2-1 وإظهار السؤال للمتسابقين؟",
+            "/api/live/start-question",
+            "بدأ العد التنازلي 3-2-1.",
+          );
+        }
+        return;
+      }
+
+      if (
+        key === "r" &&
+        snapshot.phase === "QUESTION_CLOSED" &&
+        snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
+        snapshot.closeReason !== "SOLO_ANSWERED" &&
+        snapshot.closeReason !== "SERVER_RESTART_RECOVERY" &&
+        snapshot.closeReason !== "EMERGENCY_HOLD"
+      ) {
+        consume();
+        setLastAction("Alt+R · Reveal");
+        void confirmAndRun(
+          "إعلان نتيجة السؤال الآن؟",
+          "/api/live/reveal",
+          "تم إظهار الإجابة.",
+        );
+        return;
+      }
+
+      if (
+        key === "h" &&
+        (
+          snapshot.phase === "QUESTION_COUNTDOWN" ||
+          snapshot.phase === "QUESTION_ACTIVE"
+        )
+      ) {
+        consume();
+        setLastAction("Alt+H · Emergency Hold");
+        void emergencyHold();
+        return;
+      }
+
+      if (
+        key === "v" &&
+        snapshot.question?.position != null &&
+        [
+          "QUESTION_READY",
+          "QUESTION_CLOSED",
+          "QUESTION_REVEAL",
+          "INTERMISSION",
+        ].includes(snapshot.phase)
+      ) {
+        consume();
+        setLastAction("Alt+V · VOID + replacement");
+        void voidAndReplace();
+        return;
+      }
+
+      if (
+        key === "c" &&
+        snapshot.phase === "QUESTION_REVEAL" &&
+        snapshot.question?.position === 10
+      ) {
+        consume();
+        setLastAction("Alt+C · إنهاء الجولة");
+        void confirmAndRun(
+          "إنهاء الجولة واعتماد مجموعها الآن؟",
+          "/api/live/complete-round",
+          "تم إنهاء الجولة.",
+        );
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    enabled,
+    busy,
+    snapshot,
+    run,
+    emergencyHold,
+    voidAndReplace,
+  ]);
+
+  return (
+    <div className="operator-hotkeys">
+      <label>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => {
+            setEnabled(event.target.checked);
+            setLastAction(null);
+          }}
+        />
+        تفعيل اختصارات الأوبريتر لهذه الجلسة فقط
+      </label>
+
+      {enabled ? (
+        <>
+          <div className="hotkey-legend">
+            <kbd>Alt+N</kbd><span>التالي / تجهيز</span>
+            <kbd>Alt+S</kbd><span>START</span>
+            <kbd>Alt+R</kbd><span>Reveal</span>
+            <kbd>Alt+H</kbd><span>Emergency Hold</span>
+            <kbd>Alt+V</kbd><span>VOID + replacement</span>
+            <kbd>Alt+C</kbd><span>إنهاء الجولة</span>
+          </div>
+          <small>
+            START وReveal وإنهاء الجولة تبقى بتأكيد. Emergency Hold وVOID
+            يبقيان بسبب إلزامي + تأكيد. الاختصارات لا تعمل أثناء الكتابة
+            داخل الحقول.
+          </small>
+          {lastAction ? (
+            <small className="hotkey-last-action">
+              آخر اختصار: {lastAction}
+            </small>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function OperatorLivePanel({
   snapshot,
 }: {
@@ -2923,6 +3166,14 @@ function OperatorLivePanel({
           </div>
         </div>
       ) : null}
+
+      <OperatorHotkeys
+        snapshot={snapshot}
+        busy={busy}
+        run={run}
+        emergencyHold={emergencyHold}
+        voidAndReplace={voidAndReplace}
+      />
 
       <div className="actions live-actions">
         {(snapshot.phase === "IDLE" ||
