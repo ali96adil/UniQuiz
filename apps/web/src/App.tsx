@@ -2481,6 +2481,60 @@ function OperatorLivePanel({
 
   const questionPosition = snapshot.question?.position ?? null;
 
+  const voidAndReplace = async () => {
+    if (!snapshot.round || questionPosition === null) {
+      return;
+    }
+
+    const reason = window.prompt(
+      "سبب إلغاء السؤال واستبداله بنفس المحور:",
+      snapshot.closeReason === "SERVER_RESTART_RECOVERY"
+        ? "Server restart during active question"
+        : "",
+    );
+
+    if (!reason || reason.trim().length < 3) {
+      setError("يجب كتابة سبب واضح للإلغاء والاستبدال.");
+      setMessage(null);
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "سيتم VOID للسؤال الحالي وحذف إجاباته التشغيلية من النتيجة، مع الاحتفاظ بالتاريخ في Audit، ثم اختيار سؤال بديل من نفس المحور. متابعة؟",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await apiRequest("/api/question-bank/void-replace", {
+        method: "POST",
+        body: JSON.stringify({
+          roundId: snapshot.round.id,
+          position: questionPosition,
+          reason: reason.trim(),
+          confirm: "VOID_AND_REPLACE",
+        }),
+      });
+      setMessage(
+        "تم VOID للسؤال وتجهيز بديل من نفس المحور. السؤال البديل جاهز لـ START.",
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر إلغاء السؤال واستبداله",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="panel live-operator-panel">
       <div className="section-heading">
@@ -2641,7 +2695,8 @@ function OperatorLivePanel({
 
         {snapshot.phase === "QUESTION_CLOSED" &&
         snapshot.closeReason !== "ALL_TEAMS_ANSWERED" &&
-        snapshot.closeReason !== "SOLO_ANSWERED" ? (
+        snapshot.closeReason !== "SOLO_ANSWERED" &&
+        snapshot.closeReason !== "SERVER_RESTART_RECOVERY" ? (
           <button
             className="primary"
             disabled={busy}
@@ -2653,6 +2708,22 @@ function OperatorLivePanel({
             }
           >
             Reveal الإجابة
+          </button>
+        ) : null}
+
+        {questionPosition !== null &&
+        [
+          "QUESTION_READY",
+          "QUESTION_CLOSED",
+          "QUESTION_REVEAL",
+          "INTERMISSION",
+        ].includes(snapshot.phase) ? (
+          <button
+            className="danger-outline"
+            disabled={busy}
+            onClick={() => void voidAndReplace()}
+          >
+            VOID + استبدال بنفس المحور
           </button>
         ) : null}
 
@@ -2698,6 +2769,17 @@ function OperatorLivePanel({
         <p className="locked-note">
           السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 30 ثانية.
         </p>
+      ) : null}
+
+      {snapshot.phase === "QUESTION_CLOSED" &&
+      snapshot.closeReason === "SERVER_RESTART_RECOVERY" ? (
+        <div className="status-message error recovery-warning">
+          <strong>Recovery مطلوب</strong>
+          <span>
+            السيرفر أعيد تشغيله أثناء سؤال فعال. لا يمكن Reveal لهذا السؤال.
+            استخدم VOID + استبدال بنفس المحور ثم START من جديد.
+          </span>
+        </div>
       ) : null}
 
       {snapshot.phase === "QUESTION_CLOSED" &&

@@ -1704,3 +1704,12 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.recovery-warning {
+  display: grid;
+  gap: 6px;
+}
+
+.recovery-warning strong {
+  font-size: 1rem;
+}
