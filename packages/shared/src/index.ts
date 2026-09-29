@@ -233,3 +233,21 @@ export interface LiveRevealResults {
   teamA: LiveRevealTeamResult;
   teamB: LiveRevealTeamResult | null;
 }
+
+export type QualificationRankingStatus =
+  | "PLAYING"
+  | "COMPLETED"
+  | "NOT_STARTED";
+
+export interface QualificationRankingEntry {
+  college: College;
+  status: QualificationRankingStatus;
+  rank: number | null;
+  scorePoints: number;
+  revealedQuestions: number;
+}
+
+export interface QualificationRankingSnapshot {
+  generatedAt: string;
+  entries: QualificationRankingEntry[];
+}

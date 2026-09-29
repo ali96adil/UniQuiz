@@ -14,6 +14,7 @@ import {
   registerQuestionBankRoutes,
 } from "./question-bank.js";
 import { registerLiveSessionRoutes } from "./live-session.js";
+import { getQualificationRanking } from "./ranking.js";
 import { OscOutput } from "./osc-output.js";
 import {
   ensureStationCredentials,
@@ -92,6 +93,10 @@ function publishPresence() {
   io.emit("presence:snapshot", presenceSnapshot());
 }
 
+app.get("/api/ranking", async () =>
+  getQualificationRanking(database),
+);
+
 app.get("/health", async () => ({
   ok: true,
   service: "uniquiz-server",
@@ -168,6 +173,11 @@ io.on("connection", (socket) => {
   socket.emit(
     "live:snapshot",
     liveSession.getSnapshot(),
+  );
+
+  socket.emit(
+    "ranking:snapshot",
+    getQualificationRanking(database),
   );
 
   const teamState = liveSession.getTeamSubmissionState(role);

@@ -19,6 +19,7 @@ import {
   ServerQuestionClock,
 } from "./question-clock.js";
 import { calculateScoreMicros } from "./scoring.js";
+import { getQualificationRanking } from "./ranking.js";
 import {
   NOOP_SHOW_CONTROL,
   type OscArgument,
@@ -464,6 +465,10 @@ export class LiveSessionManager {
   publish(): LiveSnapshot {
     const snapshot = this.getSnapshot();
     this.io.emit("live:snapshot", snapshot);
+    this.io.emit(
+      "ranking:snapshot",
+      getQualificationRanking(this.db),
+    );
 
     const teamAState = this.getTeamSubmissionState("team-a");
     const teamBState = this.getTeamSubmissionState("team-b");

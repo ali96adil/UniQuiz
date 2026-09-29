@@ -7,6 +7,7 @@ import type {
   DrawPresentationEvent,
   LiveSnapshot,
   LiveTeamSubmissionState,
+  QualificationRankingSnapshot,
   PresenceSnapshot,
   QualificationRound,
   QuestionAllocationSummary,
@@ -1152,6 +1153,62 @@ function AudienceDrawSurface({
 
 
 
+
+function AudienceRankingSidebar({
+  ranking,
+}: {
+  ranking: QualificationRankingSnapshot | null;
+}) {
+  return (
+    <aside className="audience-ranking">
+      <div className="audience-ranking-heading">
+        <span>الترتيب العام</span>
+        <small>بعد آخر Reveal</small>
+      </div>
+
+      <div className="audience-ranking-list">
+        {ranking?.entries.map((entry) => (
+          <div
+            className={[
+              "audience-ranking-row",
+              entry.status.toLowerCase().replace("_", "-"),
+            ].join(" ")}
+            key={entry.college.id}
+          >
+            <div className="audience-rank-number">
+              {entry.rank ?? "—"}
+            </div>
+            <div className="audience-rank-college">
+              <strong>{entry.college.name}</strong>
+              <small>
+                {entry.status === "PLAYING"
+                  ? "يلعب الآن"
+                  : entry.status === "COMPLETED"
+                    ? "مكتملة"
+                    : "لم تبدأ"}
+              </small>
+            </div>
+            <div className="audience-rank-score">
+              {entry.status === "NOT_STARTED"
+                ? "—"
+                : entry.scorePoints}
+              <small>
+                {entry.status === "NOT_STARTED"
+                  ? ""
+                  : " نقطة"}
+              </small>
+            </div>
+          </div>
+        )) ?? (
+          <div className="audience-ranking-empty">
+            بانتظار بدء الجولات
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 function AudienceLiveSurface({
   snapshot,
 }: {
@@ -2101,6 +2158,8 @@ export function App() {
     useState<LiveSnapshot | null>(null);
   const [teamSubmission, setTeamSubmission] =
     useState<LiveTeamSubmissionState | null>(null);
+  const [ranking, setRanking] =
+    useState<QualificationRankingSnapshot | null>(null);
   const [liveSocket, setLiveSocket] =
     useState<ReturnType<typeof io> | null>(null);
   const [effectiveRole, setEffectiveRole] =
@@ -2169,6 +2228,12 @@ export function App() {
       "live:snapshot",
       (snapshot: LiveSnapshot) => {
         setLiveSnapshot(snapshot);
+      },
+    );
+    socket.on(
+      "ranking:snapshot",
+      (snapshot: QualificationRankingSnapshot) => {
+        setRanking(snapshot);
       },
     );
     socket.on(
@@ -2263,7 +2328,10 @@ export function App() {
       {surface === "display" && competition ? (
         liveSnapshot &&
         liveSnapshot.phase !== "IDLE" ? (
-          <AudienceLiveSurface snapshot={liveSnapshot} />
+          <div className="audience-broadcast-layout">
+            <AudienceLiveSurface snapshot={liveSnapshot} />
+            <AudienceRankingSidebar ranking={ranking} />
+          </div>
         ) : (
           <AudienceDrawSurface
             snapshot={competition}
