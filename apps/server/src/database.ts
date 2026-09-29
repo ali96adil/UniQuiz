@@ -299,8 +299,24 @@ export function openDatabase(databasePath: string) {
     )
     ON CONFLICT(id) DO NOTHING;
 
+    CREATE TABLE IF NOT EXISTS operations_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      osc_test_sent_at TEXT,
+      osc_test_confirmed_at TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT INTO operations_state (
+      id,
+      osc_test_sent_at,
+      osc_test_confirmed_at,
+      updated_at
+    )
+    VALUES (1, NULL, NULL, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO NOTHING;
+
     UPDATE app_meta
-    SET value = '11'
+    SET value = '12'
     WHERE key = 'schema_version';
   `);
 
