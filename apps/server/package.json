@@ -8,7 +8,10 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test src/**/*.test.ts",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "ops:backup": "tsx src/backup-cli.ts backup",
+    "ops:backups": "tsx src/backup-cli.ts list",
+    "ops:restore": "tsx src/backup-cli.ts restore"
   },
   "dependencies": {
     "@uniquiz/shared": "workspace:*",

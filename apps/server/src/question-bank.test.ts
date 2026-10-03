@@ -99,6 +99,25 @@ test("allocate -> void/replace -> audit -> reset preserves invariants", async ()
   const original = allocatedRows[0];
   assert.ok(original);
 
+  db.prepare(`
+    INSERT INTO live_submissions (
+      round_id,
+      question_position,
+      station,
+      question_id,
+      selected_option,
+      submitted_at_epoch_ms,
+      response_time_ms,
+      is_correct,
+      score_micros
+    )
+    VALUES (?, ?, 'A', ?, 'A', 1000, 1000, 1, 25000000)
+  `).run(
+    original.roundId,
+    original.position,
+    original.questionId,
+  );
+
   const voidResponse = await app.inject({
     method: "POST",
     url: "/api/question-bank/void-replace",
@@ -174,6 +193,18 @@ test("allocate -> void/replace -> audit -> reset preserves invariants", async ()
   assert.equal(audit.questionId, original.questionId);
   assert.equal(audit.relatedQuestionId, replacement.questionId);
   assert.equal(audit.reason, "Technical issue during presentation");
+
+  const remainingSubmissionCount = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM live_submissions
+    WHERE round_id = ?
+      AND question_position = ?
+  `).get(
+    original.roundId,
+    original.position,
+  ) as { count: number };
+
+  assert.equal(remainingSubmissionCount.count, 0);
 
   const reset = await app.inject({
     method: "POST",

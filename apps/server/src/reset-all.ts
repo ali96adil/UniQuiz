@@ -10,6 +10,7 @@ import {
 import type { LiveSessionManager } from "./live-session.js";
 import { getQuestionAllocationSummary } from "./question-bank.js";
 import { getQualificationRanking } from "./ranking.js";
+import { createDatabaseBackup } from "./operations.js";
 
 const resetAllSchema = z.object({
   confirm: z.literal("RESET_ALL_COMPETITION_DATA"),
@@ -38,6 +39,23 @@ export function resetAllCompetitionData(
         selected_round_id = NULL
       WHERE id = 1
     `).run();
+
+    db.prepare(`
+      UPDATE audience_presentation
+      SET
+        active = 0,
+        updated_at = ?
+      WHERE id = 1
+    `).run(new Date().toISOString());
+
+    db.prepare(`
+      UPDATE operations_state
+      SET
+        osc_test_sent_at = NULL,
+        osc_test_confirmed_at = NULL,
+        updated_at = ?
+      WHERE id = 1
+    `).run(new Date().toISOString());
 
     db.prepare(`
       UPDATE live_state
@@ -76,6 +94,7 @@ export function registerResetAllRoute(
   db: AppDatabase,
   io: SocketIOServer,
   liveSession: LiveSessionManager,
+  databasePath: string,
 ): void {
   app.post("/api/setup/reset-all", async (request, reply) => {
     const body = resetAllSchema.safeParse(request.body);
@@ -85,6 +104,23 @@ export function registerResetAllRoute(
         error: "INVALID_RESET_CONFIRMATION",
         message:
           "Explicit RESET_ALL_COMPETITION_DATA confirmation is required.",
+      });
+    }
+
+    let preResetBackup;
+    try {
+      preResetBackup = createDatabaseBackup(
+        db,
+        databasePath,
+        "pre-reset",
+      );
+    } catch (error) {
+      return reply.code(500).send({
+        error: "PRE_RESET_BACKUP_FAILED",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to create the required pre-reset backup.",
       });
     }
 
@@ -103,6 +139,7 @@ export function registerResetAllRoute(
     return {
       ok: true,
       resetAt: new Date().toISOString(),
+      preResetBackup,
       competition,
       questionBank,
       allocation,
