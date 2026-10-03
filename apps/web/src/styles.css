@@ -2564,12 +2564,61 @@ h2 {
   text-align: center;
 }
 
-.preshow-identity .audience-title,
-.preshow-about .audience-title,
-.preshow-mechanism .audience-title {
+.preshow-about > .audience-title,
+.preshow-mechanism > .audience-title {
   margin: 0;
+  font-size: clamp(1.8rem, 3.6vw, 3.4rem);
+  line-height: 1.08;
+}
+
+.preshow-identity-block {
+  display: grid;
+  gap: clamp(12px, 1.8vh, 22px);
+  justify-items: center;
+  width: 100%;
+}
+
+.preshow-event-title {
+  margin: 0;
+  color: #f8fafc;
   font-size: clamp(2.2rem, 5.2vw, 5rem);
   line-height: 1.08;
+}
+
+.preshow-identity-block.compact {
+  gap: clamp(6px, 0.9vh, 10px);
+}
+
+.preshow-identity-block.compact .preshow-logo-row {
+  min-height: 62px;
+  gap: clamp(16px, 2.5vw, 30px);
+}
+
+.preshow-identity-block.compact .preshow-logo-row img {
+  width: clamp(58px, 6vw, 86px);
+  height: clamp(58px, 6vw, 86px);
+}
+
+.preshow-identity-block.compact .audience-kicker {
+  font-size: clamp(0.72rem, 1vw, 0.94rem);
+}
+
+.preshow-identity-block.compact .preshow-event-title {
+  font-size: clamp(1.5rem, 2.8vw, 2.65rem);
+}
+
+.preshow-identity-block.compact .preshow-patronage {
+  gap: 3px;
+  max-width: 1050px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  font-size: clamp(0.72rem, 1vw, 0.95rem);
+  line-height: 1.45;
+}
+
+.preshow-identity-block.compact .preshow-identity-line {
+  font-size: clamp(0.75rem, 1vw, 0.95rem);
+  line-height: 1.4;
 }
 
 .preshow-subtitle {
@@ -2790,4 +2839,10 @@ h2 {
   color: #94a3b8;
   font-size: clamp(0.82rem, 1vw, 1rem);
   font-weight: 700;
+}
+
+
+.preshow-about,
+.preshow-mechanism {
+  gap: clamp(10px, 1.4vh, 18px);
 }

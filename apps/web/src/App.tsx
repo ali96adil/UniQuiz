@@ -2321,6 +2321,60 @@ const PRESHOW_PRESENTATION_MARKER = "__UNIQUIZ_PRESHOW__";
 
 type AudiencePreShowPage = "identity" | "about" | "mechanism";
 
+function PreShowIdentityBlock({
+  settings,
+  compact = false,
+}: {
+  settings: AudienceDisplaySettings;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={
+        compact
+          ? "preshow-identity-block compact"
+          : "preshow-identity-block"
+      }
+    >
+      <div className="preshow-logo-row">
+        {settings.universityLogoUrl ? (
+          <img
+            src={settings.universityLogoUrl}
+            alt="شعار جامعة بابل"
+          />
+        ) : null}
+        {settings.departmentLogoUrl ? (
+          <img
+            src={settings.departmentLogoUrl}
+            alt="شعار قسم النشاطات الطلابية"
+          />
+        ) : null}
+      </div>
+
+      {settings.eventSubtitle ? (
+        <div className="audience-kicker">
+          {settings.eventSubtitle}
+        </div>
+      ) : null}
+
+      <h2 className="preshow-event-title">
+        {settings.eventTitle}
+      </h2>
+
+      <div className="preshow-patronage">
+        <strong>{PATRONAGE_LINE}</strong>
+        <span>{SUPERVISION_LINE}</span>
+      </div>
+
+      {settings.copy.preShow.identityLine.trim() ? (
+        <p className="preshow-identity-line">
+          {settings.copy.preShow.identityLine}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function AudiencePreShowSurface({
   settings,
   categories,
@@ -2372,55 +2426,13 @@ function AudiencePreShowSurface({
     <section className="audience-stage audience-preshow">
       {currentPage === "identity" ? (
         <div className="preshow-page preshow-identity">
-          <div className="preshow-logo-row">
-            {settings.universityLogoUrl ? (
-              <img
-                src={settings.universityLogoUrl}
-                alt="شعار جامعة بابل"
-              />
-            ) : null}
-            {settings.departmentLogoUrl ? (
-              <img
-                src={settings.departmentLogoUrl}
-                alt="شعار قسم النشاطات الطلابية"
-              />
-            ) : null}
-          </div>
-
-          {settings.eventSubtitle ? (
-            <div className="audience-kicker">
-              {settings.eventSubtitle}
-            </div>
-          ) : null}
-
-          <h2 className="audience-title">
-            {settings.eventTitle}
-          </h2>
-
-          {settings.copy.preShow.identityLine.trim() ? (
-            <p className="preshow-identity-line">
-              {settings.copy.preShow.identityLine}
-            </p>
-          ) : null}
-
-          <div className="preshow-patronage">
-            <strong>{PATRONAGE_LINE}</strong>
-            <span>{SUPERVISION_LINE}</span>
-          </div>
-
-          {settings.footerText ? (
-            <p className="preshow-footer-line">
-              {settings.footerText}
-            </p>
-          ) : null}
+          <PreShowIdentityBlock settings={settings} />
         </div>
       ) : null}
 
       {currentPage === "about" ? (
         <div className="preshow-page preshow-about">
-          <div className="audience-kicker">
-            مسابقة بنك المعلومات
-          </div>
+          <PreShowIdentityBlock settings={settings} compact />
           <h2 className="audience-title">
             نبذة عن المسابقة
           </h2>
@@ -2450,9 +2462,7 @@ function AudiencePreShowSurface({
 
       {currentPage === "mechanism" ? (
         <div className="preshow-page preshow-mechanism">
-          <div className="audience-kicker">
-            قبل أن نبدأ
-          </div>
+          <PreShowIdentityBlock settings={settings} compact />
           <h2 className="audience-title">
             آلية المسابقة
           </h2>
