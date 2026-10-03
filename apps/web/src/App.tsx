@@ -3050,6 +3050,18 @@ function OperationsPreflightPanel() {
         >
           إعادة فحص الجاهزية
         </button>
+        <button
+          disabled={busy}
+          onClick={() => void sendOscTest()}
+        >
+          إرسال OSC Test
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => void confirmOscTest()}
+        >
+          تأكيد استلام OSC Test
+        </button>
         <a
           className="button-link"
           href="/api/export/results.xlsx"
