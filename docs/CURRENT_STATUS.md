@@ -1,30 +1,29 @@
 # Current Status
 
-Updated: 2026-09-29
+Updated: 2026-10-03
 
 ## Active work
-M6 — Event-Day Hardening & Recovery, rebuilt cleanly on the accepted Post-M5 `main`.
+Post-M6 event rehearsal and final hardware acceptance.
 
 ## Master tracker
 Issue #8 — UniQuiz Roadmap & Current Work
 
 ## Active branch
-`feature/m6-hardening-recovery-clean`
+`main`
 
-## Active pull request
-PR #16 — M6: hardening & recovery on current main
+## Latest merged pull request
+PR #16 — M6: hardening & recovery on current main — MERGED
 
-Current verified feature head before this documentation checkpoint:
-`47f102ce2528a585fff5dbbd55e6908f140f13d9`
+M6 squash merge commit:
+`9ed8b144cb7fbf5c737b7f55d84517f4e0eb05a2`
 
-Latest verified CI:
-Run #37132056774 — PASS
+Latest verified CI on `main`:
+Run #37132310613 / CI #144 — PASS
 
-PR #16 passed the automated merge gate. Real-device rehearsal remains required before event-day use, but is no longer a blocker to integrating M6 into `main`.
+Automated integration is complete. Real-device rehearsal remains the final event-readiness gate before official use.
 
 ## Main baseline
-Post-M5 PR #15 is merged to `main` as:
-`faf70890c5539847492f20f46a2d9499214d48a5`
+M6 is integrated into `main`.
 
 The accepted baseline includes:
 - 25-second authoritative question window;
