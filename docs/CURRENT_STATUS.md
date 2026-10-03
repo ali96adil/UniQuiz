@@ -15,12 +15,12 @@ Issue #8 — UniQuiz Roadmap & Current Work
 PR #16 — M6: hardening & recovery on current main
 
 Current verified feature head before this documentation checkpoint:
-`e95cfda4d031c45f1f424bc4babadcb9888140bd`
+`47f102ce2528a585fff5dbbd55e6908f140f13d9`
 
 Latest verified CI:
-Run #36605322460 — PASS
+Run #37132056774 — PASS
 
-PR #16 remains Draft intentionally until the real-device rehearsal is accepted.
+PR #16 passed the automated merge gate. Real-device rehearsal remains required before event-day use, but is no longer a blocker to integrating M6 into `main`.
 
 ## Main baseline
 Post-M5 PR #15 is merged to `main` as:
@@ -71,8 +71,8 @@ The clean M6 candidate includes:
 - XLSX export regression verifies 25-second metadata plus ranking time/correct/wrong columns.
 - PR #16 is mergeable/clean and has no known code blocker.
 
-## Remaining acceptance
-Requires real hardware:
+## Post-merge event acceptance
+Still requires real hardware before event-day use:
 1. Full Mac + Team A Windows + Team B Windows + audience display rehearsal.
 2. Real OSC receiver send/confirm.
 3. Browser disconnect/reconnect test.
@@ -82,7 +82,7 @@ Requires real hardware:
 7. Backup creation + offline restore drill.
 8. Visual acceptance of Operator Preflight, rehearsal banner, announcement scenes and exported workbook.
 
-Do not merge PR #16 until these real-device checks are accepted.
+Automated verification is complete. Merge PR #16 into `main`; keep the real-device checks above as the final event-readiness gate before official use.
 
 ## Do not repeat
 - Do not recreate the repository.
