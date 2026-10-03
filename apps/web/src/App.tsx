@@ -2361,15 +2361,19 @@ function PreShowIdentityBlock({
         {settings.eventTitle}
       </h2>
 
-      <div className="preshow-patronage">
-        <strong>{PATRONAGE_LINE}</strong>
-        <span>{SUPERVISION_LINE}</span>
-      </div>
+      {!compact ? (
+        <>
+          <div className="preshow-patronage">
+            <strong>{PATRONAGE_LINE}</strong>
+            <span>{SUPERVISION_LINE}</span>
+          </div>
 
-      {settings.copy.preShow.identityLine.trim() ? (
-        <p className="preshow-identity-line">
-          {settings.copy.preShow.identityLine}
-        </p>
+          {settings.copy.preShow.identityLine.trim() ? (
+            <p className="preshow-identity-line">
+              {settings.copy.preShow.identityLine}
+            </p>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
