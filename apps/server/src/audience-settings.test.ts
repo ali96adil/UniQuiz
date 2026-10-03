@@ -43,6 +43,7 @@ test("audience branding persists across full competition reset", () => {
   assert.equal(settings.footerText, "Custom Footer");
   assert.equal(settings.roundLabel, "مرحلة");
   assert.equal(settings.copy.rankingTitle, "الترتيب العام");
+  assert.equal(settings.copy.preShow.identityLine, "");
   assert.ok(settings.universityLogoUrl?.includes("/university"));
   assert.equal(settings.departmentLogoUrl, null);
 

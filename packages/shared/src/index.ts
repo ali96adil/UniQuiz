@@ -258,6 +258,7 @@ export interface QualificationRankingSnapshot {
 
 export interface AudiencePreShowSettings {
   intervalSeconds: number;
+  identityLine: string;
   identityEnabled: boolean;
   aboutEnabled: boolean;
   mechanismEnabled: boolean;

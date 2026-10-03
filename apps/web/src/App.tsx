@@ -2323,9 +2323,11 @@ type AudiencePreShowPage = "identity" | "about" | "mechanism";
 
 function AudiencePreShowSurface({
   settings,
+  categories,
   presentationKey,
 }: {
   settings: AudienceDisplaySettings;
+  categories: QuestionBankSummary["categories"];
   presentationKey: string;
 }) {
   const enabledPages = (
@@ -2370,15 +2372,34 @@ function AudiencePreShowSurface({
     <section className="audience-stage audience-preshow">
       {currentPage === "identity" ? (
         <div className="preshow-page preshow-identity">
-          <div className="audience-kicker">
-            جامعة بابل · قسم النشاطات الطلابية
+          <div className="preshow-logo-row">
+            {settings.universityLogoUrl ? (
+              <img
+                src={settings.universityLogoUrl}
+                alt="شعار جامعة بابل"
+              />
+            ) : null}
+            {settings.departmentLogoUrl ? (
+              <img
+                src={settings.departmentLogoUrl}
+                alt="شعار قسم النشاطات الطلابية"
+              />
+            ) : null}
           </div>
+
+          {settings.eventSubtitle ? (
+            <div className="audience-kicker">
+              {settings.eventSubtitle}
+            </div>
+          ) : null}
+
           <h2 className="audience-title">
             {settings.eventTitle}
           </h2>
-          {settings.eventSubtitle ? (
-            <p className="preshow-subtitle">
-              {settings.eventSubtitle}
+
+          {settings.copy.preShow.identityLine.trim() ? (
+            <p className="preshow-identity-line">
+              {settings.copy.preShow.identityLine}
             </p>
           ) : null}
 
@@ -2387,21 +2408,10 @@ function AudiencePreShowSurface({
             <span>{SUPERVISION_LINE}</span>
           </div>
 
-          {(settings.venue || settings.season) ? (
-            <div className="preshow-meta">
-              {settings.venue ? (
-                <span>
-                  <b>المكان</b>
-                  {settings.venue}
-                </span>
-              ) : null}
-              {settings.season ? (
-                <span>
-                  <b>السنة / الموسم</b>
-                  {settings.season}
-                </span>
-              ) : null}
-            </div>
+          {settings.footerText ? (
+            <p className="preshow-footer-line">
+              {settings.footerText}
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -2425,11 +2435,15 @@ function AudiencePreShowSurface({
             الإجابة وسرعة الاستجابة.
           </p>
           <div className="preshow-categories">
-            <span>رياضي</span>
-            <span>تاريخ</span>
-            <span>جغرافيا</span>
-            <span>فني</span>
-            <span>ثقافي</span>
+            {categories.length > 0 ? (
+              categories.map((category) => (
+                <span key={category.key}>
+                  {category.name}
+                </span>
+              ))
+            ) : (
+              <span>بانتظار تحميل المحاور</span>
+            )}
           </div>
         </div>
       ) : null}
@@ -2674,6 +2688,23 @@ function PresentationControlPanel({
       </div>
 
       <div className="preshow-control">
+        <label className="preshow-identity-line-control">
+          <span>سطر إضافي في الصفحة الأولى</span>
+          <input
+            value={preShowDraft?.identityLine ?? ""}
+            disabled={busy || !preShowDraft}
+            placeholder="مثال: أهلاً بكم في المنافسة الثقافية بين كليات جامعة بابل"
+            onChange={(event) =>
+              updatePreShow({
+                identityLine: event.target.value,
+              })
+            }
+          />
+          <small>
+            اختياري — يظهر تحت عنوان المسابقة ويمكن تغييره من لوحة التحكم.
+          </small>
+        </label>
+
         <div className="preshow-control-heading">
           <div>
             <strong>شاشات ما قبل المسابقة</strong>
@@ -2716,7 +2747,7 @@ function PresentationControlPanel({
             />
             <span>
               <strong>1. الهوية والرعاية</strong>
-              <small>العنوان، الرعاية، الإشراف، المكان والسنة</small>
+              <small>العنوان، الرعاية، الإشراف والسطر الإضافي</small>
             </span>
           </label>
           <label>
@@ -4773,22 +4804,27 @@ export function App() {
       {surface === "display" &&
       competition &&
       audienceSettings ? (
+        audiencePresentation?.active &&
+        audiencePresentation.kind === "CUSTOM" &&
+        audiencePresentation.title === PRESHOW_PRESENTATION_MARKER ? (
+          <AudienceSceneTransition
+            sceneKey={`presentation:${audiencePresentation.updatedAt}`}
+          >
+            <AudiencePreShowSurface
+              settings={audienceSettings}
+              categories={questionBank?.categories ?? []}
+              presentationKey={audiencePresentation.updatedAt}
+            />
+          </AudienceSceneTransition>
+        ) : (
         <AudienceBroadcastFrame settings={audienceSettings}>
           {audiencePresentation?.active ? (
             <AudienceSceneTransition
               sceneKey={`presentation:${audiencePresentation.updatedAt}`}
             >
-              {audiencePresentation.kind === "CUSTOM" &&
-              audiencePresentation.title === PRESHOW_PRESENTATION_MARKER ? (
-                <AudiencePreShowSurface
-                  settings={audienceSettings}
-                  presentationKey={audiencePresentation.updatedAt}
-                />
-              ) : (
-                <AudienceAnnouncementSurface
-                  presentation={audiencePresentation}
-                />
-              )}
+              <AudienceAnnouncementSurface
+                presentation={audiencePresentation}
+              />
             </AudienceSceneTransition>
           ) : liveSnapshot &&
           liveSnapshot.phase !== "IDLE" ? (
@@ -4830,6 +4866,7 @@ export function App() {
             </AudienceSceneTransition>
           )}
         </AudienceBroadcastFrame>
+        )
       ) : null}
 
       {surface === "report" ? (

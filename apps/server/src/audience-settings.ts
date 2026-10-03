@@ -10,6 +10,7 @@ import type { AppDatabase } from "./database.js";
 export const DEFAULT_AUDIENCE_COPY: AudienceDisplayCopy = {
   preShow: {
     intervalSeconds: 10,
+    identityLine: "",
     identityEnabled: true,
     aboutEnabled: true,
     mechanismEnabled: true,
@@ -67,6 +68,7 @@ export const DEFAULT_AUDIENCE_COPY: AudienceDisplayCopy = {
 const copySchema = z.object({
   preShow: z.object({
     intervalSeconds: z.number().int().min(5).max(30),
+    identityLine: z.string().trim().max(240),
     identityEnabled: z.boolean(),
     aboutEnabled: z.boolean(),
     mechanismEnabled: z.boolean(),
