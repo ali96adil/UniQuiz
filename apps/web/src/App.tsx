@@ -776,7 +776,7 @@ function AudienceSettingsPanel({
             ["teamBLabel", "تسمية Team B"],
           ] as Array<
             [
-              keyof AudienceDisplaySettings["copy"],
+              Exclude<keyof AudienceDisplaySettings["copy"], "preShow">,
               string,
             ]
           >).map(([key, label]) => (
