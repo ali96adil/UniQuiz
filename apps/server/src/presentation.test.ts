@@ -39,6 +39,13 @@ test("audience presentation does not mutate live competition state", () => {
   assert.equal(shown.kind, "BREAK");
   assert.equal(shown.title, "استراحة قصيرة");
 
+  const preShow = showAudiencePresentation(db, {
+    kind: "PRESHOW",
+  });
+  assert.equal(preShow.active, true);
+  assert.equal(preShow.kind, "PRESHOW");
+  assert.equal(preShow.title, "العرض التمهيدي");
+
   const afterShow = db.prepare(`
     SELECT
       phase,
@@ -76,6 +83,7 @@ test("audience presentation does not mutate live competition state", () => {
   assert.deepEqual(
     audit.map((entry) => entry.eventType),
     [
+      "AUDIENCE_PRESENTATION_SHOWN",
       "AUDIENCE_PRESENTATION_SHOWN",
       "AUDIENCE_PRESENTATION_CLEARED",
     ],

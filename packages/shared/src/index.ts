@@ -256,7 +256,15 @@ export interface QualificationRankingSnapshot {
   entries: QualificationRankingEntry[];
 }
 
+export interface AudiencePreShowSettings {
+  intervalSeconds: number;
+  identityEnabled: boolean;
+  aboutEnabled: boolean;
+  mechanismEnabled: boolean;
+}
+
 export interface AudienceDisplayCopy {
+  preShow: AudiencePreShowSettings;
   welcomeTitle: string;
   waitingParticipantsText: string;
   drawPhaseLabel: string;
@@ -363,6 +371,7 @@ export type RuntimeMode = "official" | "rehearsal";
 
 
 export type AudiencePresentationKind =
+  | "PRESHOW"
   | "BREAK"
   | "PLEASE_WAIT"
   | "NEXT_ROUND"

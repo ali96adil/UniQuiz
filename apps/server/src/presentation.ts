@@ -11,6 +11,7 @@ import type { AppDatabase } from "./database.js";
 const presentationSchema = z
   .object({
     kind: z.enum([
+      "PRESHOW",
       "BREAK",
       "PLEASE_WAIT",
       "NEXT_ROUND",
@@ -40,6 +41,10 @@ const presets: Record<
   Exclude<AudiencePresentationKind, "CUSTOM">,
   { title: string; message: string }
 > = {
+  PRESHOW: {
+    title: "العرض التمهيدي",
+    message: "شاشات ما قبل بدء المسابقة",
+  },
   BREAK: {
     title: "استراحة قصيرة",
     message: "نعود بعد قليل",

@@ -528,7 +528,7 @@ function AudienceSettingsPanel({
   };
 
   const setCopyField = (
-    key: keyof AudienceDisplaySettings["copy"],
+    key: Exclude<keyof AudienceDisplaySettings["copy"], "preShow">,
     value: string,
   ) => {
     setDraft((current) =>
@@ -2317,12 +2317,202 @@ function AudienceAnnouncementSurface({
   );
 }
 
-function PresentationControlPanel() {
+type AudiencePreShowPage = "identity" | "about" | "mechanism";
+
+function AudiencePreShowSurface({
+  settings,
+  presentationKey,
+}: {
+  settings: AudienceDisplaySettings;
+  presentationKey: string;
+}) {
+  const enabledPages = (
+    [
+      settings.copy.preShow.identityEnabled ? "identity" : null,
+      settings.copy.preShow.aboutEnabled ? "about" : null,
+      settings.copy.preShow.mechanismEnabled ? "mechanism" : null,
+    ] as Array<AudiencePreShowPage | null>
+  ).filter(
+    (page): page is AudiencePreShowPage => page !== null,
+  );
+  const enabledKey = enabledPages.join(":");
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [presentationKey, enabledKey]);
+
+  useEffect(() => {
+    if (enabledPages.length <= 1) return;
+
+    const timer = window.setInterval(() => {
+      setPageIndex((current) =>
+        (current + 1) % enabledPages.length,
+      );
+    }, settings.copy.preShow.intervalSeconds * 1000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    presentationKey,
+    enabledKey,
+    enabledPages.length,
+    settings.copy.preShow.intervalSeconds,
+  ]);
+
+  const currentPage =
+    enabledPages[
+      pageIndex % Math.max(enabledPages.length, 1)
+    ] ?? "identity";
+
+  return (
+    <section className="audience-stage audience-preshow">
+      {currentPage === "identity" ? (
+        <div className="preshow-page preshow-identity">
+          <div className="audience-kicker">
+            جامعة بابل · قسم النشاطات الطلابية
+          </div>
+          <h2 className="audience-title">
+            {settings.eventTitle}
+          </h2>
+          {settings.eventSubtitle ? (
+            <p className="preshow-subtitle">
+              {settings.eventSubtitle}
+            </p>
+          ) : null}
+
+          <div className="preshow-patronage">
+            <strong>{PATRONAGE_LINE}</strong>
+            <span>{SUPERVISION_LINE}</span>
+          </div>
+
+          {(settings.venue || settings.season) ? (
+            <div className="preshow-meta">
+              {settings.venue ? (
+                <span>
+                  <b>المكان</b>
+                  {settings.venue}
+                </span>
+              ) : null}
+              {settings.season ? (
+                <span>
+                  <b>السنة / الموسم</b>
+                  {settings.season}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {currentPage === "about" ? (
+        <div className="preshow-page preshow-about">
+          <div className="audience-kicker">
+            مسابقة بنك المعلومات
+          </div>
+          <h2 className="audience-title">
+            نبذة عن المسابقة
+          </h2>
+          <p className="preshow-lead">
+            منافسة ثقافية تجمع طلبة كليات جامعة بابل في أجواء من
+            المعرفة والتحدي والتفاعل، وتهدف إلى تعزيز الثقافة العامة
+            وسرعة التفكير وروح المنافسة الإيجابية بين الطلبة.
+          </p>
+          <p className="preshow-support">
+            يعتمد نظام المسابقة على إجابة الفريقين عن السؤال نفسه
+            في الوقت نفسه، مع احتساب النتيجة إلكترونياً وفق صحة
+            الإجابة وسرعة الاستجابة.
+          </p>
+          <div className="preshow-categories">
+            <span>رياضي</span>
+            <span>تاريخ</span>
+            <span>جغرافيا</span>
+            <span>فني</span>
+            <span>ثقافي</span>
+          </div>
+        </div>
+      ) : null}
+
+      {currentPage === "mechanism" ? (
+        <div className="preshow-page preshow-mechanism">
+          <div className="audience-kicker">
+            قبل أن نبدأ
+          </div>
+          <h2 className="audience-title">
+            آلية المسابقة
+          </h2>
+
+          <div className="preshow-mechanism-grid">
+            <div>
+              <strong>10</strong>
+              <span>أسئلة في كل جولة</span>
+            </div>
+            <div>
+              <strong>5</strong>
+              <span>محاور · سؤالان لكل محور</span>
+            </div>
+            <div>
+              <strong>25</strong>
+              <span>ثانية للإجابة</span>
+            </div>
+            <div>
+              <strong>25 ← 1</strong>
+              <span>نقطة للصحيح بحسب سرعة الاستجابة</span>
+            </div>
+          </div>
+
+          <div className="preshow-rules">
+            <p>
+              الفريقان يجيبان عن السؤال نفسه في الوقت نفسه، وتُثبت
+              الإجابة فور إرسالها.
+            </p>
+            <p>
+              الإجابة الخاطئة أو عدم الإجابة تحتسب <b>0 نقطة</b>.
+            </p>
+            <p>
+              يحدد مجموع النقاط الترتيب العام، وعند تساوي النقاط
+              يتقدم الفريق صاحب <b>الزمن التراكمي الأقل</b>.
+            </p>
+            <p>
+              بعد اكتمال جميع الجولات تُعتمد المراكز الثلاثة الأولى
+              وفق الترتيب النهائي.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="preshow-dots" aria-label="صفحات العرض التمهيدي">
+        {enabledPages.map((page, index) => (
+          <span
+            key={page}
+            className={
+              index === pageIndex % Math.max(enabledPages.length, 1)
+                ? "active"
+                : ""
+            }
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PresentationControlPanel({
+  settings,
+}: {
+  settings: AudienceDisplaySettings | null;
+}) {
   const [customTitle, setCustomTitle] = useState("");
   const [customMessage, setCustomMessage] = useState("");
+  const [preShowDraft, setPreShowDraft] = useState<
+    AudienceDisplaySettings["copy"]["preShow"] | null
+  >(settings?.copy.preShow ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPreShowDraft(settings?.copy.preShow ?? null);
+  }, [settings]);
 
   const show = async (
     kind:
@@ -2360,6 +2550,86 @@ function PresentationControlPanel() {
     }
   };
 
+  const savePreShowSettings = async () => {
+    if (!settings || !preShowDraft) {
+      throw new Error("إعدادات شاشة الجمهور غير جاهزة.");
+    }
+
+    await apiRequest<AudienceDisplaySettings>(
+      "/api/audience/settings",
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          eventTitle: settings.eventTitle,
+          eventSubtitle: settings.eventSubtitle,
+          venue: settings.venue,
+          season: settings.season,
+          footerText: settings.footerText,
+          roundLabel: settings.roundLabel,
+          copy: {
+            ...settings.copy,
+            preShow: preShowDraft,
+          },
+        }),
+      },
+    );
+  };
+
+  const savePreShow = async () => {
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await savePreShowSettings();
+      setMessage("تم حفظ إعدادات صفحات ما قبل المسابقة.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر حفظ إعدادات العرض التمهيدي",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startPreShow = async () => {
+    if (!preShowDraft) return;
+
+    const anyEnabled =
+      preShowDraft.identityEnabled ||
+      preShowDraft.aboutEnabled ||
+      preShowDraft.mechanismEnabled;
+
+    if (!anyEnabled) {
+      setError("فعّل صفحة واحدة على الأقل قبل تشغيل العرض التمهيدي.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await savePreShowSettings();
+      await apiRequest("/api/presentation/show", {
+        method: "POST",
+        body: JSON.stringify({ kind: "PRESHOW" }),
+      });
+      setMessage(
+        "بدأ العرض التمهيدي وسيتم تبديل الصفحات تلقائياً.",
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "تعذر تشغيل العرض التمهيدي",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const clear = async () => {
     setBusy(true);
     setError(null);
@@ -2369,7 +2639,7 @@ function PresentationControlPanel() {
         method: "POST",
         body: "{}",
       });
-      setMessage("تم الرجوع إلى المشهد الحي.");
+      setMessage("تم إيقاف المشهد والرجوع إلى شاشة المسابقة.");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -2381,12 +2651,132 @@ function PresentationControlPanel() {
     }
   };
 
+  const updatePreShow = (
+    patch: Partial<AudienceDisplaySettings["copy"]["preShow"]>,
+  ) => {
+    setPreShowDraft((current) =>
+      current ? { ...current, ...patch } : current,
+    );
+  };
+
   return (
     <section className="panel presentation-control-panel">
       <div className="section-heading">
         <div>
           <p className="step-label">Audience Presentation</p>
           <h2>مشاهد شاشة الجمهور</h2>
+        </div>
+      </div>
+
+      <div className="preshow-control">
+        <div className="preshow-control-heading">
+          <div>
+            <strong>شاشات ما قبل المسابقة</strong>
+            <span>
+              تتبدل تلقائياً وتبقى في Loop إلى أن تنتقل للمسابقة.
+            </span>
+          </div>
+          <label>
+            <span>مدة الصفحة</span>
+            <input
+              type="number"
+              min={5}
+              max={30}
+              value={preShowDraft?.intervalSeconds ?? 10}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  intervalSeconds: Math.min(
+                    30,
+                    Math.max(5, Number(event.target.value) || 10),
+                  ),
+                })
+              }
+            />
+            <small>ثانية</small>
+          </label>
+        </div>
+
+        <div className="preshow-toggle-grid">
+          <label>
+            <input
+              type="checkbox"
+              checked={preShowDraft?.identityEnabled ?? false}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  identityEnabled: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>1. الهوية والرعاية</strong>
+              <small>العنوان، الرعاية، الإشراف، المكان والسنة</small>
+            </span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={preShowDraft?.aboutEnabled ?? false}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  aboutEnabled: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>2. نبذة عن المسابقة</strong>
+              <small>الهدف والمحاور وطريقة المشاركة</small>
+            </span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={preShowDraft?.mechanismEnabled ?? false}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  mechanismEnabled: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>3. آلية المسابقة</strong>
+              <small>10 أسئلة · 25 ثانية · النقاط والترتيب</small>
+            </span>
+          </label>
+        </div>
+
+        <div className="actions">
+          <button
+            disabled={busy || !preShowDraft}
+            onClick={() => void savePreShow()}
+          >
+            حفظ إعدادات الصفحات
+          </button>
+          <button
+            className="primary"
+            disabled={
+              busy ||
+              !preShowDraft ||
+              !(
+                preShowDraft.identityEnabled ||
+                preShowDraft.aboutEnabled ||
+                preShowDraft.mechanismEnabled
+              )
+            }
+            onClick={() => void startPreShow()}
+          >
+            تشغيل العرض التمهيدي
+          </button>
+          <button
+            className="danger-outline"
+            disabled={busy}
+            onClick={() => void clear()}
+          >
+            بدء المسابقة — إيقاف الصفحات
+          </button>
         </div>
       </div>
 
@@ -4383,9 +4773,16 @@ export function App() {
             <AudienceSceneTransition
               sceneKey={`presentation:${audiencePresentation.updatedAt}`}
             >
-              <AudienceAnnouncementSurface
-                presentation={audiencePresentation}
-              />
+              {audiencePresentation.kind === "PRESHOW" ? (
+                <AudiencePreShowSurface
+                  settings={audienceSettings}
+                  presentationKey={audiencePresentation.updatedAt}
+                />
+              ) : (
+                <AudienceAnnouncementSurface
+                  presentation={audiencePresentation}
+                />
+              )}
             </AudienceSceneTransition>
           ) : liveSnapshot &&
           liveSnapshot.phase !== "IDLE" ? (
@@ -4439,7 +4836,7 @@ export function App() {
 
       {surface === "operator" ? (
         <>
-          <PresentationControlPanel />
+          <PresentationControlPanel settings={audienceSettings} />
           <OperationsPreflightPanel />
           <OperatorLivePanel snapshot={liveSnapshot} />
           <StationAccessPanel />

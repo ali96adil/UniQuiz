@@ -8,6 +8,12 @@ import type {
 import type { AppDatabase } from "./database.js";
 
 export const DEFAULT_AUDIENCE_COPY: AudienceDisplayCopy = {
+  preShow: {
+    intervalSeconds: 10,
+    identityEnabled: true,
+    aboutEnabled: true,
+    mechanismEnabled: true,
+  },
   welcomeTitle: "أهلاً بكم",
   waitingParticipantsText: "بانتظار تثبيت الكليات المشاركة",
   drawPhaseLabel: "مرحلة القرعة",
@@ -59,6 +65,12 @@ export const DEFAULT_AUDIENCE_COPY: AudienceDisplayCopy = {
 };
 
 const copySchema = z.object({
+  preShow: z.object({
+    intervalSeconds: z.number().int().min(5).max(30),
+    identityEnabled: z.boolean(),
+    aboutEnabled: z.boolean(),
+    mechanismEnabled: z.boolean(),
+  }),
   welcomeTitle: z.string().trim().min(1).max(160),
   waitingParticipantsText: z.string().trim().min(1).max(240),
   drawPhaseLabel: z.string().trim().min(1).max(120),
@@ -171,6 +183,10 @@ function readAudienceCopy(db: AppDatabase): AudienceDisplayCopy {
     return {
       ...DEFAULT_AUDIENCE_COPY,
       ...parsed,
+      preShow: {
+        ...DEFAULT_AUDIENCE_COPY.preShow,
+        ...(parsed.preShow ?? {}),
+      },
     };
   } catch {
     return { ...DEFAULT_AUDIENCE_COPY };
