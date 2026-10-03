@@ -40,11 +40,12 @@ test("audience presentation does not mutate live competition state", () => {
   assert.equal(shown.title, "استراحة قصيرة");
 
   const preShow = showAudiencePresentation(db, {
-    kind: "PRESHOW",
+    kind: "CUSTOM",
+    title: "__UNIQUIZ_PRESHOW__",
   });
   assert.equal(preShow.active, true);
-  assert.equal(preShow.kind, "PRESHOW");
-  assert.equal(preShow.title, "العرض التمهيدي");
+  assert.equal(preShow.kind, "CUSTOM");
+  assert.equal(preShow.title, "__UNIQUIZ_PRESHOW__");
 
   const afterShow = db.prepare(`
     SELECT

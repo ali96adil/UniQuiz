@@ -371,7 +371,6 @@ export type RuntimeMode = "official" | "rehearsal";
 
 
 export type AudiencePresentationKind =
-  | "PRESHOW"
   | "BREAK"
   | "PLEASE_WAIT"
   | "NEXT_ROUND"

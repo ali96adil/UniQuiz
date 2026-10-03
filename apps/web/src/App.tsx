@@ -2317,6 +2317,8 @@ function AudienceAnnouncementSurface({
   );
 }
 
+const PRESHOW_PRESENTATION_MARKER = "__UNIQUIZ_PRESHOW__";
+
 type AudiencePreShowPage = "identity" | "about" | "mechanism";
 
 function AudiencePreShowSurface({
@@ -2614,7 +2616,10 @@ function PresentationControlPanel({
       await savePreShowSettings();
       await apiRequest("/api/presentation/show", {
         method: "POST",
-        body: JSON.stringify({ kind: "PRESHOW" }),
+        body: JSON.stringify({
+          kind: "CUSTOM",
+          title: PRESHOW_PRESENTATION_MARKER,
+        }),
       });
       setMessage(
         "بدأ العرض التمهيدي وسيتم تبديل الصفحات تلقائياً.",
@@ -4773,7 +4778,8 @@ export function App() {
             <AudienceSceneTransition
               sceneKey={`presentation:${audiencePresentation.updatedAt}`}
             >
-              {audiencePresentation.kind === "PRESHOW" ? (
+              {audiencePresentation.kind === "CUSTOM" &&
+              audiencePresentation.title === PRESHOW_PRESENTATION_MARKER ? (
                 <AudiencePreShowSurface
                   settings={audienceSettings}
                   presentationKey={audiencePresentation.updatedAt}
