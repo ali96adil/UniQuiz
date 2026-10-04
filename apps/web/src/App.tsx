@@ -3900,19 +3900,33 @@ function OperatorLivePanel({
         ) : null}
 
         {snapshot.qualificationComplete ? (
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() => {
-              window.open(
-                "/report?print=1",
-                "_blank",
-                "noopener,noreferrer",
-              );
-            }}
-          >
-            تصدير بيان النتائج PDF
-          </button>
+          <>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  "/api/live/awards/start",
+                  "تم إرسال Cue إعلان الجوائز إلى Ableton.",
+                )
+              }
+            >
+              بدء إعلان الجوائز — OSC
+            </button>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() => {
+                window.open(
+                  "/report?print=1",
+                  "_blank",
+                  "noopener,noreferrer",
+                );
+              }}
+            >
+              تصدير بيان النتائج PDF
+            </button>
+          </>
         ) : null}
 
         {(snapshot.phase === "QUESTION_COUNTDOWN" ||
