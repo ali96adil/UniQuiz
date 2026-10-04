@@ -570,6 +570,17 @@ export class LiveSessionManager {
       };
     }
 
+    const resultsAnnounced =
+      (
+        this.db.prepare(`
+          SELECT EXISTS(
+            SELECT 1
+            FROM audit_events
+            WHERE event_type = 'FINAL_RESULTS_ANNOUNCED'
+          ) AS announced
+        `).get() as { announced: number }
+      ).announced === 1;
+
     return {
       phase: state.phase,
       serverNowEpochMs: Date.now(),
@@ -589,6 +600,7 @@ export class LiveSessionManager {
       qualificationComplete:
         roundCounts.total > 0 &&
         completedRoundCount === roundCounts.total,
+      resultsAnnounced,
       stationReadiness: {
         teamARequired: round !== null,
         teamAConnected: this.isStationConnected("team-a"),
@@ -1644,13 +1656,32 @@ export class LiveSessionManager {
       [roundOrder],
     );
 
-    const completedSnapshot = this.getSnapshot();
-    if (completedSnapshot.qualificationComplete) {
-      this.sendShowControl(
-        "/uniquiz/results/final",
-        [roundOrder],
-      );
+    return this.publish();
+  }
+
+  announceFinalResults(): LiveSnapshot {
+    const snapshot = this.getSnapshot();
+
+    if (
+      snapshot.phase !== "ROUND_COMPLETE" ||
+      !snapshot.qualificationComplete
+    ) {
+      throw new Error("FINAL_RESULTS_NOT_READY");
     }
+
+    if (snapshot.resultsAnnounced) {
+      throw new Error("FINAL_RESULTS_ALREADY_ANNOUNCED");
+    }
+
+    appendAuditEvent(this.db, {
+      eventType: "FINAL_RESULTS_ANNOUNCED",
+      roundId: snapshot.round?.id,
+    });
+
+    this.sendShowControl(
+      "/uniquiz/results/final",
+      [snapshot.round?.order ?? 0],
+    );
 
     return this.publish();
   }
@@ -1660,7 +1691,8 @@ export class LiveSessionManager {
 
     if (
       snapshot.phase !== "ROUND_COMPLETE" ||
-      !snapshot.qualificationComplete
+      !snapshot.qualificationComplete ||
+      !snapshot.resultsAnnounced
     ) {
       throw new Error("AWARDS_NOT_READY");
     }
@@ -1801,6 +1833,7 @@ export function registerLiveSessionRoutes(
   simple("/api/live/reveal", () => manager.revealQuestion());
   simple("/api/live/intermission", () => manager.enterIntermission());
   simple("/api/live/complete-round", () => manager.completeRound());
+  simple("/api/live/results/announce", () => manager.announceFinalResults());
   simple("/api/live/awards/start", () => manager.startAwards());
 
   return manager;
