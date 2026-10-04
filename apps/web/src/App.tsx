@@ -2333,8 +2333,6 @@ function AudienceAnnouncementSurface({
 
 const PRESHOW_PRESENTATION_MARKER = "__UNIQUIZ_PRESHOW__";
 
-type AudiencePreShowPage = "identity" | "about" | "mechanism";
-
 function PreShowIdentityBlock({
   settings,
   compact = false,
@@ -2396,145 +2394,89 @@ function PreShowIdentityBlock({
 function AudiencePreShowSurface({
   settings,
   categories,
-  presentationKey,
 }: {
   settings: AudienceDisplaySettings;
   categories: QuestionBankSummary["categories"];
-  presentationKey: string;
 }) {
-  const enabledPages = (
-    [
-      settings.copy.preShow.identityEnabled ? "identity" : null,
-      settings.copy.preShow.aboutEnabled ? "about" : null,
-      settings.copy.preShow.mechanismEnabled ? "mechanism" : null,
-    ] as Array<AudiencePreShowPage | null>
-  ).filter(
-    (page): page is AudiencePreShowPage => page !== null,
-  );
-  const enabledKey = enabledPages.join(":");
-  const [pageIndex, setPageIndex] = useState(0);
-
-  useEffect(() => {
-    setPageIndex(0);
-  }, [presentationKey, enabledKey]);
-
-  useEffect(() => {
-    if (enabledPages.length <= 1) return;
-
-    const timer = window.setInterval(() => {
-      setPageIndex((current) =>
-        (current + 1) % enabledPages.length,
-      );
-    }, settings.copy.preShow.intervalSeconds * 1000);
-
-    return () => window.clearInterval(timer);
-  }, [
-    presentationKey,
-    enabledKey,
-    enabledPages.length,
-    settings.copy.preShow.intervalSeconds,
-  ]);
-
-  const currentPage =
-    enabledPages[
-      pageIndex % Math.max(enabledPages.length, 1)
-    ] ?? "identity";
-
   return (
     <section className="audience-stage audience-preshow">
-      {currentPage === "identity" ? (
-        <div className="preshow-page preshow-identity">
+      <div className="preshow-unified">
+        <header className="preshow-unified-header">
           <PreShowIdentityBlock settings={settings} />
+        </header>
+
+        <div className="preshow-unified-content">
+          <section className="preshow-unified-panel preshow-unified-about">
+            <div className="preshow-section-heading">
+              <span>01</span>
+              <h2>نبذة عن المسابقة</h2>
+            </div>
+
+            <p className="preshow-lead">
+              منافسة ثقافية تجمع طلبة كليات جامعة بابل في أجواء من
+              المعرفة والتحدي والتفاعل، وتهدف إلى تعزيز الثقافة العامة
+              وسرعة التفكير وروح المنافسة الإيجابية بين الطلبة.
+            </p>
+
+            <p className="preshow-support">
+              يجيب الفريقان عن السؤال نفسه في الوقت نفسه، وتُحتسب
+              النتيجة إلكترونياً وفق صحة الإجابة وسرعة الاستجابة.
+            </p>
+
+            <div className="preshow-categories">
+              {categories.length > 0 ? (
+                categories.map((category) => (
+                  <span key={category.key}>
+                    {category.name}
+                  </span>
+                ))
+              ) : (
+                <span>بانتظار تحميل المحاور</span>
+              )}
+            </div>
+          </section>
+
+          <section className="preshow-unified-panel preshow-unified-mechanism">
+            <div className="preshow-section-heading">
+              <span>02</span>
+              <h2>آلية المسابقة</h2>
+            </div>
+
+            <div className="preshow-mechanism-grid">
+              <div>
+                <strong>10</strong>
+                <span>أسئلة في كل جولة</span>
+              </div>
+              <div>
+                <strong>5</strong>
+                <span>محاور · سؤالان لكل محور</span>
+              </div>
+              <div>
+                <strong>25</strong>
+                <span>ثانية للإجابة</span>
+              </div>
+              <div>
+                <strong>25 ← 1</strong>
+                <span>نقطة للصحيح بحسب سرعة الاستجابة</span>
+              </div>
+            </div>
+
+            <div className="preshow-rules preshow-rules-compact">
+              <p>
+                الإجابة الخاطئة أو عدم الإجابة تحتسب <b>0 نقطة</b>.
+              </p>
+              <p>
+                عند تساوي النقاط يتقدم صاحب <b>الزمن التراكمي الأقل</b>.
+              </p>
+              <p>
+                تُثبت الإجابة فور إرسالها ولا يمكن تغييرها.
+              </p>
+              <p>
+                المراكز الثلاثة الأولى تعتمد من الترتيب النهائي.
+              </p>
+            </div>
+          </section>
         </div>
-      ) : null}
-
-      {currentPage === "about" ? (
-        <div className="preshow-page preshow-about">
-          <PreShowIdentityBlock settings={settings} compact />
-          <h2 className="audience-title">
-            نبذة عن المسابقة
-          </h2>
-          <p className="preshow-lead">
-            منافسة ثقافية تجمع طلبة كليات جامعة بابل في أجواء من
-            المعرفة والتحدي والتفاعل، وتهدف إلى تعزيز الثقافة العامة
-            وسرعة التفكير وروح المنافسة الإيجابية بين الطلبة.
-          </p>
-          <p className="preshow-support">
-            يعتمد نظام المسابقة على إجابة الفريقين عن السؤال نفسه
-            في الوقت نفسه، مع احتساب النتيجة إلكترونياً وفق صحة
-            الإجابة وسرعة الاستجابة.
-          </p>
-          <div className="preshow-categories">
-            {categories.length > 0 ? (
-              categories.map((category) => (
-                <span key={category.key}>
-                  {category.name}
-                </span>
-              ))
-            ) : (
-              <span>بانتظار تحميل المحاور</span>
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {currentPage === "mechanism" ? (
-        <div className="preshow-page preshow-mechanism">
-          <PreShowIdentityBlock settings={settings} compact />
-          <h2 className="audience-title">
-            آلية المسابقة
-          </h2>
-
-          <div className="preshow-mechanism-grid">
-            <div>
-              <strong>10</strong>
-              <span>أسئلة في كل جولة</span>
-            </div>
-            <div>
-              <strong>5</strong>
-              <span>محاور · سؤالان لكل محور</span>
-            </div>
-            <div>
-              <strong>25</strong>
-              <span>ثانية للإجابة</span>
-            </div>
-            <div>
-              <strong>25 ← 1</strong>
-              <span>نقطة للصحيح بحسب سرعة الاستجابة</span>
-            </div>
-          </div>
-
-          <div className="preshow-rules">
-            <p>
-              الفريقان يجيبان عن السؤال نفسه في الوقت نفسه، وتُثبت
-              الإجابة فور إرسالها.
-            </p>
-            <p>
-              الإجابة الخاطئة أو عدم الإجابة تحتسب <b>0 نقطة</b>.
-            </p>
-            <p>
-              يحدد مجموع النقاط الترتيب العام، وعند تساوي النقاط
-              يتقدم الفريق صاحب <b>الزمن التراكمي الأقل</b>.
-            </p>
-            <p>
-              بعد اكتمال جميع الجولات تُعتمد المراكز الثلاثة الأولى
-              وفق الترتيب النهائي.
-            </p>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="preshow-dots" aria-label="صفحات العرض التمهيدي">
-        {enabledPages.map((page, index) => (
-          <span
-            key={page}
-            className={
-              index === pageIndex % Math.max(enabledPages.length, 1)
-                ? "active"
-                : ""
-            }
-          />
-        ))}
       </div>
     </section>
   );
@@ -2640,16 +2582,6 @@ function PresentationControlPanel({
   const startPreShow = async () => {
     if (!preShowDraft) return;
 
-    const anyEnabled =
-      preShowDraft.identityEnabled ||
-      preShowDraft.aboutEnabled ||
-      preShowDraft.mechanismEnabled;
-
-    if (!anyEnabled) {
-      setError("فعّل صفحة واحدة على الأقل قبل تشغيل العرض التمهيدي.");
-      return;
-    }
-
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -2663,9 +2595,7 @@ function PresentationControlPanel({
           title: PRESHOW_PRESENTATION_MARKER,
         }),
       });
-      setMessage(
-        "بدأ العرض التمهيدي وسيتم تبديل الصفحات تلقائياً.",
-      );
+      setMessage("تم تشغيل شاشة ما قبل المسابقة الموحدة.");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -2733,83 +2663,14 @@ function PresentationControlPanel({
           </small>
         </label>
 
-        <div className="preshow-control-heading">
+        <div className="preshow-control-heading unified">
           <div>
-            <strong>شاشات ما قبل المسابقة</strong>
+            <strong>شاشة ما قبل المسابقة الموحدة</strong>
             <span>
-              تتبدل تلقائياً وتبقى في Loop إلى أن تنتقل للمسابقة.
+              الهوية والرعاية والنبذة والمحاور وآلية المسابقة تظهر كلها
+              في شاشة واحدة ثابتة لاستغلال مساحة العرض بالكامل.
             </span>
           </div>
-          <label>
-            <span>مدة الصفحة</span>
-            <input
-              type="number"
-              min={5}
-              max={30}
-              value={preShowDraft?.intervalSeconds ?? 10}
-              disabled={busy || !preShowDraft}
-              onChange={(event) =>
-                updatePreShow({
-                  intervalSeconds: Math.min(
-                    30,
-                    Math.max(5, Number(event.target.value) || 10),
-                  ),
-                })
-              }
-            />
-            <small>ثانية</small>
-          </label>
-        </div>
-
-        <div className="preshow-toggle-grid">
-          <label>
-            <input
-              type="checkbox"
-              checked={preShowDraft?.identityEnabled ?? false}
-              disabled={busy || !preShowDraft}
-              onChange={(event) =>
-                updatePreShow({
-                  identityEnabled: event.target.checked,
-                })
-              }
-            />
-            <span>
-              <strong>1. الهوية والرعاية</strong>
-              <small>العنوان، الرعاية، الإشراف والسطر الإضافي</small>
-            </span>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={preShowDraft?.aboutEnabled ?? false}
-              disabled={busy || !preShowDraft}
-              onChange={(event) =>
-                updatePreShow({
-                  aboutEnabled: event.target.checked,
-                })
-              }
-            />
-            <span>
-              <strong>2. نبذة عن المسابقة</strong>
-              <small>الهدف والمحاور وطريقة المشاركة</small>
-            </span>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={preShowDraft?.mechanismEnabled ?? false}
-              disabled={busy || !preShowDraft}
-              onChange={(event) =>
-                updatePreShow({
-                  mechanismEnabled: event.target.checked,
-                })
-              }
-            />
-            <span>
-              <strong>3. آلية المسابقة</strong>
-              <small>10 أسئلة · 25 ثانية · النقاط والترتيب</small>
-            </span>
-          </label>
         </div>
 
         <div className="actions">
@@ -2817,19 +2678,11 @@ function PresentationControlPanel({
             disabled={busy || !preShowDraft}
             onClick={() => void savePreShow()}
           >
-            حفظ إعدادات الصفحات
+            حفظ إعدادات الشاشة
           </button>
           <button
             className="primary"
-            disabled={
-              busy ||
-              !preShowDraft ||
-              !(
-                preShowDraft.identityEnabled ||
-                preShowDraft.aboutEnabled ||
-                preShowDraft.mechanismEnabled
-              )
-            }
+            disabled={busy || !preShowDraft}
             onClick={() => void startPreShow()}
           >
             تشغيل العرض التمهيدي
@@ -2839,7 +2692,7 @@ function PresentationControlPanel({
             disabled={busy}
             onClick={() => void clear()}
           >
-            بدء المسابقة — إيقاف الصفحات
+            بدء المسابقة — إيقاف الشاشة
           </button>
         </div>
       </div>
@@ -4886,7 +4739,6 @@ export function App() {
             <AudiencePreShowSurface
               settings={audienceSettings}
               categories={questionBank?.categories ?? []}
-              presentationKey={audiencePresentation.updatedAt}
             />
           </AudienceSceneTransition>
         ) : (
