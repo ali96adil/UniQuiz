@@ -1,6 +1,6 @@
 # OSC Show Control
 
-UniQuiz can emit OSC over UDP from the authoritative Mac server. OSC is **show control only**: delivery failure never changes competition state, timing, submissions, scoring, or ranking.
+UniQuiz emits OSC over UDP from the authoritative Mac server. OSC is **show control only**: delivery failure never changes competition state, timing, submissions, scoring, ranking, draw state, or final results.
 
 ## Configuration
 
@@ -13,33 +13,54 @@ export UNIQUIZ_OSC_PORT=9001
 pnpm dev
 ```
 
-For Ableton running on the same Mac, keep the host at `127.0.0.1`. The port must match the OSC receiver used by Ableton / Max for Live.
+For Ableton running on the same Mac, keep the host at `127.0.0.1`. The port must match the Max for Live / OSC receiver.
 
 ## Messages
 
-All numeric arguments are OSC int32 values.
+Numeric arguments are OSC int32 values.
 
 | Address | Arguments | Meaning |
 | --- | --- | --- |
+| `/uniquiz/system/test` | ISO timestamp | Preflight test cue |
+| `/uniquiz/draw/start` | `round_count` | Animated draw presentation started |
+| `/uniquiz/draw/complete` | `round_count` | Animated draw presentation finished |
 | `/uniquiz/round/start` | `round_order` | Operator started the round |
 | `/uniquiz/question/countdown` | `round_order, question_position, value` | Prestart cue; value is 3, 2, then 1 |
-| `/uniquiz/question/start` | `round_order, question_position, duration_ms` | Question became visible and official 30s timing started |
-| `/uniquiz/question/answered` | `round_order, question_position, reason` | All required stations answered; result auto-reveal is scheduled after this cue |
-| `/uniquiz/question/timeout` | `round_order, question_position` | Official answer window expired |
+| `/uniquiz/question/start` | `round_order, question_position, duration_ms` | Question became visible and the official 25-second timing started |
+| `/uniquiz/question/answered` | `round_order, question_position, reason` | All required stations answered |
+| `/uniquiz/question/timeout` | `round_order, question_position` | Official 25-second answer window expired |
 | `/uniquiz/question/closed` | `round_order, question_position, reason` | Question closed for any reason |
-| `/uniquiz/question/reveal` | `round_order, question_position` | Operator triggered Reveal |
+| `/uniquiz/question/reveal` | `round_order, question_position` | Result/reveal became visible |
+| `/uniquiz/question/emergency_hold` | `round_order, question_position, phase` | Emergency hold was triggered |
+| `/uniquiz/question/recovery_required` | state-dependent | Restart recovery requires operator action |
 | `/uniquiz/intermission` | `round_order, question_position` | Operator entered Hold/Intermission |
 | `/uniquiz/round/complete` | `round_order` | Operator completed the round |
+| `/uniquiz/results/final` | `round_order` | Final ranking became available after the last round |
+| `/uniquiz/awards/start` | none | Operator manually started the awards announcement |
 
-## Ableton mapping idea
+## Ableton scene mapping
 
-Use the countdown cues for a short 3-2-1 sound sequence. Use `/uniquiz/question/start` to launch the 30-second question bed/timer cue. Stop or transition that cue on either `/uniquiz/question/answered` or `/uniquiz/question/timeout`. Use `/uniquiz/question/reveal` for the answer/reveal sting.
+```text
+0  ROUND START
+1  COUNTDOWN
+2  QUESTION
+3  ANSWERED
+4  TIMEOUT
+5  REVEAL
+6  BREAK
+7  ROUND END
+8  DRAW
+9  DRAW END
+10 FINAL RESULTS
+11 AWARDS
+```
 
-UniQuiz does not require Ableton to acknowledge any cue.
+For `/uniquiz/question/countdown`, launch the COUNTDOWN scene only when the third argument is `3`; the later `2` and `1` packets are timing cues and should not relaunch the scene.
 
+The QUESTION scene begins on `/uniquiz/question/start`. Stop or transition it on `/uniquiz/question/answered` or `/uniquiz/question/timeout`.
+
+The final-results cue is automatic when the last round is completed. The awards cue is intentionally manual from Operator so music does not start until the presenter is ready.
 
 ## Automatic reveal delay
 
-When all required stations have answered, UniQuiz closes the question immediately and emits `/uniquiz/question/answered`. The result is then revealed automatically after **1.5 seconds**, at which point `/uniquiz/question/reveal` is emitted.
-
-This prevents the correct answer from appearing while another required team can still answer. Timeout closure does **not** use this automatic answered-path reveal; the operator retains the explicit Reveal action for timeout cases.
+When all required stations answer, or when the 25-second window expires, UniQuiz closes the question and automatically reveals the result after **1.5 seconds**. The reveal emits `/uniquiz/question/reveal`.

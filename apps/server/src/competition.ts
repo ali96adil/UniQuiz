@@ -10,6 +10,10 @@ import type {
 } from "@uniquiz/shared";
 import type { AppDatabase } from "./database.js";
 import { generateQualificationRounds } from "./draw.js";
+import {
+  NOOP_SHOW_CONTROL,
+  type ShowControlOutput,
+} from "./osc-output.js";
 
 const collegeInputSchema = z.object({
   name: z.string().trim().min(1).max(160),
@@ -197,7 +201,21 @@ export function registerCompetitionRoutes(
   app: FastifyInstance,
   db: AppDatabase,
   io: SocketIOServer,
+  showControl: ShowControlOutput = NOOP_SHOW_CONTROL,
 ) {
+  let drawCompleteTimer: NodeJS.Timeout | null = null;
+
+  const sendShowControl = (
+    address: string,
+    args: readonly (string | number)[] = [],
+  ) => {
+    try {
+      showControl.send(address, args);
+    } catch {
+      // Show-control failures must never affect competition state.
+    }
+  };
+
   const publishSnapshot = () => {
     const snapshot = getCompetitionSnapshot(db);
     io.emit("competition:snapshot", snapshot);
@@ -362,6 +380,27 @@ export function registerCompetitionRoutes(
     };
 
     io.emit("draw:presentation:start", event);
+    sendShowControl(
+      "/uniquiz/draw/start",
+      [snapshot.rounds.length],
+    );
+
+    if (drawCompleteTimer) {
+      clearTimeout(drawCompleteTimer);
+    }
+
+    const presentationDurationMs =
+      1_600 + snapshot.rounds.length * 850;
+
+    drawCompleteTimer = setTimeout(() => {
+      sendShowControl(
+        "/uniquiz/draw/complete",
+        [snapshot.rounds.length],
+      );
+      drawCompleteTimer = null;
+    }, presentationDurationMs);
+    drawCompleteTimer.unref?.();
+
     return event;
   };
 
@@ -492,6 +531,12 @@ export function registerCompetitionRoutes(
     });
 
     reset();
+
+    if (drawCompleteTimer) {
+      clearTimeout(drawCompleteTimer);
+      drawCompleteTimer = null;
+    }
+
     const next = publishSnapshot();
     io.emit("draw:reset", next);
     return next;
