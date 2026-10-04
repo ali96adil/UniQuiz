@@ -2156,7 +2156,7 @@ function AudienceLiveSurface({
   if (snapshot.phase === "ROUND_COMPLETE") {
     const totals = snapshot.roundTotals;
 
-    if (snapshot.qualificationComplete) {
+    if (snapshot.qualificationComplete && snapshot.resultsAnnounced) {
       const finalists =
         ranking?.entries
           .filter((entry) => entry.rank !== null)
@@ -2196,6 +2196,20 @@ function AudienceLiveSurface({
 
           <p className="audience-copy">
             {settings.copy.qualificationFinalText}
+          </p>
+        </section>
+      );
+    }
+
+    if (snapshot.qualificationComplete && !snapshot.resultsAnnounced) {
+      return (
+        <section className="audience-stage audience-live-stage">
+          <div className="audience-kicker">
+            {settings.copy.qualificationCompleteKicker}
+          </div>
+          <h2 className="audience-title">انتهت جميع الجولات</h2>
+          <p className="audience-copy">
+            بانتظار إعلان النتائج النهائية
           </p>
         </section>
       );
@@ -3901,18 +3915,33 @@ function OperatorLivePanel({
 
         {snapshot.qualificationComplete ? (
           <>
-            <button
-              className="primary"
-              disabled={busy}
-              onClick={() =>
-                void run(
-                  "/api/live/awards/start",
-                  "تم إرسال Cue إعلان الجوائز إلى Ableton.",
-                )
-              }
-            >
-              بدء إعلان الجوائز — OSC
-            </button>
+            {!snapshot.resultsAnnounced ? (
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    "/api/live/results/announce",
+                    "تم إعلان النتائج النهائية وإرسال Cue إلى Ableton.",
+                  )
+                }
+              >
+                إعلان النتائج
+              </button>
+            ) : (
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    "/api/live/awards/start",
+                    "تم إرسال Cue إعلان الجوائز إلى Ableton.",
+                  )
+                }
+              >
+                بدء إعلان الجوائز — OSC
+              </button>
+            )}
             <button
               className="primary"
               disabled={busy}
@@ -4004,7 +4033,11 @@ function OperatorLivePanel({
       snapshot.qualificationComplete ? (
         <div className="reveal-answer">
           <strong>انتهت جميع جولات التصفيات</strong>
-          <span>لا توجد جولة أخرى بانتظار التجهيز.</span>
+          <span>
+            {snapshot.resultsAnnounced
+              ? "تم إعلان النتائج النهائية."
+              : "النتائج محفوظة ومخفية. اضغط «إعلان النتائج» عند استعداد المقدم."}
+          </span>
         </div>
       ) : null}
 

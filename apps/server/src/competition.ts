@@ -203,8 +203,6 @@ export function registerCompetitionRoutes(
   io: SocketIOServer,
   showControl: ShowControlOutput = NOOP_SHOW_CONTROL,
 ) {
-  let drawCompleteTimer: NodeJS.Timeout | null = null;
-
   const sendShowControl = (
     address: string,
     args: readonly (string | number)[] = [],
@@ -385,22 +383,6 @@ export function registerCompetitionRoutes(
       [snapshot.rounds.length],
     );
 
-    if (drawCompleteTimer) {
-      clearTimeout(drawCompleteTimer);
-    }
-
-    const presentationDurationMs =
-      1_600 + snapshot.rounds.length * 850;
-
-    drawCompleteTimer = setTimeout(() => {
-      sendShowControl(
-        "/uniquiz/draw/complete",
-        [snapshot.rounds.length],
-      );
-      drawCompleteTimer = null;
-    }, presentationDurationMs);
-    drawCompleteTimer.unref?.();
-
     return event;
   };
 
@@ -531,11 +513,6 @@ export function registerCompetitionRoutes(
     });
 
     reset();
-
-    if (drawCompleteTimer) {
-      clearTimeout(drawCompleteTimer);
-      drawCompleteTimer = null;
-    }
 
     const next = publishSnapshot();
     io.emit("draw:reset", next);
