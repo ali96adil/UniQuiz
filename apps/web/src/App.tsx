@@ -2457,22 +2457,16 @@ function AudiencePreShowSurface({
               <h1>{settings.eventTitle}</h1>
               <div className="preshow-v2-title-rule" />
 
+              <div className="preshow-v3-patronage">
+                <p>{PATRONAGE_LINE}</p>
+                <p>{SUPERVISION_LINE}</p>
+              </div>
+
               {settings.copy.preShow.identityLine.trim() ? (
                 <p className="preshow-v2-identity-line">
                   {settings.copy.preShow.identityLine}
                 </p>
               ) : null}
-            </div>
-
-            <div className="preshow-v2-patronage-grid">
-              <article>
-                <span>الرعاية</span>
-                <strong>{PATRONAGE_LINE}</strong>
-              </article>
-              <article>
-                <span>الإشراف</span>
-                <strong>{SUPERVISION_LINE}</strong>
-              </article>
             </div>
           </>
         ) : null}
@@ -2481,55 +2475,48 @@ function AudiencePreShowSurface({
           <>
             <PreShowTopBar settings={settings} />
 
-            <main className="preshow-v2-about-main">
-              <section className="preshow-v2-about-copy">
-                <div className="preshow-v2-section-kicker">
-                  <span>01</span>
-                  <b>عن المسابقة</b>
+            <main className="preshow-v3-about-main">
+              <section className="preshow-v3-about-band">
+                <div className="preshow-v3-about-title">
+                  <div className="preshow-v2-section-kicker">
+                    <span>01</span>
+                    <b>عن المسابقة</b>
+                  </div>
+                  <h2>منافسة معرفية تجمع كليات جامعة بابل</h2>
                 </div>
 
-                <h2>معرفة، سرعة قرار، ومنافسة جامعية واحدة</h2>
-
-                <p className="preshow-v2-lead">
-                  منافسة ثقافية تجمع طلبة كليات جامعة بابل في أجواء
-                  من المعرفة والتحدي والتفاعل، وتهدف إلى تعزيز
-                  الثقافة العامة وسرعة التفكير وروح المنافسة
-                  الإيجابية بين الطلبة.
-                </p>
-
-                <div className="preshow-v2-callout">
-                  <strong>كيف تجري المنافسة؟</strong>
+                <div className="preshow-v3-about-text">
+                  <p>
+                    مسابقة معرفية تعتمد على الثقافة العامة وسرعة
+                    التفكير ودقة القرار، ويجيب فيها الفريقان عن
+                    السؤال نفسه في الوقت نفسه ضمن نظام إلكتروني موحّد.
+                  </p>
                   <span>
-                    يجيب الفريقان عن السؤال نفسه في الوقت نفسه،
-                    وتُحتسب النتيجة إلكترونياً وفق صحة الإجابة
-                    وسرعة الاستجابة.
+                    النتيجة تُحتسب وفق صحة الإجابة وسرعة الاستجابة.
                   </span>
                 </div>
               </section>
 
-              <section className="preshow-v2-category-panel">
-                <div className="preshow-v2-category-heading">
-                  <span>5</span>
-                  <div>
-                    <small>محاور المعرفة</small>
-                    <strong>تنوع يصنع المنافسة</strong>
-                  </div>
+              <section className="preshow-v3-categories-band">
+                <div className="preshow-v3-band-label">
+                  <small>محاور المسابقة</small>
+                  <strong>خمسة محاور · سؤالان من كل محور</strong>
                 </div>
 
-                <div className="preshow-v2-category-grid">
+                <div className="preshow-v3-category-row">
                   {categories.length > 0 ? (
                     categories.map((category, index) => (
-                      <article key={category.key}>
+                      <div key={category.key}>
                         <span>
                           {String(index + 1).padStart(2, "0")}
                         </span>
                         <strong>{category.name}</strong>
-                      </article>
+                      </div>
                     ))
                   ) : (
-                    <article className="empty">
+                    <div className="empty">
                       <strong>بانتظار تحميل المحاور</strong>
-                    </article>
+                    </div>
                   )}
                 </div>
               </section>
@@ -2541,67 +2528,50 @@ function AudiencePreShowSurface({
           <>
             <PreShowTopBar settings={settings} />
 
-            <main className="preshow-v2-mechanism-main">
-              <div className="preshow-v2-mechanism-heading">
+            <main className="preshow-v3-mechanism-main">
+              <div className="preshow-v3-mechanism-heading">
                 <div className="preshow-v2-section-kicker">
                   <span>02</span>
                   <b>آلية المسابقة</b>
                 </div>
-                <h2>كل ثانية تصنع فرقاً</h2>
+                <h2>واضحة، سريعة، وكل ثانية تصنع فرقاً</h2>
               </div>
 
-              <div className="preshow-v2-stat-grid">
-                <article>
+              <div className="preshow-v3-flow" aria-label="تسلسل آلية المسابقة">
+                <div>
                   <strong>10</strong>
-                  <span>أسئلة</span>
-                  <small>في كل جولة</small>
-                </article>
-                <article>
+                  <span>أسئلة في الجولة</span>
+                </div>
+                <i aria-hidden="true">←</i>
+                <div>
                   <strong>5</strong>
-                  <span>محاور</span>
-                  <small>سؤالان لكل محور</small>
-                </article>
-                <article>
+                  <span>محاور · سؤالان لكل محور</span>
+                </div>
+                <i aria-hidden="true">←</i>
+                <div>
                   <strong>25</strong>
-                  <span>ثانية</span>
-                  <small>زمن الإجابة</small>
-                </article>
-                <article>
-                  <strong>25 ← 1</strong>
-                  <span>نقطة</span>
-                  <small>للإجابة الصحيحة حسب السرعة</small>
-                </article>
+                  <span>ثانية لكل سؤال</span>
+                </div>
+                <i aria-hidden="true">←</i>
+                <div>
+                  <strong>25 → 1</strong>
+                  <span>نقطة حسب سرعة الإجابة</span>
+                </div>
               </div>
 
-              <div className="preshow-v2-rule-grid">
-                <article>
-                  <span>01</span>
-                  <p>
-                    الفريقان يجيبان عن السؤال نفسه في الوقت نفسه،
-                    وتُثبت الإجابة فور إرسالها.
-                  </p>
-                </article>
-                <article>
-                  <span>02</span>
-                  <p>
-                    الإجابة الخاطئة أو عدم الإجابة تحتسب
-                    <b> 0 نقطة</b>.
-                  </p>
-                </article>
-                <article>
-                  <span>03</span>
-                  <p>
-                    عند تساوي النقاط يتقدم الفريق صاحب
-                    <b> الزمن التراكمي الأقل</b>.
-                  </p>
-                </article>
-                <article>
-                  <span>04</span>
-                  <p>
-                    بعد اكتمال جميع الجولات تعتمد المراكز الثلاثة
-                    الأولى وفق الترتيب النهائي.
-                  </p>
-                </article>
+              <div className="preshow-v3-rules-strip">
+                <p>
+                  <b>الإجابة:</b> الفريقان يجيبان بالتزامن، وتُثبت
+                  الإجابة فور إرسالها.
+                </p>
+                <p>
+                  <b>الاحتساب:</b> الصحيحة تنخفض نقطة كل ثانية،
+                  والخاطئة أو عدم الإجابة = 0.
+                </p>
+                <p>
+                  <b>حسم التعادل:</b> الأعلى نقاطاً أولاً، ثم صاحب
+                  الزمن التراكمي الأقل.
+                </p>
               </div>
             </main>
           </>
