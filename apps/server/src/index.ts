@@ -117,12 +117,6 @@ app.get("/health", async () => ({
 
 app.get("/api/presence", async () => presenceSnapshot());
 
-registerCompetitionRoutes(app, database, io);
-registerImportRoutes(app, database, io);
-registerStationAuthRoutes(app, database);
-registerAudienceSettingsRoutes(app, database, io);
-registerAudiencePresentationRoutes(app, database, io);
-
 const oscOutput = new OscOutput(
   config.osc,
   (error) => {
@@ -136,6 +130,12 @@ const oscOutput = new OscOutput(
     );
   },
 );
+
+registerCompetitionRoutes(app, database, io, oscOutput);
+registerImportRoutes(app, database, io);
+registerStationAuthRoutes(app, database);
+registerAudienceSettingsRoutes(app, database, io);
+registerAudiencePresentationRoutes(app, database, io);
 
 const liveSession = registerLiveSessionRoutes(
   app,
