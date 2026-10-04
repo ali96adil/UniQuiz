@@ -23,7 +23,6 @@ Numeric arguments are OSC int32 values.
 | --- | --- | --- |
 | `/uniquiz/system/test` | ISO timestamp | Preflight test cue |
 | `/uniquiz/draw/start` | `round_count` | Animated draw presentation started |
-| `/uniquiz/draw/complete` | `round_count` | Animated draw presentation finished |
 | `/uniquiz/round/start` | `round_order` | Operator started the round |
 | `/uniquiz/question/countdown` | `round_order, question_position, value` | Prestart cue; value is 3, 2, then 1 |
 | `/uniquiz/question/start` | `round_order, question_position, duration_ms` | Question became visible and the official 25-second timing started |
@@ -35,7 +34,7 @@ Numeric arguments are OSC int32 values.
 | `/uniquiz/question/recovery_required` | state-dependent | Restart recovery requires operator action |
 | `/uniquiz/intermission` | `round_order, question_position` | Operator entered Hold/Intermission |
 | `/uniquiz/round/complete` | `round_order` | Operator completed the round |
-| `/uniquiz/results/final` | `round_order` | Final ranking became available after the last round |
+| `/uniquiz/results/final` | `round_order` | Operator pressed إعلان النتائج after the last round |
 | `/uniquiz/awards/start` | none | Operator manually started the awards announcement |
 
 ## Ableton scene mapping
@@ -50,7 +49,7 @@ Numeric arguments are OSC int32 values.
 6  BREAK
 7  ROUND END
 8  DRAW
-9  DRAW END
+9  UNUSED (former DRAW END)
 10 FINAL RESULTS
 11 AWARDS
 ```
@@ -59,7 +58,9 @@ For `/uniquiz/question/countdown`, launch the COUNTDOWN scene only when the thir
 
 The QUESTION scene begins on `/uniquiz/question/start`. Stop or transition it on `/uniquiz/question/answered` or `/uniquiz/question/timeout`.
 
-The final-results cue is automatic when the last round is completed. The awards cue is intentionally manual from Operator so music does not start until the presenter is ready.
+The draw emits only `/uniquiz/draw/start`; there is no automatic draw-stop cue, so draw music can continue until another Ableton scene stops or replaces it.
+
+After the last round, UniQuiz keeps the final ranking hidden. The Operator must press **إعلان النتائج**; only then does the audience display reveal the final ranking and UniQuiz emit `/uniquiz/results/final`. The awards cue remains manual and becomes available after results are announced.
 
 ## Automatic reveal delay
 
