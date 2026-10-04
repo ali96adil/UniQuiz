@@ -2647,7 +2647,7 @@ function PresentationControlPanel({
 
       <div className="preshow-control">
         <label className="preshow-identity-line-control">
-          <span>سطر إضافي في الصفحة الأولى</span>
+          <span>سطر إضافي في أعلى الشاشة</span>
           <input
             value={preShowDraft?.identityLine ?? ""}
             disabled={busy || !preShowDraft}
@@ -2659,7 +2659,7 @@ function PresentationControlPanel({
             }
           />
           <small>
-            اختياري — يظهر تحت عنوان المسابقة ويمكن تغييره من لوحة التحكم.
+            اختياري — يظهر تحت عنوان المسابقة في الشاشة الموحدة ويمكن تغييره من لوحة التحكم.
           </small>
         </label>
 
