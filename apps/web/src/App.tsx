@@ -2333,28 +2333,32 @@ function AudienceAnnouncementSurface({
 
 const PRESHOW_PRESENTATION_MARKER = "__UNIQUIZ_PRESHOW__";
 
-function PreShowIdentityBlock({
+type AudiencePreShowPage = "identity" | "about" | "mechanism";
+
+function PreShowTopBar({
   settings,
-  compact = false,
 }: {
   settings: AudienceDisplaySettings;
-  compact?: boolean;
 }) {
   return (
-    <div
-      className={
-        compact
-          ? "preshow-identity-block compact"
-          : "preshow-identity-block"
-      }
-    >
-      <div className="preshow-logo-row">
+    <header className="preshow-v2-topbar">
+      <div className="preshow-v2-topbar-logo">
         {settings.universityLogoUrl ? (
           <img
             src={settings.universityLogoUrl}
             alt="شعار جامعة بابل"
           />
         ) : null}
+      </div>
+
+      <div className="preshow-v2-topbar-copy">
+        {settings.eventSubtitle ? (
+          <span>{settings.eventSubtitle}</span>
+        ) : null}
+        <strong>{settings.eventTitle}</strong>
+      </div>
+
+      <div className="preshow-v2-topbar-logo">
         {settings.departmentLogoUrl ? (
           <img
             src={settings.departmentLogoUrl}
@@ -2362,120 +2366,264 @@ function PreShowIdentityBlock({
           />
         ) : null}
       </div>
-
-      {settings.eventSubtitle ? (
-        <div className="audience-kicker">
-          {settings.eventSubtitle}
-        </div>
-      ) : null}
-
-      <h2 className="preshow-event-title">
-        {settings.eventTitle}
-      </h2>
-
-      {!compact ? (
-        <>
-          <div className="preshow-patronage">
-            <strong>{PATRONAGE_LINE}</strong>
-            <span>{SUPERVISION_LINE}</span>
-          </div>
-
-          {settings.copy.preShow.identityLine.trim() ? (
-            <p className="preshow-identity-line">
-              {settings.copy.preShow.identityLine}
-            </p>
-          ) : null}
-        </>
-      ) : null}
-    </div>
+    </header>
   );
 }
 
 function AudiencePreShowSurface({
   settings,
   categories,
+  presentationKey,
 }: {
   settings: AudienceDisplaySettings;
   categories: QuestionBankSummary["categories"];
+  presentationKey: string;
 }) {
+  const enabledPages = (
+    [
+      settings.copy.preShow.identityEnabled ? "identity" : null,
+      settings.copy.preShow.aboutEnabled ? "about" : null,
+      settings.copy.preShow.mechanismEnabled ? "mechanism" : null,
+    ] as Array<AudiencePreShowPage | null>
+  ).filter(
+    (page): page is AudiencePreShowPage => page !== null,
+  );
+
+  const enabledKey = enabledPages.join(":");
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [presentationKey, enabledKey]);
+
+  useEffect(() => {
+    if (enabledPages.length <= 1) return;
+
+    const timer = window.setInterval(() => {
+      setPageIndex((current) =>
+        (current + 1) % enabledPages.length,
+      );
+    }, settings.copy.preShow.intervalSeconds * 1000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    presentationKey,
+    enabledKey,
+    enabledPages.length,
+    settings.copy.preShow.intervalSeconds,
+  ]);
+
+  const currentPage =
+    enabledPages[
+      pageIndex % Math.max(enabledPages.length, 1)
+    ] ?? "identity";
+
+  const visibleIndex = enabledPages.indexOf(currentPage) + 1;
+
   return (
-    <section className="audience-stage audience-preshow">
-      <div className="preshow-unified">
-        <header className="preshow-unified-header">
-          <PreShowIdentityBlock settings={settings} />
-        </header>
-
-        <div className="preshow-unified-content">
-          <section className="preshow-unified-panel preshow-unified-about">
-            <div className="preshow-section-heading">
-              <span>01</span>
-              <h2>نبذة عن المسابقة</h2>
+    <section className="audience-stage audience-preshow preshow-v2">
+      <div
+        key={currentPage}
+        className={`preshow-v2-page preshow-v2-${currentPage}`}
+      >
+        {currentPage === "identity" ? (
+          <>
+            <div className="preshow-v2-hero-logos">
+              <div>
+                {settings.universityLogoUrl ? (
+                  <img
+                    src={settings.universityLogoUrl}
+                    alt="شعار جامعة بابل"
+                  />
+                ) : null}
+              </div>
+              <div>
+                {settings.departmentLogoUrl ? (
+                  <img
+                    src={settings.departmentLogoUrl}
+                    alt="شعار قسم النشاطات الطلابية"
+                  />
+                ) : null}
+              </div>
             </div>
 
-            <p className="preshow-lead">
-              منافسة ثقافية تجمع طلبة كليات جامعة بابل في أجواء من
-              المعرفة والتحدي والتفاعل، وتهدف إلى تعزيز الثقافة العامة
-              وسرعة التفكير وروح المنافسة الإيجابية بين الطلبة.
-            </p>
+            <div className="preshow-v2-hero">
+              {settings.eventSubtitle ? (
+                <div className="preshow-v2-eyebrow">
+                  {settings.eventSubtitle}
+                </div>
+              ) : null}
 
-            <p className="preshow-support">
-              يجيب الفريقان عن السؤال نفسه في الوقت نفسه، وتُحتسب
-              النتيجة إلكترونياً وفق صحة الإجابة وسرعة الاستجابة.
-            </p>
+              <h1>{settings.eventTitle}</h1>
+              <div className="preshow-v2-title-rule" />
 
-            <div className="preshow-categories">
-              {categories.length > 0 ? (
-                categories.map((category) => (
-                  <span key={category.key}>
-                    {category.name}
+              {settings.copy.preShow.identityLine.trim() ? (
+                <p className="preshow-v2-identity-line">
+                  {settings.copy.preShow.identityLine}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="preshow-v2-patronage-grid">
+              <article>
+                <span>الرعاية</span>
+                <strong>{PATRONAGE_LINE}</strong>
+              </article>
+              <article>
+                <span>الإشراف</span>
+                <strong>{SUPERVISION_LINE}</strong>
+              </article>
+            </div>
+          </>
+        ) : null}
+
+        {currentPage === "about" ? (
+          <>
+            <PreShowTopBar settings={settings} />
+
+            <main className="preshow-v2-about-main">
+              <section className="preshow-v2-about-copy">
+                <div className="preshow-v2-section-kicker">
+                  <span>01</span>
+                  <b>عن المسابقة</b>
+                </div>
+
+                <h2>معرفة، سرعة قرار، ومنافسة جامعية واحدة</h2>
+
+                <p className="preshow-v2-lead">
+                  منافسة ثقافية تجمع طلبة كليات جامعة بابل في أجواء
+                  من المعرفة والتحدي والتفاعل، وتهدف إلى تعزيز
+                  الثقافة العامة وسرعة التفكير وروح المنافسة
+                  الإيجابية بين الطلبة.
+                </p>
+
+                <div className="preshow-v2-callout">
+                  <strong>كيف تجري المنافسة؟</strong>
+                  <span>
+                    يجيب الفريقان عن السؤال نفسه في الوقت نفسه،
+                    وتُحتسب النتيجة إلكترونياً وفق صحة الإجابة
+                    وسرعة الاستجابة.
                   </span>
-                ))
-              ) : (
-                <span>بانتظار تحميل المحاور</span>
-              )}
-            </div>
-          </section>
+                </div>
+              </section>
 
-          <section className="preshow-unified-panel preshow-unified-mechanism">
-            <div className="preshow-section-heading">
-              <span>02</span>
-              <h2>آلية المسابقة</h2>
-            </div>
+              <section className="preshow-v2-category-panel">
+                <div className="preshow-v2-category-heading">
+                  <span>5</span>
+                  <div>
+                    <small>محاور المعرفة</small>
+                    <strong>تنوع يصنع المنافسة</strong>
+                  </div>
+                </div>
 
-            <div className="preshow-mechanism-grid">
-              <div>
-                <strong>10</strong>
-                <span>أسئلة في كل جولة</span>
-              </div>
-              <div>
-                <strong>5</strong>
-                <span>محاور · سؤالان لكل محور</span>
-              </div>
-              <div>
-                <strong>25</strong>
-                <span>ثانية للإجابة</span>
-              </div>
-              <div>
-                <strong>25 ← 1</strong>
-                <span>نقطة للصحيح بحسب سرعة الاستجابة</span>
-              </div>
-            </div>
+                <div className="preshow-v2-category-grid">
+                  {categories.length > 0 ? (
+                    categories.map((category, index) => (
+                      <article key={category.key}>
+                        <span>
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <strong>{category.name}</strong>
+                      </article>
+                    ))
+                  ) : (
+                    <article className="empty">
+                      <strong>بانتظار تحميل المحاور</strong>
+                    </article>
+                  )}
+                </div>
+              </section>
+            </main>
+          </>
+        ) : null}
 
-            <div className="preshow-rules preshow-rules-compact">
-              <p>
-                الإجابة الخاطئة أو عدم الإجابة تحتسب <b>0 نقطة</b>.
-              </p>
-              <p>
-                عند تساوي النقاط يتقدم صاحب <b>الزمن التراكمي الأقل</b>.
-              </p>
-              <p>
-                تُثبت الإجابة فور إرسالها ولا يمكن تغييرها.
-              </p>
-              <p>
-                المراكز الثلاثة الأولى تعتمد من الترتيب النهائي.
-              </p>
-            </div>
-          </section>
+        {currentPage === "mechanism" ? (
+          <>
+            <PreShowTopBar settings={settings} />
+
+            <main className="preshow-v2-mechanism-main">
+              <div className="preshow-v2-mechanism-heading">
+                <div className="preshow-v2-section-kicker">
+                  <span>02</span>
+                  <b>آلية المسابقة</b>
+                </div>
+                <h2>كل ثانية تصنع فرقاً</h2>
+              </div>
+
+              <div className="preshow-v2-stat-grid">
+                <article>
+                  <strong>10</strong>
+                  <span>أسئلة</span>
+                  <small>في كل جولة</small>
+                </article>
+                <article>
+                  <strong>5</strong>
+                  <span>محاور</span>
+                  <small>سؤالان لكل محور</small>
+                </article>
+                <article>
+                  <strong>25</strong>
+                  <span>ثانية</span>
+                  <small>زمن الإجابة</small>
+                </article>
+                <article>
+                  <strong>25 ← 1</strong>
+                  <span>نقطة</span>
+                  <small>للإجابة الصحيحة حسب السرعة</small>
+                </article>
+              </div>
+
+              <div className="preshow-v2-rule-grid">
+                <article>
+                  <span>01</span>
+                  <p>
+                    الفريقان يجيبان عن السؤال نفسه في الوقت نفسه،
+                    وتُثبت الإجابة فور إرسالها.
+                  </p>
+                </article>
+                <article>
+                  <span>02</span>
+                  <p>
+                    الإجابة الخاطئة أو عدم الإجابة تحتسب
+                    <b> 0 نقطة</b>.
+                  </p>
+                </article>
+                <article>
+                  <span>03</span>
+                  <p>
+                    عند تساوي النقاط يتقدم الفريق صاحب
+                    <b> الزمن التراكمي الأقل</b>.
+                  </p>
+                </article>
+                <article>
+                  <span>04</span>
+                  <p>
+                    بعد اكتمال جميع الجولات تعتمد المراكز الثلاثة
+                    الأولى وفق الترتيب النهائي.
+                  </p>
+                </article>
+              </div>
+            </main>
+          </>
+        ) : null}
+
+        <div className="preshow-v2-nav" aria-label="صفحات العرض التمهيدي">
+          <span className="preshow-v2-nav-count">
+            {visibleIndex} / {Math.max(enabledPages.length, 1)}
+          </span>
+          <div className="preshow-v2-nav-dots">
+            {enabledPages.map((page, index) => (
+              <span
+                key={page}
+                className={
+                  index ===
+                  pageIndex % Math.max(enabledPages.length, 1)
+                    ? "active"
+                    : ""
+                }
+              />
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -2582,6 +2730,16 @@ function PresentationControlPanel({
   const startPreShow = async () => {
     if (!preShowDraft) return;
 
+    const anyEnabled =
+      preShowDraft.identityEnabled ||
+      preShowDraft.aboutEnabled ||
+      preShowDraft.mechanismEnabled;
+
+    if (!anyEnabled) {
+      setError("فعّل شاشة واحدة على الأقل قبل تشغيل العرض التمهيدي.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -2595,7 +2753,7 @@ function PresentationControlPanel({
           title: PRESHOW_PRESENTATION_MARKER,
         }),
       });
-      setMessage("تم تشغيل شاشة ما قبل المسابقة الموحدة.");
+      setMessage("بدأ العرض التمهيدي وسيتم التبديل بين الشاشات تلقائياً.");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -2647,7 +2805,7 @@ function PresentationControlPanel({
 
       <div className="preshow-control">
         <label className="preshow-identity-line-control">
-          <span>سطر إضافي في أعلى الشاشة</span>
+          <span>سطر إضافي في شاشة الهوية</span>
           <input
             value={preShowDraft?.identityLine ?? ""}
             disabled={busy || !preShowDraft}
@@ -2659,18 +2817,87 @@ function PresentationControlPanel({
             }
           />
           <small>
-            اختياري — يظهر تحت عنوان المسابقة في الشاشة الموحدة ويمكن تغييره من لوحة التحكم.
+            اختياري — يظهر أسفل عنوان المسابقة في الشاشة الأولى.
           </small>
         </label>
 
-        <div className="preshow-control-heading unified">
+        <div className="preshow-control-heading">
           <div>
-            <strong>شاشة ما قبل المسابقة الموحدة</strong>
+            <strong>العرض التمهيدي — 3 شاشات</strong>
             <span>
-              الهوية والرعاية والنبذة والمحاور وآلية المسابقة تظهر كلها
-              في شاشة واحدة ثابتة لاستغلال مساحة العرض بالكامل.
+              تتبدل تلقائياً وتبقى في Loop إلى أن تبدأ المسابقة.
             </span>
           </div>
+          <label>
+            <span>مدة كل شاشة</span>
+            <input
+              type="number"
+              min={5}
+              max={30}
+              value={preShowDraft?.intervalSeconds ?? 10}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  intervalSeconds: Math.min(
+                    30,
+                    Math.max(5, Number(event.target.value) || 10),
+                  ),
+                })
+              }
+            />
+            <small>ثانية</small>
+          </label>
+        </div>
+
+        <div className="preshow-toggle-grid">
+          <label>
+            <input
+              type="checkbox"
+              checked={preShowDraft?.identityEnabled ?? false}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  identityEnabled: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>1. الهوية والرعاية</strong>
+              <small>افتتاحية قوية + الرعاية والإشراف</small>
+            </span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={preShowDraft?.aboutEnabled ?? false}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  aboutEnabled: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>2. نبذة ومحاور</strong>
+              <small>تعريف مختصر + المحاور الخمسة</small>
+            </span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={preShowDraft?.mechanismEnabled ?? false}
+              disabled={busy || !preShowDraft}
+              onChange={(event) =>
+                updatePreShow({
+                  mechanismEnabled: event.target.checked,
+                })
+              }
+            />
+            <span>
+              <strong>3. آلية المسابقة</strong>
+              <small>الأرقام الأساسية + قواعد المنافسة</small>
+            </span>
+          </label>
         </div>
 
         <div className="actions">
@@ -2678,11 +2905,19 @@ function PresentationControlPanel({
             disabled={busy || !preShowDraft}
             onClick={() => void savePreShow()}
           >
-            حفظ إعدادات الشاشة
+            حفظ إعدادات الشاشات
           </button>
           <button
             className="primary"
-            disabled={busy || !preShowDraft}
+            disabled={
+              busy ||
+              !preShowDraft ||
+              !(
+                preShowDraft.identityEnabled ||
+                preShowDraft.aboutEnabled ||
+                preShowDraft.mechanismEnabled
+              )
+            }
             onClick={() => void startPreShow()}
           >
             تشغيل العرض التمهيدي
@@ -2692,7 +2927,7 @@ function PresentationControlPanel({
             disabled={busy}
             onClick={() => void clear()}
           >
-            بدء المسابقة — إيقاف الشاشة
+            بدء المسابقة — إيقاف العرض
           </button>
         </div>
       </div>
@@ -4739,6 +4974,7 @@ export function App() {
             <AudiencePreShowSurface
               settings={audienceSettings}
               categories={questionBank?.categories ?? []}
+              presentationKey={audiencePresentation.updatedAt}
             />
           </AudienceSceneTransition>
         ) : (
