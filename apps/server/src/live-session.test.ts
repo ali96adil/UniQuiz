@@ -879,3 +879,59 @@ test("answer audit records correctness explicitly", async () => {
   void app.close();
   db.close();
 });
+
+
+test("final results wait for explicit operator announcement", () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const events: string[] = [];
+  const manager = new LiveSessionManager(
+    db,
+    io,
+    1,
+    30_000,
+    {
+      send(address) {
+        events.push(address);
+      },
+    },
+  );
+
+  db.exec(`
+    UPDATE qualification_rounds
+    SET status = 'ACTIVE'
+    WHERE id = 1;
+
+    UPDATE live_state
+    SET
+      phase = 'QUESTION_REVEAL',
+      round_id = 1,
+      question_position = 10
+    WHERE id = 1;
+  `);
+
+  const completed = manager.completeRound();
+
+  assert.equal(completed.qualificationComplete, true);
+  assert.equal(completed.resultsAnnounced, false);
+  assert.equal(events.includes("/uniquiz/round/complete"), true);
+  assert.equal(events.includes("/uniquiz/results/final"), false);
+  assert.throws(
+    () => manager.startAwards(),
+    /AWARDS_NOT_READY/,
+  );
+
+  const announced = manager.announceFinalResults();
+
+  assert.equal(announced.resultsAnnounced, true);
+  assert.equal(events.includes("/uniquiz/results/final"), true);
+
+  manager.startAwards();
+  assert.equal(events.includes("/uniquiz/awards/start"), true);
+
+  manager.dispose();
+  io.close();
+  void app.close();
+  db.close();
+});
