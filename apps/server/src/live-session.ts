@@ -1637,9 +1637,42 @@ export class LiveSessionManager {
       roundId: state.roundId,
     });
 
+    const roundOrder = this.roundOrder(state.roundId);
+
     this.sendShowControl(
       "/uniquiz/round/complete",
-      [this.roundOrder(state.roundId)],
+      [roundOrder],
+    );
+
+    const completedSnapshot = this.getSnapshot();
+    if (completedSnapshot.qualificationComplete) {
+      this.sendShowControl(
+        "/uniquiz/results/final",
+        [roundOrder],
+      );
+    }
+
+    return this.publish();
+  }
+
+  startAwards(): LiveSnapshot {
+    const snapshot = this.getSnapshot();
+
+    if (
+      snapshot.phase !== "ROUND_COMPLETE" ||
+      !snapshot.qualificationComplete
+    ) {
+      throw new Error("AWARDS_NOT_READY");
+    }
+
+    appendAuditEvent(this.db, {
+      eventType: "AWARDS_STARTED",
+      roundId: snapshot.round?.id,
+    });
+
+    this.sendShowControl(
+      "/uniquiz/awards/start",
+      [],
     );
 
     return this.publish();
@@ -1768,6 +1801,7 @@ export function registerLiveSessionRoutes(
   simple("/api/live/reveal", () => manager.revealQuestion());
   simple("/api/live/intermission", () => manager.enterIntermission());
   simple("/api/live/complete-round", () => manager.completeRound());
+  simple("/api/live/awards/start", () => manager.startAwards());
 
   return manager;
 }
