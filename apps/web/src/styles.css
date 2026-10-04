@@ -2794,185 +2794,581 @@ h2 {
 
 
 
-/* Unified pre-show screen: identity + about + mechanism on one 16:9 surface. */
-.preshow-unified {
-  width: min(1580px, 100%);
+/* Pre-show V2 — three cinematic 16:9 scenes with deliberate full-frame balance. */
+.audience-preshow.preshow-v2 {
+  position: relative;
+  display: block;
+  width: 100%;
   height: 100%;
   min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: clamp(14px, 2vh, 24px);
-  align-content: center;
-}
-
-.preshow-unified-header {
-  padding-bottom: clamp(10px, 1.4vh, 18px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.preshow-unified-header .preshow-identity-block {
-  gap: clamp(5px, 0.7vh, 10px);
-}
-
-.preshow-unified-header .preshow-logo-row {
-  min-height: 58px;
-  gap: clamp(20px, 3vw, 42px);
-}
-
-.preshow-unified-header .preshow-logo-row img {
-  width: clamp(64px, 6.5vw, 92px);
-  height: clamp(64px, 6.5vw, 92px);
-}
-
-.preshow-unified-header .audience-kicker {
-  font-size: clamp(0.76rem, 1vw, 0.98rem);
-}
-
-.preshow-unified-header .preshow-event-title {
-  font-size: clamp(2rem, 3.7vw, 3.65rem);
-}
-
-.preshow-unified-header .preshow-patronage {
-  width: min(1120px, 100%);
-  max-width: none;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 22px;
-  padding: 10px 18px;
-  font-size: clamp(0.76rem, 1.03vw, 1rem);
-  line-height: 1.45;
-}
-
-.preshow-unified-header .preshow-patronage > * {
-  align-self: center;
-}
-
-.preshow-unified-header .preshow-identity-line {
-  max-width: 1120px;
-  font-size: clamp(0.78rem, 1.05vw, 1rem);
-  line-height: 1.45;
-}
-
-.preshow-unified-content {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: clamp(14px, 1.8vw, 24px);
-  align-items: stretch;
-}
-
-.preshow-unified-panel {
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  align-content: start;
-  gap: clamp(10px, 1.4vh, 16px);
-  padding: clamp(16px, 2vw, 26px);
-  border: 1px solid rgba(96, 165, 250, 0.2);
-  border-radius: 22px;
+  padding: 0;
+  overflow: hidden;
+  color: #f8fafc;
   background:
-    linear-gradient(180deg, rgba(30, 41, 59, 0.66), rgba(15, 23, 42, 0.5));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    radial-gradient(circle at 12% 12%, rgba(37, 99, 235, 0.20), transparent 34%),
+    radial-gradient(circle at 88% 88%, rgba(14, 116, 144, 0.12), transparent 32%),
+    linear-gradient(145deg, #07101f 0%, #081225 52%, #050b16 100%);
 }
 
-.preshow-section-heading {
-  display: flex;
+.audience-preshow.preshow-v2::before,
+.audience-preshow.preshow-v2::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.audience-preshow.preshow-v2::before {
+  inset: 0;
+  opacity: 0.24;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+
+.audience-preshow.preshow-v2::after {
+  width: min(42vw, 760px);
+  aspect-ratio: 1;
+  left: -16vw;
+  top: 18%;
+  border: 1px solid rgba(96, 165, 250, 0.10);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 72px rgba(37, 99, 235, 0.025),
+    0 0 0 145px rgba(37, 99, 235, 0.018);
+}
+
+.preshow-v2-page {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding:
+    clamp(28px, 4.2vh, 54px)
+    clamp(38px, 5.1vw, 86px)
+    clamp(38px, 5.2vh, 64px);
+  animation: preshow-v2-enter 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes preshow-v2-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.994);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Shared slim brand bar for pages 2 and 3. */
+.preshow-v2-topbar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: clamp(72px, 7vw, 108px) minmax(0, 1fr) clamp(72px, 7vw, 108px);
+  gap: clamp(18px, 2vw, 34px);
   align-items: center;
-  gap: 12px;
-  text-align: right;
+  padding-bottom: clamp(14px, 2vh, 22px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.20);
 }
 
-.preshow-section-heading > span {
-  flex: 0 0 auto;
+.preshow-v2-topbar-logo {
+  width: 100%;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: rgba(37, 99, 235, 0.22);
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.preshow-v2-topbar-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.preshow-v2-topbar-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  text-align: center;
+}
+
+.preshow-v2-topbar-copy span {
   color: #93c5fd;
+  font-size: clamp(0.82rem, 1.15vw, 1.08rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.preshow-v2-topbar-copy strong {
+  color: #f8fafc;
+  font-size: clamp(1.8rem, 3vw, 3rem);
+  line-height: 1.08;
+}
+
+/* Page 1 — identity / hero. */
+.preshow-v2-identity {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(18px, 2.5vh, 30px);
+}
+
+.preshow-v2-hero-logos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.preshow-v2-hero-logos > div {
+  width: clamp(98px, 9.5vw, 148px);
+  height: clamp(98px, 9.5vw, 148px);
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 1.2vw, 16px);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 45px rgba(0, 0, 0, 0.16);
+}
+
+.preshow-v2-hero-logos img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.preshow-v2-hero {
+  width: min(1240px, 94%);
+  justify-self: center;
+  align-self: center;
+  display: grid;
+  justify-items: center;
+  gap: clamp(10px, 1.6vh, 18px);
+  text-align: center;
+}
+
+.preshow-v2-eyebrow {
+  padding: 8px 16px;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  border-radius: 999px;
+  background: rgba(30, 64, 175, 0.12);
+  color: #bfdbfe;
+  font-size: clamp(0.9rem, 1.3vw, 1.18rem);
+  font-weight: 850;
+}
+
+.preshow-v2-hero h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(3.3rem, 7vw, 7.3rem);
+  font-weight: 950;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+  text-wrap: balance;
+  text-shadow: 0 12px 42px rgba(0, 0, 0, 0.28);
+}
+
+.preshow-v2-title-rule {
+  width: min(320px, 28vw);
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+}
+
+.preshow-v2-identity-line {
+  max-width: 980px;
+  margin: 0;
+  color: #cbd5e1;
+  font-size: clamp(1rem, 1.7vw, 1.55rem);
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.preshow-v2-patronage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 1.8vw, 24px);
+}
+
+.preshow-v2-patronage-grid article {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  align-content: center;
+  padding: clamp(14px, 1.7vw, 22px) clamp(18px, 2vw, 28px);
+  border: 1px solid rgba(148, 163, 184, 0.17);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(30, 41, 59, 0.68), rgba(15, 23, 42, 0.48));
+}
+
+.preshow-v2-patronage-grid article > span {
+  color: #60a5fa;
+  font-size: clamp(0.72rem, 0.9vw, 0.88rem);
   font-weight: 900;
 }
 
-.preshow-section-heading h2 {
-  margin: 0;
-  color: #f8fafc;
-  font-size: clamp(1.35rem, 2vw, 2rem);
-  line-height: 1.1;
+.preshow-v2-patronage-grid article > strong {
+  color: #e2e8f0;
+  font-size: clamp(0.86rem, 1.14vw, 1.1rem);
+  font-weight: 800;
+  line-height: 1.5;
 }
 
-.preshow-unified-about .preshow-lead {
-  max-width: none;
+/* Page 2 — overview + categories. */
+.preshow-v2-about,
+.preshow-v2-mechanism {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(18px, 2.6vh, 30px);
+}
+
+.preshow-v2-about-main {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  gap: clamp(18px, 2.4vw, 34px);
+  align-items: stretch;
+}
+
+.preshow-v2-about-copy,
+.preshow-v2-category-panel {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 26px;
+  background:
+    linear-gradient(145deg, rgba(30, 41, 59, 0.62), rgba(15, 23, 42, 0.40));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.preshow-v2-about-copy {
+  display: grid;
+  align-content: center;
+  gap: clamp(14px, 2vh, 24px);
+  padding: clamp(24px, 3vw, 46px);
   text-align: right;
-  font-size: clamp(1.05rem, 1.55vw, 1.55rem);
-  line-height: 1.65;
 }
 
-.preshow-unified-about .preshow-support {
-  max-width: none;
-  text-align: right;
-  font-size: clamp(0.9rem, 1.12vw, 1.08rem);
-  line-height: 1.6;
-}
-
-.preshow-unified .preshow-categories {
-  margin-top: auto;
-  gap: 8px;
-}
-
-.preshow-unified .preshow-categories span {
-  min-width: 104px;
-  padding: 9px 14px;
-  font-size: clamp(0.82rem, 1vw, 1rem);
-}
-
-.preshow-unified .preshow-mechanism-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.preshow-v2-section-kicker {
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
 
-.preshow-unified .preshow-mechanism-grid > div {
-  min-height: 92px;
-  padding: 12px;
+.preshow-v2-section-kicker > span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: rgba(37, 99, 235, 0.20);
+  color: #93c5fd;
+  font-weight: 950;
+}
+
+.preshow-v2-section-kicker > b {
+  color: #bfdbfe;
+  font-size: clamp(0.92rem, 1.16vw, 1.12rem);
+}
+
+.preshow-v2-about-copy h2,
+.preshow-v2-mechanism-heading h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(2rem, 3.65vw, 3.8rem);
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.preshow-v2-lead {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: clamp(1.08rem, 1.65vw, 1.55rem);
+  font-weight: 720;
+  line-height: 1.72;
+}
+
+.preshow-v2-callout {
+  display: grid;
+  gap: 6px;
+  padding: clamp(15px, 1.6vw, 22px);
+  border-right: 4px solid #3b82f6;
   border-radius: 16px;
+  background: rgba(37, 99, 235, 0.10);
 }
 
-.preshow-unified .preshow-mechanism-grid strong {
-  font-size: clamp(1.65rem, 2.7vw, 2.6rem);
+.preshow-v2-callout strong {
+  color: #93c5fd;
+  font-size: clamp(0.9rem, 1.05vw, 1rem);
 }
 
-.preshow-unified .preshow-mechanism-grid span {
-  font-size: clamp(0.78rem, 0.96vw, 0.96rem);
+.preshow-v2-callout span {
+  color: #cbd5e1;
+  font-size: clamp(0.9rem, 1.1vw, 1.06rem);
+  line-height: 1.55;
 }
 
-.preshow-rules-compact {
+.preshow-v2-category-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(14px, 2vh, 22px);
+  padding: clamp(22px, 2.5vw, 36px);
+}
+
+.preshow-v2-category-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.preshow-v2-category-heading > span {
+  color: #60a5fa;
+  font-size: clamp(3rem, 5vw, 5.1rem);
+  font-weight: 950;
+  line-height: 0.9;
+}
+
+.preshow-v2-category-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.preshow-v2-category-heading small {
+  color: #94a3b8;
+  font-size: clamp(0.78rem, 0.95vw, 0.92rem);
+  font-weight: 800;
+}
+
+.preshow-v2-category-heading strong {
+  color: #f8fafc;
+  font-size: clamp(1.25rem, 1.8vw, 1.8rem);
+}
+
+.preshow-v2-category-grid {
+  min-height: 0;
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: clamp(10px, 1.2vw, 16px);
 }
 
-.preshow-rules-compact p {
-  padding: 9px 11px;
-  font-size: clamp(0.76rem, 0.92vw, 0.92rem);
-  line-height: 1.45;
-}
-
-.preshow-control-heading.unified {
-  padding: 14px 16px;
+.preshow-v2-category-grid article {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: clamp(13px, 1.35vw, 20px);
   border: 1px solid rgba(96, 165, 250, 0.18);
-  border-radius: 14px;
-  background: rgba(30, 64, 175, 0.08);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.54);
+}
+
+.preshow-v2-category-grid article:nth-child(5),
+.preshow-v2-category-grid article.empty {
+  grid-column: 1 / -1;
+}
+
+.preshow-v2-category-grid article > span {
+  color: #60a5fa;
+  font-size: clamp(0.78rem, 0.95vw, 0.9rem);
+  font-weight: 950;
+}
+
+.preshow-v2-category-grid article > strong {
+  color: #f8fafc;
+  font-size: clamp(1.05rem, 1.45vw, 1.38rem);
+}
+
+/* Page 3 — mechanics. */
+.preshow-v2-mechanism-main {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: clamp(14px, 2vh, 22px);
+}
+
+.preshow-v2-mechanism-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.preshow-v2-mechanism-heading h2 {
+  text-align: left;
+  font-size: clamp(1.8rem, 3vw, 3rem);
+}
+
+.preshow-v2-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1.35vw, 18px);
+}
+
+.preshow-v2-stat-grid article {
+  min-width: 0;
+  min-height: clamp(126px, 16vh, 176px);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid rgba(96, 165, 250, 0.20);
+  border-radius: 22px;
+  background:
+    linear-gradient(160deg, rgba(37, 99, 235, 0.14), rgba(15, 23, 42, 0.58));
+  text-align: center;
+}
+
+.preshow-v2-stat-grid article > strong {
+  color: #bfdbfe;
+  font-size: clamp(2.6rem, 4.5vw, 4.8rem);
+  font-weight: 950;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.preshow-v2-stat-grid article > span {
+  color: #f8fafc;
+  font-size: clamp(1rem, 1.3vw, 1.24rem);
+  font-weight: 900;
+}
+
+.preshow-v2-stat-grid article > small {
+  color: #94a3b8;
+  font-size: clamp(0.76rem, 0.9vw, 0.9rem);
+  font-weight: 700;
+}
+
+.preshow-v2-rule-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: clamp(10px, 1.35vw, 18px);
+}
+
+.preshow-v2-rule-grid article {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: clamp(14px, 1.6vw, 22px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.50);
+}
+
+.preshow-v2-rule-grid article > span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: rgba(37, 99, 235, 0.16);
+  color: #93c5fd;
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.preshow-v2-rule-grid p {
+  margin: 0;
+  color: #dbe3ef;
+  font-size: clamp(0.88rem, 1.12vw, 1.08rem);
+  font-weight: 690;
+  line-height: 1.55;
+  text-align: right;
+}
+
+.preshow-v2-rule-grid b {
+  color: #ffffff;
+}
+
+/* Navigation is intentionally quiet: content remains the visual focus. */
+.preshow-v2-nav {
+  position: absolute;
+  right: clamp(38px, 5.1vw, 86px);
+  bottom: clamp(14px, 1.8vh, 24px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preshow-v2-nav-count {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 850;
+  direction: ltr;
+}
+
+.preshow-v2-nav-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.preshow-v2-nav-dots > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.30);
+  transition: width 180ms ease, background 180ms ease;
+}
+
+.preshow-v2-nav-dots > span.active {
+  width: 24px;
+  background: #60a5fa;
 }
 
 @media (max-width: 1000px) {
-  .preshow-unified {
-    height: auto;
-  }
-
-  .preshow-unified-content {
+  .preshow-v2-about-main {
     grid-template-columns: 1fr;
   }
 
-  .preshow-unified-header .preshow-patronage {
+  .preshow-v2-about-copy {
+    align-content: start;
+  }
+
+  .preshow-v2-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .preshow-v2-patronage-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .preshow-v2-page {
+    overflow-y: auto;
+    padding: 24px 22px 48px;
+  }
+
+  .preshow-v2-topbar {
+    grid-template-columns: 58px minmax(0, 1fr) 58px;
+  }
+
+  .preshow-v2-category-grid,
+  .preshow-v2-rule-grid,
+  .preshow-v2-stat-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .preshow-v2-category-grid article:nth-child(5) {
+    grid-column: auto;
   }
 }
 
