@@ -185,6 +185,7 @@ export interface LiveSnapshot {
   closeReason: string | null;
   hasPendingRound: boolean;
   qualificationComplete: boolean;
+  resultsAnnounced: boolean;
   stationReadiness: LiveStationReadiness;
   answerStatus: LiveAnswerStatus;
   revealResults: LiveRevealResults | null;
