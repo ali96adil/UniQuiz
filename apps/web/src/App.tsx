@@ -2339,11 +2339,13 @@ function AudiencePreShowSurface({
   categories,
   allocation,
   presentationKey,
+  participantType,
 }: {
   settings: AudienceDisplaySettings;
   categories: QuestionBankSummary["categories"];
   allocation: QuestionAllocationSummary | null;
   presentationKey: string;
+  participantType: ParticipantType;
 }) {
   const activeCategories = categories.filter((category) =>
     allocation?.categories.some((item) => item.key === category.key && item.quotaPerRound > 0),
@@ -2452,7 +2454,7 @@ function AudiencePreShowSurface({
                     <span>01</span>
                     <b>عن المسابقة</b>
                   </div>
-                  <h2>منافسة معرفية تجمع كليات جامعة بابل</h2>
+                  <h2>منافسة معرفية تجمع {PARTICIPANT_LABELS[participantType].plural}</h2>
                 </div>
 
                 <div className="preshow-v3-about-text">
@@ -4334,10 +4336,12 @@ function TeamLivePanel({
   teamState,
   connected,
   onSubmit,
+  participantType,
 }: {
   snapshot: LiveSnapshot | null;
   teamState: LiveTeamSubmissionState | null;
   connected: boolean;
+  participantType: ParticipantType;
   onSubmit: (option: "A" | "B" | "C" | "D") => Promise<void>;
 }) {
   const [now, setNow] = useState(Date.now());
@@ -4440,7 +4444,7 @@ function TeamLivePanel({
       <div className="team-live-header">
         <div>
           <p className="team-station-label">Station {station}</p>
-          <h2>{assignedCollege?.name ?? "بانتظار تعيين الكلية"}</h2>
+          <h2>{assignedCollege?.name ?? `بانتظار تعيين ${PARTICIPANT_LABELS[participantType].singular}`}</h2>
         </div>
         <span className={connected ? "team-online" : "team-offline"}>
           {connected ? "متصل" : "غير متصل"}
@@ -4920,7 +4924,9 @@ export function App() {
           <DrawSurface snapshot={competition} />
           <QuestionAllocationPanel allocation={questionAllocation} />
           <AudienceSettingsPanel settings={audienceSettings} />
-          <ResetAllCompetitionPanel />
+          {/* With independent workspaces, new competitions use Create / Switch above.
+              Keep the legacy reset API available for backup/restore tooling,
+              but do not place a destructive reset beside the workspace controls. */}
         </>
       ) : null}
 
@@ -4943,6 +4949,7 @@ export function App() {
               settings={audienceSettings}
               categories={questionBank?.categories ?? []}
               allocation={questionAllocation}
+              participantType={participantType}
               presentationKey={audiencePresentation.updatedAt}
             />
           </AudienceSceneTransition>
@@ -5029,6 +5036,7 @@ export function App() {
             connected && effectiveRole === role
           }
           onSubmit={submitTeamAnswer}
+          participantType={participantType}
         />
       ) : null}
 
