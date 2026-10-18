@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { openDatabase } from "./database.js";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import Fastify from "fastify";
+import { Server as SocketIOServer } from "socket.io";
+import { LiveSessionManager } from "./live-session.js";
+import { registerCompetitionWorkspaceRoutes } from "./competition-workspaces.js";
 import { getCompetitionRules } from "./competition-rules.js";
 import {
   activateCompetitionWorkspace,
@@ -110,4 +117,46 @@ test("M7.2 duplicate copies setup, sponsor branding and question quotas but not 
     assert.equal(getCompetitionRules(db).questionsPerRound,12);
     assert.equal((db.prepare("SELECT phase FROM live_state").get() as {phase:string}).phase,"IDLE");
   } finally { db.close(); }
+});
+
+test("M7.2 HTTP activation creates a verified physical backup before switching", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "uniquiz-m7-workspaces-"));
+  const path = join(dir, "active.db");
+  const db = openDatabase(path);
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const live = new LiveSessionManager(db, io);
+  try {
+    registerCompetitionWorkspaceRoutes(app, db, io, live, path);
+    await app.ready();
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/competitions",
+      payload: { name: "Tournament 2", participantType: "department" },
+    });
+    assert.equal(created.statusCode, 201, created.body);
+    const id = (created.json() as {competition: {id: string}}).competition.id;
+    const switched = await app.inject({
+      method: "POST",
+      url: "/api/competitions/" + id + "/activate",
+      payload: {},
+    });
+    assert.equal(switched.statusCode, 200, switched.body);
+    assert.equal(activeWorkspaceId(db), id);
+    const backups = readdirSync(join(dir, "backups"));
+    assert.equal(backups.filter((item) => item.endsWith(".db")).length, 1);
+    assert.ok(backups.some((item) => item.includes("pre-switch")));
+    const backupName = backups.find((item) => item.endsWith(".db"))!;
+    assert.ok(existsSync(join(dir, "backups", backupName + ".json")));
+
+    const list = await app.inject({ method: "GET", url: "/api/competitions" });
+    assert.equal(list.statusCode, 200);
+    assert.equal((list.json() as { activeId: string }).activeId, id);
+  } finally {
+    live.dispose();
+    io.close();
+    await app.close();
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
