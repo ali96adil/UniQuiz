@@ -1157,7 +1157,7 @@ export function registerImportRoutes(
       ).counts,
       questionBank,
       questionMode:
-        staged.parsed.questions ? questionMode : null,
+        staged.parsed.questions ? "append" : null,
     };
   });
 }
