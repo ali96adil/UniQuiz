@@ -90,3 +90,40 @@ test("requires exactly five categories", () => {
     /Exactly five categories/,
   );
 });
+
+test("sports-only 12-question rounds use only the selected category without repeats", () => {
+  const allocated = allocateQualificationQuestions(
+    [11, 12, 13],
+    [{ ...pool(7, 7000, 36), questionsPerRound: 12 }],
+    firstIndex,
+  );
+  const allIds = allocated.flatMap((round) => round.questions.map((question) => question.questionId));
+  assert.equal(allocated.length, 3);
+  for (const round of allocated) {
+    assert.equal(round.questions.length, 12);
+    assert.deepEqual(round.questions.map((question) => question.position), Array.from({length: 12}, (_, index) => index + 1));
+    assert.ok(round.questions.every((question) => question.categoryId === 7));
+  }
+  assert.equal(new Set(allIds).size, 36);
+});
+
+test("custom distribution can mix quotas and rejects insufficient pools", () => {
+  const rounds = allocateQualificationQuestions(
+    [1, 2],
+    [
+      { ...pool(1, 1000, 16), questionsPerRound: 8 },
+      { ...pool(2, 2000, 8), questionsPerRound: 4 },
+    ],
+    firstIndex,
+  );
+  for (const round of rounds) {
+    assert.equal(round.questions.length, 12);
+    assert.equal(round.questions.filter((question) => question.categoryId === 1).length, 8);
+    assert.equal(round.questions.filter((question) => question.categoryId === 2).length, 4);
+  }
+  assert.throws(() => allocateQualificationQuestions(
+    [1, 2],
+    [{ ...pool(1, 1000, 23), questionsPerRound: 12 }],
+    firstIndex,
+  ), /needs 24 questions but has 23/);
+});
