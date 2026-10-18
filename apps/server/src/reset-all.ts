@@ -29,6 +29,7 @@ export function resetAllCompetitionData(
     db.prepare("DELETE FROM qualification_round_question_sets").run();
     db.prepare("DELETE FROM qualification_rounds").run();
     db.prepare("DELETE FROM participants").run();
+    db.prepare("UPDATE competition_rules SET distribution_json = NULL WHERE id = 1").run();
     // Reuse the permanent question/category library in the next competition.
     db.prepare("DELETE FROM colleges").run();
 
