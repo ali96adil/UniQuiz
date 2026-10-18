@@ -47,10 +47,6 @@ const surfaceTitles: Record<Surface, string> = {
   "team-b": "محطة المتسابق B",
 };
 
-const PATRONAGE_LINE =
-  "برعاية السيد رئيس جامعة بابل الأستاذ الدكتور أمين عجيل ياسر الياسري المحترم";
-const SUPERVISION_LINE =
-  "وإشراف الأستاذ الدكتور ميثاق طالب عبد الجبوري مساعد رئيس الجامعة للشؤون الإدارية المحترم";
 
 const roleTitles: Record<ClientRole, string> = {
   operator: "Operator",
@@ -686,6 +682,8 @@ function AudienceSettingsPanel({
         </p>
         <div className="audience-settings-grid">
           {([
+            ["patronageLine", "نص الرعاية"],
+            ["supervisionLine", "نص الإشراف"],
             ["welcomeTitle", "عنوان الترحيب"],
             ["waitingParticipantsText", "انتظار المشاركين"],
             ["drawPhaseLabel", "تسمية مرحلة القرعة"],
@@ -1613,8 +1611,8 @@ function AudienceBroadcastFrame({
             <span>{settings.eventSubtitle}</span>
           ) : null}
           <div className="audience-patronage">
-            <span>{PATRONAGE_LINE}</span>
-            <span>{SUPERVISION_LINE}</span>
+            <span>{settings.copy.patronageLine}</span>
+            <span>{settings.copy.supervisionLine}</span>
           </div>
           {meta ? <small>{meta}</small> : null}
         </div>
@@ -2418,8 +2416,8 @@ function AudiencePreShowSurface({
               <div className="preshow-v2-title-rule" />
 
               <div className="preshow-v3-patronage">
-                <p>{PATRONAGE_LINE}</p>
-                <p>{SUPERVISION_LINE}</p>
+                <p>{settings.copy.patronageLine}</p>
+                <p>{settings.copy.supervisionLine}</p>
               </div>
 
               {settings.copy.preShow.identityLine.trim() ? (
@@ -4222,8 +4220,8 @@ function OfficialResultsReport({
       </header>
 
       <div className="report-patronage">
-        <strong>{PATRONAGE_LINE}</strong>
-        <strong>{SUPERVISION_LINE}</strong>
+        <strong>{settings.copy.patronageLine}</strong>
+        <strong>{settings.copy.supervisionLine}</strong>
       </div>
 
       <div className="report-meta">
