@@ -108,7 +108,8 @@ export function createDatabaseBackup(
   purpose:
     | "manual"
     | "pre-restore"
-    | "pre-reset" = "manual",
+    | "pre-reset"
+    | "pre-switch" = "manual",
   now = new Date(),
 ): OperationsBackupRecord {
   if (databasePath === ":memory:") {
@@ -173,7 +174,8 @@ function readBackupMetadata(
       parsed.integrity !== "ok" ||
       (parsed.purpose !== "manual" &&
         parsed.purpose !== "pre-restore" &&
-        parsed.purpose !== "pre-reset") ||
+        parsed.purpose !== "pre-reset" &&
+        parsed.purpose !== "pre-switch") ||
       typeof parsed.databaseFileName !== "string"
     ) {
       return null;
