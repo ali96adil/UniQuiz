@@ -480,7 +480,7 @@ export function getOperationsPreflight(
       required: true,
       ready: allocation.ready,
       detail: allocation.ready
-        ? "Every round has a locked 10-question set."
+        ? "Every round has the configured number of locked questions."
         : "Question sets are not fully allocated and locked.",
     },
     {
