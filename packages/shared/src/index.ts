@@ -268,6 +268,8 @@ export interface AudiencePreShowSettings {
 
 export interface AudienceDisplayCopy {
   preShow: AudiencePreShowSettings;
+  patronageLine: string;
+  supervisionLine: string;
   welcomeTitle: string;
   waitingParticipantsText: string;
   drawPhaseLabel: string;
