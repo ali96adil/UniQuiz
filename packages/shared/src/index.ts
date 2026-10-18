@@ -175,6 +175,7 @@ export interface LiveRoundView {
 
 export interface LiveSnapshot {
   phase: LivePhase;
+  questionsPerRound: number;
   serverNowEpochMs: number;
   round: LiveRoundView | null;
   stationsConfirmed: boolean;
