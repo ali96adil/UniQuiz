@@ -347,7 +347,7 @@ export function registerCompetitionWorkspaceRoutes(
 
     // Before replacing any live competition tables, persist a physical DB backup.
     try {
-      createDatabaseBackup(db, databasePath, "pre-workspace-switch");
+      createDatabaseBackup(db, databasePath, "pre-switch");
     } catch (error) {
       return reply.code(500).send({
         error: "PRE_WORKSPACE_BACKUP_FAILED",
