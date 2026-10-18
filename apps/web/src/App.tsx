@@ -163,8 +163,6 @@ function BulkImportPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [questionMode, setQuestionMode] =
-    useState<"append" | "replace">("append");
 
   const previewFile = async () => {
     if (!file) return;
@@ -210,25 +208,6 @@ function BulkImportPanel({
   const applyImport = async () => {
     if (!preview?.valid) return;
 
-    const importsQuestions =
-      preview.kinds.includes("questions");
-    const importsCategories =
-      preview.kinds.includes("categories");
-    const effectiveQuestionMode =
-      importsQuestions && importsCategories
-        ? "replace"
-        : questionMode;
-
-    if (
-      importsQuestions &&
-      effectiveQuestionMode === "replace" &&
-      !window.confirm(
-        "استبدال بنك الأسئلة الحالي بالكامل؟ سيتم حذف الأسئلة الحالية قبل إدخال أسئلة الملف.",
-      )
-    ) {
-      return;
-    }
-
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -238,11 +217,7 @@ function BulkImportPanel({
         method: "POST",
         body: JSON.stringify({
           previewId: preview.previewId,
-          questionMode:
-            preview.kinds.includes("questions") &&
-            preview.kinds.includes("categories")
-              ? "replace"
-              : questionMode,
+          questionMode: "append",
         }),
       });
 
@@ -314,7 +289,11 @@ function BulkImportPanel({
         </div>
         <div>
           <strong>Categories</strong>
-          <code>key · name</code>
+          <code>key · name · display_name</code>
+          <small className="muted">
+            name هو الاسم الداخلي وdisplay_name هو الاسم الظاهر للجمهور،
+            مثل رياضة تخصصية ← رياضة.
+          </small>
         </div>
         <div>
           <strong>Colleges</strong>
@@ -332,7 +311,6 @@ function BulkImportPanel({
             setPreview(null);
             setError(null);
             setMessage(null);
-            setQuestionMode("append");
           }}
         />
         <button
@@ -404,34 +382,10 @@ function BulkImportPanel({
           ) : null}
 
           {preview.kinds.includes("questions") ? (
-            preview.kinds.includes("categories") ? (
-              <div className="import-mode-note">
-                هذا الملف يحتوي Categories وQuestions؛ سيتم استبدال
-                المحاور وبنك الأسئلة معًا عند الاعتماد.
-              </div>
-            ) : (
-              <div className="import-mode">
-                <strong>طريقة إدخال الأسئلة</strong>
-                <label>
-                  <input
-                    type="radio"
-                    name="question-import-mode"
-                    checked={questionMode === "append"}
-                    onChange={() => setQuestionMode("append")}
-                  />
-                  إضافة إلى بنك الأسئلة الحالي
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="question-import-mode"
-                    checked={questionMode === "replace"}
-                    onChange={() => setQuestionMode("replace")}
-                  />
-                  استبدال بنك الأسئلة بالكامل
-                </label>
-              </div>
-            )
+            <div className="import-mode-note">
+              سيتم إضافة الأسئلة الجديدة دون حذف الأسئلة القديمة،
+              مع تحديث تسمية العرض للمحاور المستوردة.
+            </div>
           ) : null}
 
           <div className="import-samples">
@@ -471,8 +425,8 @@ function BulkImportPanel({
           <div>
             {questionBank.categories.map((category) => (
               <span key={category.key}>
-                {category.name}: {category.questionCount}
-                <small> · key: {category.key}</small>
+                {category.internalName}: {category.questionCount}
+                <small> · للجمهور: {category.name} · key: {category.key}</small>
               </span>
             ))}
           </div>
