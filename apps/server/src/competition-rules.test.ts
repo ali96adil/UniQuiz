@@ -51,8 +51,7 @@ test("M7: 12 questions from one internal category, with no repeats across rounds
     assert.equal(allocated.ready, true);
     assert.ok(allocated.rounds.every((round) => round.questionCount === 12));
 
-    const rows = db.prepare("SELECT position, question_id AS questionId FROM qualification_round_questions").all()
-      as Array<{ position: number; questionId: number }>;
+    const rows = db.prepare("SELECT position, question_id AS questionId FROM qualification_round_questions").all() as Array<{ position: number; questionId: number }>;
     assert.equal(rows.length, 24);
     assert.equal(new Set(rows.map((r) => r.questionId)).size, 24);
     assert.ok(rows.some((r) => r.position === 12));
