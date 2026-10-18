@@ -5004,6 +5004,7 @@ export function App() {
           ranking={ranking}
           settings={audienceSettings}
           snapshot={liveSnapshot}
+          participantType={participantType}
         />
       ) : null}
 
