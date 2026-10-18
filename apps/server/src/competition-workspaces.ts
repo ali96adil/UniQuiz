@@ -74,7 +74,15 @@ function snapshot(db: AppDatabase): StoredSnapshot {
   ])) as StoredSnapshot;
 }
 
-function emptySnapshot(db: AppDatabase, title: string): StoredSnapshot {
+function emptySnapshot(
+  db: AppDatabase, title: string, participantType: ParticipantType,
+): StoredSnapshot {
+  const plural = ({
+    college: "الكليات",
+    department: "الأقسام",
+    class: "الشعب",
+    team: "الفرق",
+  } as const)[participantType];
   const saved = snapshot(db);
   for (const table of eventTables) {
     saved[table] = [];
@@ -99,6 +107,8 @@ function emptySnapshot(db: AppDatabase, title: string): StoredSnapshot {
       ...DEFAULT_AUDIENCE_COPY,
       patronageLine: "",
       supervisionLine: "",
+      waitingParticipantsText: `بانتظار تثبيت ${plural} المشاركة`,
+      participatingCollegeCountText: `{count} من ${plural} المشاركة`,
     }), updated_at: now,
   }];
   saved.audience_presentation = [{
@@ -108,8 +118,10 @@ function emptySnapshot(db: AppDatabase, title: string): StoredSnapshot {
   return saved;
 }
 
-function duplicateSetup(db: AppDatabase, title: string, source: StoredSnapshot): StoredSnapshot {
-  const target = emptySnapshot(db, title);
+function duplicateSetup(
+  db: AppDatabase, title: string, participantType: ParticipantType, source: StoredSnapshot,
+): StoredSnapshot {
+  const target = emptySnapshot(db, title, participantType);
   target.colleges = source.colleges;
   target.participants = source.participants;
   target.competition_rules = source.competition_rules;
@@ -194,7 +206,7 @@ export function createCompetitionWorkspace(
   const now = new Date().toISOString();
   const id = randomUUID();
   db.transaction(() => {
-    let initial = emptySnapshot(db, name);
+    let initial = emptySnapshot(db, name, participantType);
     if (copyFromId) {
       const source = db.prepare(
         "SELECT payload_json AS payload FROM competition_workspaces WHERE id=?",
@@ -203,7 +215,7 @@ export function createCompetitionWorkspace(
       const payload = copyFromId === activeWorkspaceId(db)
         ? snapshot(db)
         : parseSnapshot(source.payload ?? "");
-      initial = duplicateSetup(db, name, payload);
+      initial = duplicateSetup(db, name, participantType, payload);
     }
     db.prepare(`
       INSERT INTO competition_workspaces (
