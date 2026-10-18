@@ -4,7 +4,7 @@ import { openDatabase } from "./database.js";
 import { ensureStationCredentials } from "./station-auth.js";
 import { resetAllCompetitionData } from "./reset-all.js";
 
-test("full competition reset clears user data and preserves station credentials", () => {
+test("reset clears current competition but preserves question library and credentials", () => {
   const db = openDatabase(":memory:");
   ensureStationCredentials(db);
 
@@ -74,8 +74,6 @@ test("full competition reset clears user data and preserves station credentials"
     "colleges",
     "participants",
     "qualification_rounds",
-    "categories",
-    "questions",
     "audit_events",
     "live_submissions",
     "qualification_round_question_sets",
@@ -87,6 +85,13 @@ test("full competition reset clears user data and preserves station credentials"
     ).get() as { count: number };
 
     assert.equal(row.count, 0, table);
+  }
+
+  for (const table of ["categories", "questions"]) {
+    const row = db.prepare(
+      `SELECT COUNT(*) AS count FROM ${table}`,
+    ).get() as { count: number };
+    assert.equal(row.count, 1, table);
   }
 
   const competition = db.prepare(`
