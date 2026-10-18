@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArchivesPanel } from "./Archives.js";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -23,6 +24,7 @@ import type {
 type Surface =
   | "home"
   | "setup"
+  | "archives"
   | "draw"
   | "operator"
   | "display"
@@ -34,6 +36,7 @@ type Surface =
 const surfaceTitles: Record<Surface, string> = {
   home: "مسابقة بنك المعلومات",
   setup: "إعداد المسابقة",
+  archives: "أرشيف المسابقات",
   draw: "القرعة",
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
@@ -58,6 +61,7 @@ const roleTitles: Record<ClientRole, string> = {
 
 function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/setup")) return "setup";
+  if (pathname.startsWith("/archives")) return "archives";
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
   if (pathname.startsWith("/report")) return "report";
@@ -71,6 +75,7 @@ function surfaceFromPath(pathname: string): Surface {
 function roleForSurface(surface: Surface): ClientRole {
   switch (surface) {
     case "setup":
+    case "archives":
     case "draw":
     case "operator":
     case "report":
@@ -4848,6 +4853,9 @@ export function App() {
               <a className="button-link" href="/operator">
                 الانتقال إلى لوحة التحكم
               </a>
+              <a className="button-link" href="/archives">
+                أرشيف المسابقات
+              </a>
             </div>
           ) : surface === "draw" ? (
             <div className="surface-switcher">
@@ -4866,6 +4874,9 @@ export function App() {
               <a className="button-link" href="/draw">
                 القرعة الرسمية
               </a>
+              <a className="button-link" href="/archives">
+                أرشيف المسابقات
+              </a>
             </div>
           ) : null}
         </section>
@@ -4881,6 +4892,8 @@ export function App() {
           <ResetAllCompetitionPanel />
         </>
       ) : null}
+
+      {surface === "archives" ? <ArchivesPanel /> : null}
 
       {surface === "draw" && competition ? (
         <DrawSurface snapshot={competition} />
@@ -4998,6 +5011,7 @@ export function App() {
       ) : null}
 
       {surface !== "setup" &&
+      surface !== "archives" &&
       surface !== "draw" &&
       surface !== "operator" &&
       surface !== "display" &&
