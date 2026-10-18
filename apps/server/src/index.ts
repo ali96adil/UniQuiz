@@ -28,6 +28,7 @@ import { OscOutput } from "./osc-output.js";
 import { registerOperationsRoutes } from "./operations.js";
 import { registerResultsExportRoutes } from "./results-export.js";
 import { registerCompetitionArchiveRoutes } from "./competition-archives.js";
+import { registerCompetitionWorkspaceRoutes } from "./competition-workspaces.js";
 import {
   ensureStationCredentials,
   registerStationAuthRoutes,
@@ -183,6 +184,7 @@ registerOperationsRoutes(app, database, {
 
 registerResultsExportRoutes(app, database);
 registerCompetitionArchiveRoutes(app, database);
+registerCompetitionWorkspaceRoutes(app, database, io, liveSession, config.databasePath);
 
 io.on("connection", (socket) => {
   const role = normalizeRole(
