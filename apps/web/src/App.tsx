@@ -1068,7 +1068,7 @@ function QuestionAllocationPanel({
 
       {!inventoryReady && allocation.roundCount > 0 ? (
         <p className="status-message error">
-          بنك الأسئلة غير كافٍ لتوزيع سؤالين من كل محور على كل الجولات
+          بنك الأسئلة غير كافٍ لتوزيع الحصص المحددة للمحاور على كل الجولات
           بدون تكرار.
         </p>
       ) : null}
