@@ -23,6 +23,7 @@ const historicalTables = [
   "qualification_question_reservations",
   "categories",
   "questions",
+  "competition_rules",
   "audit_events",
   "live_state",
   "live_submissions",
