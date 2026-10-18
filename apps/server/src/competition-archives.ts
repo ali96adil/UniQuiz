@@ -77,6 +77,68 @@ function findArchive(db: AppDatabase, id: string) {
   `).get(id) as (ArchiveRow & { payloadJson: string }) | undefined;
 }
 
+export function saveCompetitionArchive(db: AppDatabase, title: string) {
+  // Snapshot and insert are a single SQLite transaction; no existing rows
+  // are changed, and creating an archive never clears the live competition.
+  return db.transaction(() => {
+    const roundCount = (db.prepare(
+      "SELECT COUNT(*) AS count FROM qualification_rounds",
+    ).get() as { count: number }).count;
+
+    if (roundCount === 0) return null;
+
+    const participantCount = (db.prepare(
+      "SELECT COUNT(*) AS count FROM participants",
+    ).get() as { count: number }).count;
+    const questionCount = (db.prepare(
+      "SELECT COUNT(*) AS count FROM qualification_round_questions",
+    ).get() as { count: number }).count;
+
+    const id = randomUUID();
+    const archivedAt = new Date().toISOString();
+    const snapshot = {
+      competition: getCompetitionSnapshot(db),
+      ranking: getQualificationRanking(db),
+      audienceSettings: getAudienceDisplaySettings(db),
+      questionBank: getQuestionBankSummary(db),
+    };
+    const tables = Object.fromEntries(
+      historicalTables.map((table) => [
+        table,
+        portableValue(db.prepare(`SELECT * FROM ${table}`).all()),
+      ]),
+    );
+    const payloadJson = JSON.stringify({
+      formatVersion: 1,
+      id,
+      title: title,
+      archivedAt,
+      snapshot,
+      tables,
+    });
+
+    db.prepare(`
+      INSERT INTO competition_archives (
+        id, title, archived_at, participant_count,
+        round_count, question_count, payload_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, title, archivedAt,
+      participantCount, roundCount, questionCount, payloadJson,
+    );
+
+    return {
+      id,
+      title: title,
+      archivedAt,
+      participantCount,
+      roundCount,
+      questionCount,
+    };
+  })();
+
+}
+
 export function registerCompetitionArchiveRoutes(
   app: FastifyInstance,
   db: AppDatabase,
@@ -92,64 +154,7 @@ export function registerCompetitionArchiveRoutes(
       });
     }
 
-    // Snapshot and insert are a single SQLite transaction; no existing rows
-    // are changed, and creating an archive never clears the live competition.
-    const archive = db.transaction(() => {
-      const roundCount = (db.prepare(
-        "SELECT COUNT(*) AS count FROM qualification_rounds",
-      ).get() as { count: number }).count;
-
-      if (roundCount === 0) return null;
-
-      const participantCount = (db.prepare(
-        "SELECT COUNT(*) AS count FROM participants",
-      ).get() as { count: number }).count;
-      const questionCount = (db.prepare(
-        "SELECT COUNT(*) AS count FROM qualification_round_questions",
-      ).get() as { count: number }).count;
-
-      const id = randomUUID();
-      const archivedAt = new Date().toISOString();
-      const snapshot = {
-        competition: getCompetitionSnapshot(db),
-        ranking: getQualificationRanking(db),
-        audienceSettings: getAudienceDisplaySettings(db),
-        questionBank: getQuestionBankSummary(db),
-      };
-      const tables = Object.fromEntries(
-        historicalTables.map((table) => [
-          table,
-          portableValue(db.prepare(`SELECT * FROM ${table}`).all()),
-        ]),
-      );
-      const payloadJson = JSON.stringify({
-        formatVersion: 1,
-        id,
-        title: parsed.data.title,
-        archivedAt,
-        snapshot,
-        tables,
-      });
-
-      db.prepare(`
-        INSERT INTO competition_archives (
-          id, title, archived_at, participant_count,
-          round_count, question_count, payload_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        id, parsed.data.title, archivedAt,
-        participantCount, roundCount, questionCount, payloadJson,
-      );
-
-      return {
-        id,
-        title: parsed.data.title,
-        archivedAt,
-        participantCount,
-        roundCount,
-        questionCount,
-      };
-    })();
+    const archive = saveCompetitionArchive(db, parsed.data.title);
 
     if (!archive) {
       return reply.code(409).send({
