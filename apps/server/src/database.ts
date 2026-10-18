@@ -64,6 +64,7 @@ export function openDatabase(databasePath: string) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category_key TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL UNIQUE,
+      display_name TEXT,
       sort_order INTEGER NOT NULL UNIQUE
     );
 
@@ -315,11 +316,16 @@ export function openDatabase(databasePath: string) {
     VALUES (1, NULL, NULL, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO NOTHING;
 
-    UPDATE app_meta
-    SET value = '12'
-    WHERE key = 'schema_version';
   `);
 
+  // SQLite CREATE TABLE IF NOT EXISTS does not add columns to older databases.
+  // Keep the internal name stable and let the presenter use display_name.
+  const categoryColumns = db.pragma("table_info(categories)") as Array<{ name: string }>;
+  if (!categoryColumns.some((column) => column.name === "display_name")) {
+    db.exec("ALTER TABLE categories ADD COLUMN display_name TEXT");
+  }
+
+  db.prepare("UPDATE app_meta SET value = '13' WHERE key = 'schema_version'").run();
   return db;
 }
 
