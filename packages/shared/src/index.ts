@@ -109,7 +109,8 @@ export interface QuestionBankSummary {
   totalQuestions: number;
   categories: Array<{
     key: string;
-    name: string;
+    name: string; // Public label shown to the audience.
+    internalName: string; // Editorial label, never shown to the audience.
     sortOrder: number;
     questionCount: number;
   }>;
