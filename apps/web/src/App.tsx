@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
+import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -4885,6 +4886,7 @@ export function App() {
       {surface === "setup" && competition ? (
         <>
           <BulkImportPanel questionBank={questionBank} />
+          <CategoryLabelsPanel questionBank={questionBank} />
           <SetupSurface snapshot={competition} />
           <DrawSurface snapshot={competition} />
           <QuestionAllocationPanel allocation={questionAllocation} />
