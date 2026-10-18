@@ -308,6 +308,36 @@ export function openDatabase(databasePath: string) {
     )
     ON CONFLICT(id) DO NOTHING;
 
+    -- Only the selected workspace is materialized in the legacy singleton tables.
+    -- Inactive workspaces keep transactionally captured copies of event-scoped rows.
+    -- The global categories/questions library and station access tokens are shared.
+    CREATE TABLE IF NOT EXISTS competition_workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      participant_type TEXT NOT NULL DEFAULT 'college'
+        CHECK (participant_type IN ('college', 'department', 'class', 'team')),
+      payload_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    INSERT INTO competition_workspaces
+      (id, name, participant_type, payload_json, created_at, updated_at)
+    SELECT
+      'legacy',
+      event_title,
+      'college',
+      NULL,
+      CURRENT_TIMESTAMP,
+      CURRENT_TIMESTAMP
+    FROM audience_settings
+    WHERE id = 1
+    ON CONFLICT(id) DO NOTHING;
+
+    INSERT INTO app_meta (key, value)
+    VALUES ('active_workspace_id', 'legacy')
+    ON CONFLICT(key) DO NOTHING;
+
     -- Immutable records of completed or in-progress competition snapshots.
     -- Archive rows are never touched by reset/import operations.
     CREATE TABLE IF NOT EXISTS competition_archives (
