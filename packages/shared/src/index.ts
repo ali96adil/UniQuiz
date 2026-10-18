@@ -121,6 +121,7 @@ export interface QuestionAllocationCategorySummary {
   name: string;
   availableQuestions: number;
   requiredQuestions: number;
+  quotaPerRound: number;
 }
 
 export interface RoundQuestionSetSummary {
