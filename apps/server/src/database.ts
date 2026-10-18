@@ -300,6 +300,21 @@ export function openDatabase(databasePath: string) {
     )
     ON CONFLICT(id) DO NOTHING;
 
+    -- Immutable records of completed or in-progress competition snapshots.
+    -- Archive rows are never touched by reset/import operations.
+    CREATE TABLE IF NOT EXISTS competition_archives (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      archived_at TEXT NOT NULL,
+      participant_count INTEGER NOT NULL,
+      round_count INTEGER NOT NULL,
+      question_count INTEGER NOT NULL,
+      payload_json TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_competition_archives_date
+      ON competition_archives(archived_at DESC);
+
     CREATE TABLE IF NOT EXISTS operations_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       osc_test_sent_at TEXT,
