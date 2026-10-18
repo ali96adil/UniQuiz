@@ -146,6 +146,7 @@ export function getQuestionAllocationSummary(
       name: category.name,
       availableQuestions: category.availableQuestions,
       requiredQuestions: rounds.length * (quotas.get(category.key) ?? 0),
+      quotaPerRound: quotas.get(category.key) ?? 0,
     })),
     rounds: roundSummaries,
   };
