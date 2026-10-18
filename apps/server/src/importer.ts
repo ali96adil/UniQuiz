@@ -26,7 +26,8 @@ interface ImportedCollege {
 
 interface ImportedCategory {
   key: string;
-  name: string;
+  name: string; // Internal editorial label.
+  displayName: string; // Short public label.
 }
 
 interface ImportedQuestion {
@@ -55,7 +56,7 @@ interface StagedImport {
 
 const applySchema = z.object({
   previewId: z.string().uuid(),
-  questionMode: z.enum(["append", "replace"]).default("append"),
+  questionMode: z.literal("append").default("append"),
 });
 
 const previews = new Map<string, StagedImport>();
@@ -167,20 +168,15 @@ function validateCategories(
   const keys = new Set<string>();
   const names = new Set<string>();
 
-  if (records.length !== 5) {
-    issue(
-      issues,
-      "error",
-      sheet,
-      null,
-      "Official qualification requires exactly 5 categories.",
-    );
+  if (records.length === 0) {
+    issue(issues, "error", sheet, null, "At least one category is required.");
   }
 
   records.forEach((record, index) => {
     const row = index + 2;
     const key = text(record.key);
     const name = text(record.name);
+    const displayName = text(record.display_name) || name;
 
     if (!key || !name) {
       issue(issues, "error", sheet, row, "Both key and name are required.");
@@ -199,7 +195,7 @@ function validateCategories(
 
     keys.add(normalizedKey);
     names.add(normalizedName);
-    rows.push({ key, name });
+    rows.push({ key, name, displayName });
   });
 
   return rows;
@@ -589,8 +585,12 @@ export async function parseImportBuffer(
     ? validateCategories(categoryRecords, "Categories", issues)
     : null;
 
+  // Include existing keys: new category sheets extend the library.
   const categoryLookup = categories
-    ? categoryLookupFromRows(categories)
+    ? categoryLookupFromRows([
+        ...(db.prepare("SELECT category_key AS key, name FROM categories").all() as Array<{ key: string; name: string }>),
+        ...categories,
+      ])
     : existingCategoryLookup(db);
 
   const colleges = collegeRecords
@@ -606,16 +606,6 @@ export async function parseImportBuffer(
       )
     : null;
 
-  if (questions && categoryLookup.canonicalKeys.size !== 5) {
-    issue(
-      issues,
-      "error",
-      "Questions",
-      null,
-      "Question import requires exactly 5 configured categories.",
-    );
-  }
-
   if (questions) {
     const importedCounts = new Map<string, number>();
     for (const question of questions) {
@@ -626,9 +616,7 @@ export async function parseImportBuffer(
       );
     }
 
-    const baseCounts = categories
-      ? new Map<string, number>()
-      : existingQuestionCounts(db);
+    const baseCounts = existingQuestionCounts(db);
     const requiredPerCategory =
       qualificationRequiredPerCategory(db);
 
@@ -704,7 +692,8 @@ export function getQuestionBankSummary(
   const categories = db.prepare(`
     SELECT
       c.category_key AS key,
-      c.name,
+      COALESCE(NULLIF(TRIM(c.display_name), ''), c.name) AS name,
+      c.name AS internalName,
       c.sort_order AS sortOrder,
       COUNT(q.id) AS questionCount
     FROM categories c
@@ -716,6 +705,7 @@ export function getQuestionBankSummary(
   `).all() as Array<{
     key: string;
     name: string;
+    internalName: string;
     sortOrder: number;
     questionCount: number;
   }>;
@@ -736,7 +726,7 @@ async function sendTemplate(reply: FastifyReply) {
   colleges.addRow(["name", "short_name", "participating"]);
 
   const categories = workbook.addWorksheet("Categories");
-  categories.addRow(["key", "name"]);
+  categories.addRow(["key", "name", "display_name"]);
 
   const questions = workbook.addWorksheet("Questions");
   questions.addRow([
@@ -791,7 +781,7 @@ async function sendSampleWorkbook(reply: FastifyReply) {
   ] as const;
 
   const categories = workbook.addWorksheet("Categories");
-  categories.addRow(["key", "name"]);
+  categories.addRow(["key", "name", "display_name"]);
   for (const category of categoriesData) {
     categories.addRow(category);
   }
@@ -872,21 +862,23 @@ async function sendExport(
   }
 
   const categories = workbook.addWorksheet("Categories");
-  categories.addRow(["key", "name"]);
+  categories.addRow(["key", "name", "display_name"]);
 
   const categoryRows = db.prepare(`
     SELECT
       category_key AS categoryKey,
-      name
+      name,
+      COALESCE(NULLIF(TRIM(display_name), ''), name) AS displayName
     FROM categories
     ORDER BY sort_order, id
   `).all() as Array<{
     categoryKey: string;
     name: string;
+    displayName: string;
   }>;
 
   for (const category of categoryRows) {
-    categories.addRow([category.categoryKey, category.name]);
+    categories.addRow([category.categoryKey, category.name, category.displayName]);
   }
 
   const questions = workbook.addWorksheet("Questions");
@@ -1053,28 +1045,8 @@ export function registerImportRoutes(
       });
     }
 
-    const existingQuestionCount = (
-      db.prepare("SELECT COUNT(*) AS count FROM questions").get() as {
-        count: number;
-      }
-    ).count;
-
-    if (
-      staged.parsed.categories &&
-      !staged.parsed.questions &&
-      existingQuestionCount > 0
-    ) {
-      return reply.code(409).send({
-        error: "CATEGORY_IMPORT_REQUIRES_QUESTIONS",
-        message:
-          "Import categories together with questions while a question bank exists.",
-      });
-    }
-
-    const questionMode =
-      staged.parsed.categories && staged.parsed.questions
-        ? "replace"
-        : parsedBody.data.questionMode;
+    // Only append is allowed; keeping existing questions is mandatory.
+    void parsedBody.data.questionMode;
 
     const apply = db.transaction(() => {
       if (staged.parsed.colleges) {
@@ -1103,24 +1075,18 @@ export function registerImportRoutes(
         });
       }
 
-      if (
-        staged.parsed.questions &&
-        questionMode === "replace"
-      ) {
-        db.prepare("DELETE FROM questions").run();
-      }
-
       if (staged.parsed.categories) {
-        db.prepare("DELETE FROM categories").run();
-
         const insertCategory = db.prepare(`
-          INSERT INTO categories (category_key, name, sort_order)
-          VALUES (?, ?, ?)
+          INSERT INTO categories (category_key, name, display_name, sort_order)
+          VALUES (?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories))
+          ON CONFLICT(category_key) DO UPDATE SET
+            name = excluded.name,
+            display_name = excluded.display_name
         `);
 
-        staged.parsed.categories.forEach((category, index) => {
-          insertCategory.run(category.key, category.name, index + 1);
-        });
+        for (const category of staged.parsed.categories) {
+          insertCategory.run(category.key, category.name, category.displayName);
+        }
       }
 
       if (staged.parsed.questions) {
