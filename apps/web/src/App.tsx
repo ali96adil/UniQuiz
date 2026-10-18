@@ -2333,12 +2333,18 @@ function PreShowTopBar({
 function AudiencePreShowSurface({
   settings,
   categories,
+  allocation,
   presentationKey,
 }: {
   settings: AudienceDisplaySettings;
   categories: QuestionBankSummary["categories"];
+  allocation: QuestionAllocationSummary | null;
   presentationKey: string;
 }) {
+  const activeCategories = categories.filter((category) =>
+    allocation?.categories.some((item) => item.key === category.key && item.quotaPerRound > 0),
+  );
+  const questionsPerRound = allocation?.questionsPerRound ?? 10;
   const enabledPages = (
     [
       settings.copy.preShow.identityEnabled ? "identity" : null,
@@ -2460,12 +2466,12 @@ function AudiencePreShowSurface({
               <section className="preshow-v3-categories-band">
                 <div className="preshow-v3-band-label">
                   <small>محاور المسابقة</small>
-                  <strong>خمسة محاور · سؤالان من كل محور</strong>
+                  <strong>{activeCategories.length} محاور · {questionsPerRound} سؤالاً للجولة</strong>
                 </div>
 
                 <div className="preshow-v3-category-row">
-                  {categories.length > 0 ? (
-                    categories.map((category, index) => (
+                  {activeCategories.length > 0 ? (
+                    activeCategories.map((category, index) => (
                       <div key={category.key}>
                         <span>
                           {String(index + 1).padStart(2, "0")}
@@ -2499,13 +2505,13 @@ function AudiencePreShowSurface({
 
               <div className="preshow-v3-flow" aria-label="تسلسل آلية المسابقة">
                 <div>
-                  <strong>10</strong>
+                  <strong>{questionsPerRound}</strong>
                   <span>أسئلة في الجولة</span>
                 </div>
                 <i aria-hidden="true">←</i>
                 <div>
-                  <strong>5</strong>
-                  <span>محاور · سؤالان لكل محور</span>
+                  <strong>{activeCategories.length}</strong>
+                  <span>محاور مختارة</span>
                 </div>
                 <i aria-hidden="true">←</i>
                 <div>
@@ -4914,6 +4920,7 @@ export function App() {
             <AudiencePreShowSurface
               settings={audienceSettings}
               categories={questionBank?.categories ?? []}
+              allocation={questionAllocation}
               presentationKey={audiencePresentation.updatedAt}
             />
           </AudienceSceneTransition>
