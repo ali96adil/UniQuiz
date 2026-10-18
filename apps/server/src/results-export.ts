@@ -152,7 +152,7 @@ export async function buildResultsWorkbook(
     SELECT
       r.round_order AS roundOrder,
       s.question_position AS questionPosition,
-      c.name AS categoryName,
+      COALESCE(NULLIF(TRIM(c.display_name), ''), c.name) AS categoryName,
       s.station,
       CASE
         WHEN s.station = 'A' THEN ca.name
