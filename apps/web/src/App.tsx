@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
 import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { RoundRulesPanel } from "./RoundRules.js";
+import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -1080,9 +1081,12 @@ function QuestionAllocationPanel({
 
 function SetupSurface({
   snapshot,
+  participantType,
 }: {
   snapshot: CompetitionSetupSnapshot;
+  participantType: ParticipantType;
 }) {
+  const participantLabels = PARTICIPANT_LABELS[participantType];
   const [collegeDrafts, setCollegeDrafts] = useState<string[]>(() =>
     Array.from({ length: 20 }, (_, index) =>
       snapshot.colleges[index]?.name ?? "",
@@ -1141,7 +1145,7 @@ function SetupSurface({
               .map((name) => ({ name })),
           }),
         }),
-      "تم حفظ قائمة الكليات.",
+      `تم حفظ قائمة ${participantLabels.plural}.`,
     );
 
   const persistParticipants = async (nextIds: Set<number>) => {
@@ -1156,7 +1160,7 @@ function SetupSurface({
           collegeIds: [...nextIds],
         }),
       });
-      setMessage("تم تحديث الكليات المشاركة مباشرةً على شاشة الجمهور.");
+      setMessage(`تم تحديث ${participantLabels.plural} المشاركة على شاشة الجمهور.`);
     } catch (caught) {
       setSelectedIds(new Set(snapshot.participantCollegeIds));
       setError(
@@ -1217,7 +1221,7 @@ function SetupSurface({
         <div className="section-heading">
           <div>
             <p className="step-label">الخطوة 2</p>
-            <h2>قائمة الكليات</h2>
+            <h2>قائمة {participantLabels.plural}</h2>
           </div>
           <span className="counter">
             {snapshot.colleges.length} / 20
@@ -1225,8 +1229,8 @@ function SetupSurface({
         </div>
 
         <p className="muted">
-          اكتب أسماء الكليات المستخدمة في هذه النسخة من المسابقة. يمكن
-          استخدام أقل من 20 كلية وترك بقية الخانات فارغة.
+          اكتب أسماء {participantLabels.plural} لهذه المسابقة. الحد الأعلى 20 مشاركاً،
+          ويمكن ترك بقية الخانات فارغة.
         </p>
 
         <div className="college-input-grid">
@@ -1236,7 +1240,7 @@ function SetupSurface({
               <input
                 value={value}
                 disabled={locked || busy}
-                placeholder={`اسم الكلية ${index + 1}`}
+                placeholder={`اسم ${participantLabels.singular} ${index + 1}`}
                 onChange={(event) => {
                   const next = [...collegeDrafts];
                   next[index] = event.target.value;
@@ -1253,7 +1257,7 @@ function SetupSurface({
             disabled={locked || busy}
             onClick={() => void saveColleges()}
           >
-            حفظ قائمة الكليات
+            حفظ قائمة {participantLabels.plural}
           </button>
         </div>
       </section>
@@ -1262,14 +1266,14 @@ function SetupSurface({
         <div className="section-heading">
           <div>
             <p className="step-label">الخطوة 3</p>
-            <h2>تحديد الكليات المشاركة</h2>
+            <h2>تحديد {participantLabels.plural} المشاركة</h2>
           </div>
           <span className="counter">{selectedIds.size} مختارة</span>
         </div>
 
         {snapshot.colleges.length === 0 ? (
           <p className="empty-state">
-            احفظ قائمة الكليات أولاً.
+            احفظ قائمة {participantLabels.plural} أولاً.
           </p>
         ) : (
           <div className="participant-grid">
@@ -4074,10 +4078,12 @@ function OfficialResultsReport({
   ranking,
   settings,
   snapshot,
+  participantType,
 }: {
   ranking: QualificationRankingSnapshot | null;
   settings: AudienceDisplaySettings | null;
   snapshot: LiveSnapshot | null;
+  participantType: ParticipantType;
 }) {
   const autoPrintRequested = useMemo(
     () =>
@@ -4234,7 +4240,7 @@ function OfficialResultsReport({
 
       <div className="report-meta">
         <span>
-          <b>عدد الكليات المشاركة:</b> {finalEntries.length}
+          <b>عدد {PARTICIPANT_LABELS[participantType].plural} المشاركة:</b> {finalEntries.length}
         </span>
         <span>
           <b>تاريخ ووقت إصدار البيان:</b> {issuedAt}
@@ -4281,7 +4287,7 @@ function OfficialResultsReport({
         <thead>
           <tr>
             <th>المركز</th>
-            <th>الكلية</th>
+            <th>{PARTICIPANT_LABELS[participantType].singular}</th>
             <th>المجموع</th>
             <th>مجموع زمن الإجابات</th>
             <th>الإجابات الصحيحة</th>
@@ -4633,6 +4639,17 @@ export function App() {
     useState<ClientRole>("unknown");
   const [runtimeMode, setRuntimeMode] =
     useState<RuntimeMode>("official");
+  const [participantType, setParticipantType] = useState<ParticipantType>("college");
+
+  useEffect(() => {
+    void fetch("/api/competitions")
+      .then((response) => response.ok ? response.json() : null)
+      .then((response: { competitions?: Array<{ active: boolean; participantType: ParticipantType }> } | null) => {
+        const current = response?.competitions?.find((row) => row.active);
+        if (current) setParticipantType(current.participantType);
+      })
+      .catch(() => { /* Existing legacy runtime can still operate. */ });
+  }, []);
 
   useEffect(() => {
     const displayMode = surface === "display";
@@ -4705,6 +4722,10 @@ export function App() {
         setRuntimeMode(payload.mode);
       },
     );
+    socket.on("competition:workspaces", (items: Array<{ active: boolean; participantType: ParticipantType }>) => {
+      const active = items.find((item) => item.active);
+      if (active) setParticipantType(active.participantType);
+    });
     socket.on("presence:snapshot", (snapshot: PresenceSnapshot) => {
       setPresence(snapshot);
     });
@@ -4891,10 +4912,11 @@ export function App() {
 
       {surface === "setup" && competition ? (
         <>
+          <CompetitionWorkspacesPanel onActiveChange={setParticipantType} />
           <BulkImportPanel questionBank={questionBank} />
           <CategoryLabelsPanel questionBank={questionBank} />
           <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
-          <SetupSurface snapshot={competition} />
+          <SetupSurface snapshot={competition} participantType={participantType} />
           <DrawSurface snapshot={competition} />
           <QuestionAllocationPanel allocation={questionAllocation} />
           <AudienceSettingsPanel settings={audienceSettings} />
