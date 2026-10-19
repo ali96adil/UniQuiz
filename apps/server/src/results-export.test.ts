@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import ExcelJS from "exceljs";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  activateCompetitionWorkspace,
+  activeWorkspaceId,
+  createCompetitionWorkspace,
+} from "./competition-workspaces.js";
 import { openDatabase } from "./database.js";
 import { buildResultsWorkbook } from "./results-export.js";
 
@@ -155,4 +163,67 @@ test("M7 workbook describes custom time-decay settings instead of historical 25s
     assert.equal(summary.getRow(10).getCell(2).value,"time_decay");
     assert.equal(summary.getRow(11).getCell(2).value,2);
   } finally { db.close(); }
+});
+
+
+test("M7 results exports stay attached to their competition after a real server database restart", async () => {
+  const folder=mkdtempSync(join(tmpdir(),"uniquiz-m7-export-restart-"));
+  const path=join(folder,"competitions.sqlite3");
+  let db=openDatabase(path);
+  let secondId="";
+  try {
+    db.exec(`
+      UPDATE audience_settings SET event_title='2026 Original College Cup' WHERE id=1;
+      INSERT INTO colleges(name,sort_order) VALUES('Original College',1);
+      INSERT INTO participants(college_id) VALUES(1);
+      INSERT INTO qualification_rounds(round_order,college_a_id,status)
+        VALUES(1,1,'COMPLETED');
+      INSERT INTO categories(category_key,name,sort_order) VALUES('sports','رياضة',1);
+      INSERT INTO questions(category_id,prompt,option_a,option_b,option_c,option_d,correct_option)
+        VALUES(1,'Original question','A','B','C','D','A');
+      INSERT INTO live_submissions(
+        round_id,question_position,station,question_id,selected_option,
+        submitted_at_epoch_ms,response_time_ms,is_correct,score_micros
+      ) VALUES(1,1,'A',1,'A',1000,1500,1,24000000);
+      INSERT INTO audit_events(event_type,round_id,question_id,position,occurred_at)
+        VALUES('QUESTION_REVEALED',1,1,1,CURRENT_TIMESTAMP);
+    `);
+    const second=createCompetitionWorkspace(db,"2027 Sports Teams","team");
+    secondId=second.id;
+    activateCompetitionWorkspace(db,secondId);
+    db.exec(`
+      UPDATE competition_gameplay_rules
+        SET duration_seconds=40,scoring_mode='fixed',correct_points=10,
+            points_lost_per_second=0 WHERE id=1;
+      UPDATE audience_settings SET event_title='2027 Sports Teams' WHERE id=1;
+    `);
+    db.close();
+
+    // Closing and reopening this physical database simulates a full server
+    // restart and verifies both the active tables and inactive JSON snapshot.
+    db=openDatabase(path);
+    assert.equal(activeWorkspaceId(db),secondId);
+    const newer=new ExcelJS.Workbook();
+    await newer.xlsx.load(await buildResultsWorkbook(db) as any);
+    assert.equal(newer.getWorksheet("Summary")!.getRow(2).getCell(2).value,"2027 Sports Teams");
+    assert.equal(newer.getWorksheet("Summary")!.getRow(7).getCell(2).value,40);
+    assert.equal(newer.getWorksheet("Summary")!.getRow(8).getCell(2).value,10);
+    assert.equal(newer.getWorksheet("Summary")!.getRow(12).getCell(2).value,"team");
+
+    activateCompetitionWorkspace(db,"legacy");
+    const previous=new ExcelJS.Workbook();
+    await previous.xlsx.load(await buildResultsWorkbook(db) as any);
+    assert.equal(previous.getWorksheet("Summary")!.getRow(2).getCell(2).value,"2026 Original College Cup");
+    assert.equal(previous.getWorksheet("Summary")!.getRow(7).getCell(2).value,25);
+    assert.equal(previous.getWorksheet("Summary")!.getRow(8).getCell(2).value,25);
+    assert.equal(previous.getWorksheet("Summary")!.getRow(12).getCell(2).value,"college");
+    assert.equal(previous.getWorksheet("Ranking")!.getRow(2).getCell(4).value,24);
+    assert.equal(previous.getWorksheet("Rounds")!.getRow(2).getCell(5).value,24);
+    assert.equal(previous.getWorksheet("Submissions")!.getRow(2).getCell(11).value,24);
+    activateCompetitionWorkspace(db,secondId);
+    assert.equal(activeWorkspaceId(db),secondId);
+  } finally {
+    if(db.open) db.close();
+    rmSync(folder,{recursive:true,force:true});
+  }
 });
