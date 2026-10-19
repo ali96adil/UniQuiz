@@ -26,6 +26,8 @@ recorded, and final results are announced only when the operator requests it.
   per competition. The 25-second/25→1 original scoring remains the default.
 - Guided five-stage setup for identity/branding, participants, question bank
   and rules, round draw/plans and actual event-day readiness.
+- Operator administration requires an explicitly configured passphrase and a
+  server-side authenticated session; team stations retain independent tokens.
 - SQLite startup migration creates a protected, verified, WAL-consistent
   database backup before changing any older schema. Migration changes are
   atomic; workspace switching is guarded and transactional.
@@ -41,7 +43,9 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#30](https://github.com/ali96adil/UniQuiz/pull/30) →
 [#31](https://github.com/ali96adil/UniQuiz/pull/31) →
 [#32](https://github.com/ali96adil/UniQuiz/pull/32) →
-[#33](https://github.com/ali96adil/UniQuiz/pull/33).
+[#33](https://github.com/ali96adil/UniQuiz/pull/33) →
+[#34](https://github.com/ali96adil/UniQuiz/pull/34) →
+[#36](https://github.com/ali96adil/UniQuiz/pull/36).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -58,6 +62,8 @@ pnpm install
 pnpm typecheck
 pnpm test
 pnpm build
+# Server startup now requires UNIQUIZ_OPERATOR_PASSPHRASE (12+ characters).
+# See docs/M7-OPERATOR-AUTH-SETUP.md for a secure interactive prompt.
 pnpm dev:rehearsal
 ```
 
