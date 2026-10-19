@@ -262,10 +262,10 @@ export function registerQuestionBankRoutes(
       if (total > 100 || keys.size !== categories.length) {
         return reply.code(400).send({ error: "INVALID_QUOTA_DISTRIBUTION" });
       }
-      const existing = new Set(
-        (db.prepare("SELECT category_key AS categoryKey FROM categories").all()
-          as Array<{ categoryKey: string }>).map((item) => item.categoryKey),
-      );
+      const existingRows = db.prepare(
+        "SELECT category_key AS categoryKey FROM categories",
+      ).all() as Array<{ categoryKey: string }>;
+      const existing = new Set(existingRows.map((item) => item.categoryKey));
       if (categories.some((item) => !existing.has(item.categoryKey))) {
         return reply.code(400).send({ error: "UNKNOWN_CATEGORY" });
       }
