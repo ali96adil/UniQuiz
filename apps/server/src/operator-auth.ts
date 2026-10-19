@@ -1,5 +1,5 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 const COOKIE = "uniquiz_operator";
@@ -63,9 +63,19 @@ export function createOperatorAuth(password: string) {
     // Register before application routes. Do not trust a self-declared role,
     // reverse-proxy IP, or an answer-station token for admin authorization.
     app.addHook("onRequest", async (request, reply) => {
-      if (request.headers["sec-fetch-site"] === "cross-site" &&
-          request.method !== "GET" && request.method !== "HEAD") {
-        return reply.code(403).send({ error: "CROSS_SITE_REQUEST_FORBIDDEN" });
+      if (request.method !== "GET" && request.method !== "HEAD" &&
+          request.method !== "OPTIONS") {
+        const origin = request.headers.origin;
+        const host = request.headers.host;
+        // SameSite protects cross-site cookies; Origin additionally blocks
+        // malicious pages hosted on a sibling origin within the same site.
+        // Vite's default proxy preserves the browser-facing Host header.
+        if (request.headers["sec-fetch-site"] === "cross-site" ||
+            (origin && (!host || (() => {
+              try { return new URL(origin).host !== host; } catch { return true; }
+            })()))) {
+          return reply.code(403).send({ error: "CROSS_SITE_REQUEST_FORBIDDEN" });
+        }
       }
       const path = request.url.split("?")[0];
       if (!path.startsWith("/api/")) return;
@@ -77,6 +87,7 @@ export function createOperatorAuth(password: string) {
       if (!isAuthorized(request.headers.cookie)) {
         return reply.code(401).send({ error: "OPERATOR_AUTH_REQUIRED" });
       }
+      reply.header("cache-control", "no-store");
     });
 
     app.get("/api/auth/session", async (request) => ({
