@@ -134,3 +134,75 @@ export function allocateQualificationQuestions(
     };
   });
 }
+
+/**
+ * Allocate independently configured rounds from a shared pool of unused
+ * questions. A category may appear in some rounds but not others.
+ */
+export function allocateRoundsByPlan(
+  plans: readonly Array<{ roundId: number; categories: readonly Array<{ categoryId: number; questions: number }> }>,
+  categoryPools: readonly CategoryQuestionPool[],
+  randomIndex: RandomIndex,
+): AllocatedRound[] {
+  if (plans.length === 0) throw new Error("At least one qualification round is required.");
+  if (new Set(plans.map((plan) => plan.roundId)).size !== plans.length) {
+    throw new Error("Duplicate round IDs.");
+  }
+  const requirements = new Map<number, number>();
+  for (const plan of plans) {
+    const total = plan.categories.reduce((sum, quota) => sum + quota.questions, 0);
+    if (!Number.isSafeInteger(total) || total < 1 || total > 100) {
+      throw new Error("Round question count must be 1..100.");
+    }
+    if (new Set(plan.categories.map((quota) => quota.categoryId)).size !== plan.categories.length) {
+      throw new Error("Duplicate category in round plan.");
+    }
+    for (const quota of plan.categories) {
+      if (!Number.isSafeInteger(quota.questions) || quota.questions < 1) {
+        throw new Error("Invalid category quota.");
+      }
+      requirements.set(quota.categoryId, (requirements.get(quota.categoryId) ?? 0) + quota.questions);
+    }
+  }
+  const inventory = new Map<number, { ids: number[]; offset: number }>();
+  const allIds = new Set<number>();
+  for (const pool of categoryPools) {
+    if (inventory.has(pool.categoryId)) throw new Error("Duplicate category inventory.");
+    for (const id of pool.questionIds) {
+      if (allIds.has(id)) throw new Error("Question ID appears in multiple categories.");
+      allIds.add(id);
+    }
+    const required = requirements.get(pool.categoryId) ?? 0;
+    if (new Set(pool.questionIds).size !== pool.questionIds.length) {
+      throw new Error(`Category ${pool.categoryId} contains duplicate question IDs.`);
+    }
+    if (pool.questionIds.length < required) {
+      throw new Error(`Category ${pool.categoryId} needs ${required} questions but has ${pool.questionIds.length}.`);
+    }
+    inventory.set(pool.categoryId, {
+      ids: shuffled(pool.questionIds, randomIndex),
+      offset: 0,
+    });
+  }
+  for (const [categoryId] of requirements) {
+    if (!inventory.has(categoryId)) throw new Error(`Missing question inventory for category ${categoryId}.`);
+  }
+
+  return plans.map((plan) => {
+    const questions: Array<{ questionId: number; categoryId: number }> = [];
+    for (const quota of plan.categories) {
+      const pool = inventory.get(quota.categoryId)!;
+      for (const questionId of pool.ids.slice(pool.offset, pool.offset + quota.questions)) {
+        questions.push({ questionId, categoryId: quota.categoryId });
+      }
+      pool.offset += quota.questions;
+    }
+    return {
+      roundId: plan.roundId,
+      questions: shuffled(questions, randomIndex).map((question, index) => ({
+        ...question,
+        position: index + 1,
+      })),
+    };
+  });
+}
