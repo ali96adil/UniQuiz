@@ -4835,9 +4835,16 @@ export function App() {
     setLiveSocket(socket);
 
     socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       setConnected(false);
       setEffectiveRole("unknown");
+      // The server forcibly disconnects a station when the operator rotates
+      // its credential. Clear the stale local secret and show enrollment.
+      if (reason === "io server disconnect" &&
+          (role === "team-a" || role === "team-b")) {
+        window.localStorage.removeItem(`uniquiz:${role}:token`);
+        setStationToken(null);
+      }
     });
     socket.on(
       "server:hello",
