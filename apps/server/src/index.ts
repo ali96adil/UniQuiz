@@ -211,6 +211,18 @@ io.on("connection", (socket) => {
   );
   roles.set(socket.id, role);
 
+  // An established operator socket cannot outlive the HttpOnly session that
+  // authorized its role. Logout separately disconnects it immediately.
+  const operatorExpiresAt = role === "operator"
+    ? operatorAuth.expiresAt(socket.handshake.headers.cookie)
+    : null;
+  const operatorExpiryTimer = operatorExpiresAt === null ? null : setTimeout(() => {
+    socket.disconnect(true);
+  }, Math.max(1, operatorExpiresAt - Date.now()));
+  if (operatorExpiryTimer) {
+    socket.once("disconnect", () => clearTimeout(operatorExpiryTimer));
+  }
+
   if (role === "team-a" || role === "team-b") {
     void socket.join(role);
   }
