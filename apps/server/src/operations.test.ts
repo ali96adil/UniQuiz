@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import {
   existsSync,
   mkdtempSync,
+  rmSync,
   readFileSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +18,7 @@ import {
   listDatabaseBackups,
   restoreDatabaseFromBackup,
   verifyDatabaseFile,
+  verifyBackupRecord,
   confirmOscTest,
   getOscTestState,
   markOscTestSent,
@@ -317,4 +320,68 @@ test("pre-reset backups are recognized as verified backups", () => {
   );
 
   db.close();
+});
+
+
+test("M7 preflight refuses same-size corrupted SQLite backup even when metadata says ok", () => {
+  const root = mkdtempSync(join(tmpdir(), "uniquiz-m7-backup-integrity-"));
+  const dbPath = join(root, "uniquiz.db");
+  const db = openDatabase(dbPath);
+  try {
+    const presence: PresenceSnapshot = { generatedAt: new Date().toISOString(), stations: [] };
+    const osc = { enabled: false, host: "127.0.0.1", port: 9001 };
+    const record = createDatabaseBackup(db, dbPath);
+    const file = join(backupDirectory(dbPath), record.fileName);
+    const baseline = readFileSync(file);
+    assert.equal(verifyBackupRecord(dbPath, record), true);
+    assert.equal(
+      getOperationsPreflight(db, dbPath, osc, presence).checks.find((check) => check.key === "backup")?.ready,
+      true,
+    );
+
+    const corrupt = Buffer.from(baseline);
+    // Keep the exact file length and original JSON sidecar unchanged.
+    // Header damage is an unambiguous failure independent of SQLite page size.
+    corrupt[0] ^= 0xff;
+    writeFileSync(file, corrupt);
+    assert.equal(readFileSync(file).length, record.sizeBytes);
+    assert.equal(verifyBackupRecord(dbPath, record), false);
+    const failed = getOperationsPreflight(db, dbPath, osc, presence);
+    assert.equal(failed.checks.find((check) => check.key === "backup")?.ready, false);
+    assert.match(
+      failed.checks.find((check) => check.key === "backup")?.detail ?? "",
+      /content or checksum could not be verified/,
+    );
+
+    writeFileSync(file, baseline);
+    assert.equal(verifyBackupRecord(dbPath, record), true);
+    assert.equal(
+      getOperationsPreflight(db, dbPath, osc, presence).checks.find((check) => check.key === "backup")?.ready,
+      true,
+    );
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("M7 preflight rejects forged backup sidecar checksum with intact database file", () => {
+  const root = mkdtempSync(join(tmpdir(), "uniquiz-m7-backup-hash-"));
+  const dbPath = join(root, "uniquiz.db");
+  const db = openDatabase(dbPath);
+  try {
+    const record = createDatabaseBackup(db, dbPath);
+    const metadataPath = join(backupDirectory(dbPath), record.fileName + ".json");
+    const metadata = JSON.parse(readFileSync(metadataPath, "utf8")) as { sha256: string };
+    metadata.sha256 = "0".repeat(64);
+    writeFileSync(metadataPath, JSON.stringify(metadata));
+    const presence: PresenceSnapshot = { generatedAt: new Date().toISOString(), stations: [] };
+    const osc = { enabled: false, host: "127.0.0.1", port: 9001 };
+    const result = getOperationsPreflight(db, dbPath, osc, presence);
+    assert.equal(result.checks.find((check) => check.key === "backup")?.ready, false);
+    assert.equal(result.ready, false);
+  } finally {
+    db.close();
+    rmSync(root, { recursive: true, force: true });
+  }
 });
