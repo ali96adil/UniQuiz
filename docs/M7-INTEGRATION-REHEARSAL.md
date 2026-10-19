@@ -13,6 +13,7 @@ This document applies to the stacked PR sequence:
 9. PR #33 — accurate Excel results for configurable timing/scoring and variable rounds
 10. PR #34 — verify on-disk SQLite backup hash and integrity before preflight READY
 11. PR #36 — operator authorization for HTTP and realtime, station tokens protected
+12. PR #37 — revoke live operator WebSocket on logout and protect unrevealed answers
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -195,6 +196,33 @@ Automated tests in PR #33 validate 40s fixed/10-point rules, 45s custom
 time-decay, per-round 2/3-question plans, team labels and physical SQLite
 restart/restore of two competitions. These tests **do not** replace the
 manual check against the actual 2026 event copy.
+
+## Realtime security and answer confidentiality
+
+Before approving M7 on the Mac rehearsal copy:
+
+1. Log in as operator and keep a second operator window open. Sign out
+   using the first authenticated session. A Socket.IO connection using
+   that revoked session must immediately disconnect, and the revoked
+   cookie must no longer authorize HTTP actions.
+2. Verify operator sockets also disconnect at the server's session
+   expiry deadline; do not let an already-open browser keep privileges
+   indefinitely.
+3. In question READY/COUNTDOWN, no prompt, options or correct answer
+   should be displayed on team stations. During ACTIVE and CLOSED,
+   the question/options may be visible but the correct option and rival
+   answer must remain hidden until REVEAL.
+4. Answer from A while B has not submitted. B must not receive A's
+   locked selected option through either live snapshots or
+   `live:team-submission`; the private submission event belongs
+   only to its matching station.
+5. Joining/leaving an audience/operator screen must not trigger
+   redundant global live updates. An authenticated team station joining
+   still refreshes station-readiness data.
+
+CI tests the reveal boundary, private team submission snapshots and
+real server operator WebSocket revocation after logout. This is not
+a substitute for the actual two-Windows-station rehearsal.
 
 ## Acceptance and release gate
 
