@@ -3952,3 +3952,34 @@ h2 {
     flex-wrap: wrap;
   }
 }
+
+/* M7 operator authentication is isolated from public audience / station UIs. */
+.operator-login {
+  max-width: 540px;
+  margin: clamp(40px, 11vh, 140px) auto 0;
+}
+.operator-login form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.operator-login label {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+.operator-login input[type="password"] {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  border-radius: 12px;
+  color: #f8fafc;
+  background: #0f172a;
+  padding: 12px 14px;
+  outline-offset: 3px;
+}
+.operator-login input[type="password"]:focus {
+  outline: 2px solid #93c5fd;
+}
+.operator-login button.primary {
+  align-self: stretch;
+}
