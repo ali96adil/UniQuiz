@@ -25,6 +25,7 @@ const historicalTables = [
   "categories",
   "questions",
   "competition_rules",
+  "competition_gameplay_rules",
   "audit_events",
   "live_state",
   "live_submissions",
