@@ -15,7 +15,7 @@ import type {
 import { appendAuditEvent } from "./audit.js";
 import { getCompetitionSnapshot } from "./competition.js";
 import type { AppDatabase } from "./database.js";
-import { getCompetitionRules } from "./competition-rules.js";
+import { getCompetitionRules, getRoundRules } from "./competition-rules.js";
 import {
   QUESTION_DURATION_MS,
   ServerQuestionClock,
@@ -584,7 +584,9 @@ export class LiveSessionManager {
 
     return {
       phase: state.phase,
-      questionsPerRound: getCompetitionRules(this.db).questionsPerRound,
+      questionsPerRound: state.roundId === null
+        ? getCompetitionRules(this.db).questionsPerRound
+        : getRoundRules(this.db, state.roundId).questionsPerRound,
       serverNowEpochMs: Date.now(),
       round,
       stationsConfirmed: state.stationsConfirmed === 1,
@@ -830,7 +832,7 @@ export class LiveSessionManager {
       `).get(targetRoundId) as { count: number }
     ).count;
 
-    if (questionCount !== getCompetitionRules(this.db).questionsPerRound) {
+    if (questionCount !== getRoundRules(this.db, targetRoundId).questionsPerRound) {
       throw new Error("ROUND_QUESTION_SET_NOT_READY");
     }
 
@@ -1044,7 +1046,7 @@ export class LiveSessionManager {
     }
 
     const nextPosition = (state.questionPosition ?? 0) + 1;
-    if (nextPosition > getCompetitionRules(this.db).questionsPerRound) {
+    if (nextPosition > getRoundRules(this.db, state.roundId).questionsPerRound) {
       throw new Error("ALL_ROUND_QUESTIONS_COMPLETED");
     }
 
@@ -1620,7 +1622,7 @@ export class LiveSessionManager {
     if (
       state.phase !== "QUESTION_REVEAL" ||
       state.roundId === null ||
-      state.questionPosition !== getCompetitionRules(this.db).questionsPerRound
+      state.questionPosition !== getRoundRules(this.db, state.roundId).questionsPerRound
     ) {
       throw new Error("ROUND_NOT_READY_TO_COMPLETE");
     }
