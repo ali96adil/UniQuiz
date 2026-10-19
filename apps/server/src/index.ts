@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from "socket.io";
 import type { ClientRole, PresenceSnapshot } from "@uniquiz/shared";
 import { registerCompetitionRoutes, getCompetitionSnapshot } from "./competition.js";
 import { config } from "./config.js";
+import { createOperatorAuth } from "./operator-auth.js";
 import { openDatabase } from "./database.js";
 import {
   getQuestionBankSummary,
@@ -35,6 +36,10 @@ import {
   validateStationToken,
 } from "./station-auth.js";
 
+// Fail closed if the local Mac has not been provisioned with an operator secret.
+// Never generate a known/default password or silently expose admin APIs.
+if (!config.operatorPassword) throw new Error("UNIQUIZ_OPERATOR_PASSWORD_REQUIRED");
+const operatorAuth = createOperatorAuth(config.operatorPassword);
 const app = Fastify({ logger: true });
 const database = openDatabase(config.databasePath);
 ensureStationCredentials(database);
@@ -55,16 +60,28 @@ const io = new SocketIOServer(app.server, {
   },
 });
 
+// One authenticated HttpOnly cookie covers operator API and operator Socket.IO.
+// Station tokens are scoped to answer stations; display remains read-only.
+operatorAuth.register(app, (revokedToken) => {
+  for (const socket of io.sockets.sockets.values()) {
+    if (operatorAuth.tokenFromCookie(socket.handshake.headers.cookie) === revokedToken) {
+      socket.disconnect(true);
+    }
+  }
+});
+
 const roles = new Map<string, ClientRole>();
 
 function normalizeRole(
   value: unknown,
   token: unknown,
+  cookie: string | undefined,
 ): ClientRole {
   switch (value) {
     case "operator":
+      return operatorAuth.isAuthorized(cookie) ? "operator" : "unknown";
     case "display":
-      return value;
+      return "display";
     case "team-a":
       return validateStationToken(database, "A", token)
         ? "team-a"
@@ -190,6 +207,7 @@ io.on("connection", (socket) => {
   const role = normalizeRole(
     socket.handshake.auth?.role,
     socket.handshake.auth?.token,
+    socket.handshake.headers.cookie,
   );
   roles.set(socket.id, role);
 
