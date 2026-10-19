@@ -4785,23 +4785,44 @@ export function App() {
     };
   }, [surface]);
 
-  const stationToken = useMemo(() => {
-    if (role !== "team-a" && role !== "team-b") {
-      return null;
-    }
-
+  const [stationToken, setStationToken] = useState<string | null>(() => {
+    if (role !== "team-a" && role !== "team-b") return null;
     const key = `uniquiz:${role}:token`;
-    const queryToken = new URLSearchParams(
-      window.location.search,
-    ).get("token");
-
-    if (queryToken) {
-      window.localStorage.setItem(key, queryToken);
-      return queryToken;
+    // Import a legacy bookmarked link at most once, then remove the secret
+    // from address-bar history. Newly issued links never include any token.
+    const legacyToken = new URLSearchParams(window.location.search).get("token");
+    if (legacyToken) {
+      window.localStorage.setItem(key, legacyToken);
+      return legacyToken;
     }
-
     return window.localStorage.getItem(key);
+  });
+  const [stationTokenDraft, setStationTokenDraft] = useState("");
+  useEffect(() => {
+    if (role !== "team-a" && role !== "team-b") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("token")) {
+      url.searchParams.delete("token");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
   }, [role]);
+
+  const enrollStation = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (role !== "team-a" && role !== "team-b") return;
+    const token = stationTokenDraft.trim();
+    if (!/^[A-Za-z0-9_-]{32}$/.test(token)) return;
+    window.localStorage.setItem(`uniquiz:${role}:token`, token);
+    setStationTokenDraft("");
+    setStationToken(token);
+  };
+
+  const clearStationToken = () => {
+    if (role !== "team-a" && role !== "team-b") return;
+    window.localStorage.removeItem(`uniquiz:${role}:token`);
+    setStationToken(null);
+    setStationTokenDraft("");
+  };
 
   useEffect(() => {
     if (operatorSurface && operatorAccess !== "authorized") return;
@@ -4939,6 +4960,36 @@ export function App() {
       );
     });
   };
+
+  if ((role === "team-a" || role === "team-b") &&
+      (!stationToken || (connected && effectiveRole !== role))) {
+    return (
+      <main className="shell">
+        <section className="panel station-enrollment" dir="rtl">
+          <h1>تهيئة محطة الفريق {role === "team-a" ? "A" : "B"}</h1>
+          <p>أدخل الرمز الذي يظهر في لوحة المشغّل. لا تضع الرمز داخل عنوان الصفحة.</p>
+          {stationToken && effectiveRole !== role ? (
+            <p className="status-message error">
+              الرمز السابق غير صالح أو تم إلغاؤه. أدخل الرمز الجديد من المشغّل.
+            </p>
+          ) : null}
+          <form onSubmit={enrollStation}>
+            <label htmlFor="station-access-token">رمز المحطة</label>
+            <input id="station-access-token" type="password" autoComplete="off"
+              value={stationTokenDraft} minLength={32} maxLength={32}
+              onChange={(event) => setStationTokenDraft(event.target.value)}
+              placeholder="ألصق الرمز هنا" required dir="ltr" />
+            <button className="primary" type="submit">ربط محطة الفريق</button>
+          </form>
+          {stationToken ? (
+            <button type="button" onClick={clearStationToken}>
+              مسح الرمز المحفوظ
+            </button>
+          ) : null}
+        </section>
+      </main>
+    );
+  }
 
   if (operatorSurface && operatorAccess !== "authorized") {
     return (
