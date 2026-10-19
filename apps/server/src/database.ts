@@ -1,13 +1,85 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { chmodSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { basename, dirname, join } from "node:path";
 import Database from "better-sqlite3";
+
+const CURRENT_SCHEMA_VERSION = 16;
+
+/**
+ * M7 migrations affect table checks and add competition/workspace metadata.
+ * A WAL-aware, consistent, physical snapshot is mandatory *before* the first
+ * schema change on any existing database. If it fails we do not run migrations.
+ * VACUUM INTO is synchronous and includes committed WAL content; never copy
+ * only the .sqlite3 file while WAL is active.
+ */
+function backupBeforeMigration(db: Database.Database, databasePath: string): void {
+  if (databasePath === ":memory:") return;
+  const metaExists = db.prepare(`
+    SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_meta'
+  `).get();
+  const installedVersion = metaExists
+    ? (db.prepare("SELECT value FROM app_meta WHERE key = 'schema_version'")
+      .get() as { value: string } | undefined)?.value
+    : undefined;
+  if (installedVersion !== undefined && Number(installedVersion) >= CURRENT_SCHEMA_VERSION) {
+    return;
+  }
+
+  const sourceIntegrity = db.pragma("integrity_check") as Array<{ integrity_check: string }>;
+  if (sourceIntegrity.length !== 1 || sourceIntegrity[0]?.integrity_check !== "ok") {
+    throw new Error("M7_PREUPGRADE_SOURCE_INTEGRITY_FAILED");
+  }
+
+  const directory = join(dirname(databasePath), "migration-backups");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  chmodSync(directory, 0o700);
+  const safeName = basename(databasePath).replace(/[^a-zA-Z0-9._-]/g, "_");
+  const backupPath = join(
+    directory,
+    safeName + "-before-m7-v" + CURRENT_SCHEMA_VERSION +
+      "-" + new Date().toISOString().replace(/[:.]/g, "-") +
+      "-" + randomUUID() + ".sqlite3",
+  );
+
+  // The SQLite engine writes a transactional copy, including live WAL pages.
+  db.prepare("VACUUM INTO ?").run(backupPath);
+  chmodSync(backupPath, 0o600);
+  const backup = new Database(backupPath, { readonly: true, fileMustExist: true });
+  try {
+    const integrity = backup.pragma("integrity_check") as Array<{ integrity_check: string }>;
+    if (integrity.length !== 1 || integrity[0]?.integrity_check !== "ok") {
+      throw new Error("M7_PREUPGRADE_BACKUP_INTEGRITY_FAILED");
+    }
+    const backedVersion = metaExists
+      ? (backup.prepare("SELECT value FROM app_meta WHERE key = 'schema_version'")
+        .get() as { value: string } | undefined)?.value
+      : undefined;
+    if (backedVersion !== installedVersion) {
+      throw new Error("M7_PREUPGRADE_BACKUP_VERSION_MISMATCH");
+    }
+  } finally {
+    backup.close();
+  }
+}
 
 export function openDatabase(databasePath: string) {
   mkdirSync(dirname(databasePath), { recursive: true });
+  const existingFile = databasePath !== ":memory:" &&
+    existsSync(databasePath) && statSync(databasePath).size > 0;
 
   const db = new Database(databasePath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+
+  // Stop startup rather than mutating an existing DB without a verified copy.
+  if (existingFile) {
+    try {
+      backupBeforeMigration(db, databasePath);
+    } catch (error) {
+      db.close();
+      throw error;
+    }
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS app_meta (
