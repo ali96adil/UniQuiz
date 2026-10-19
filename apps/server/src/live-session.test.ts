@@ -935,3 +935,55 @@ test("final results wait for explicit operator announcement", () => {
   void app.close();
   db.close();
 });
+
+test("M7 fairness: correct answer and rival selected option stay hidden until explicit reveal", async () => {
+  const db = seedLiveRound();
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  // Long auto-reveal delay: inspect the pre-reveal state independently.
+  const manager = new LiveSessionManager(db, io, 20_000, 30_000);
+  try {
+    manager.prepareRound(1);
+    manager.confirmStations();
+    manager.startRound();
+    const ready = manager.prepareNextQuestion();
+    assert.equal(ready.question?.prompt, null);
+    assert.equal(ready.question?.options, null);
+    assert.equal(ready.question?.correctOption, null);
+    manager.startQuestion();
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    const active = manager.getSnapshot();
+    assert.equal(active.phase, "QUESTION_ACTIVE");
+    assert.equal(active.question?.prompt, "Question 1");
+    assert.equal(active.question?.correctOption, null);
+    assert.equal(active.revealResults, null);
+
+    manager.submitAnswer("team-a", "B");
+    const partial = manager.getSnapshot();
+    assert.equal(partial.phase, "QUESTION_ACTIVE");
+    assert.equal(partial.question?.correctOption, null);
+    assert.equal(partial.revealResults, null);
+    assert.equal(manager.getTeamSubmissionState("team-a")?.selectedOption, "B");
+    assert.equal(manager.getTeamSubmissionState("team-b")?.selectedOption, null);
+
+    manager.submitAnswer("team-b", "C");
+    const closed = manager.getSnapshot();
+    assert.equal(closed.phase, "QUESTION_CLOSED");
+    assert.equal(closed.question?.correctOption, null);
+    assert.equal(closed.revealResults, null);
+    // No serialized pre-reveal answer key or rival response is broadcast.
+    assert.equal(JSON.stringify(closed).includes('"correctOption":"B"'), false);
+    assert.equal(JSON.stringify(closed).includes('"selectedOption":"B"'), false);
+
+    const revealed = manager.revealQuestion();
+    assert.equal(revealed.phase, "QUESTION_REVEAL");
+    assert.equal(revealed.question?.correctOption, "B");
+    assert.equal(revealed.revealResults?.teamA?.selectedOption, "B");
+    assert.equal(revealed.revealResults?.teamB?.selectedOption, "C");
+  } finally {
+    manager.dispose();
+    io.close();
+    await app.close();
+    db.close();
+  }
+});
