@@ -43,7 +43,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#32](https://github.com/ali96adil/UniQuiz/pull/32) →
 [#33](https://github.com/ali96adil/UniQuiz/pull/33) →
 [#34](https://github.com/ali96adil/UniQuiz/pull/34) →
-[#39](https://github.com/ali96adil/UniQuiz/pull/39).
+[#39](https://github.com/ali96adil/UniQuiz/pull/39) →
+[#40](https://github.com/ali96adil/UniQuiz/pull/40).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -66,6 +67,17 @@ For password setup, local restart/logout and safe rehearsal instructions, see
 **does not make the existing HTTP-only LAN deployment safe to expose** to an
 untrusted network or public tunnel; TLS and a deployment-specific security
 review remain required.
+
+## Windows team station enrollment (draft)
+
+New station links contain **no bearer token in the URL**. Open
+`/team/a` or `/team/b` and enter the team-specific token supplied by the
+authenticated operator. If a token is lost or the machine changes, the
+operator can rotate it safely **outside active rounds**; old station sockets
+are disconnected, and only the corresponding team's token is replaced.
+See [docs/M7-STATION-ENROLLMENT.md](docs/M7-STATION-ENROLLMENT.md) for
+operational safety limits, migration from old bookmarked URLs and rehearsal
+tests. All HTTP-only station tokens remain sensitive on an untrusted LAN.
 
 ## Development
 
