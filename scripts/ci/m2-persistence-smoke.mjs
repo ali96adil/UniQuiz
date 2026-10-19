@@ -4,12 +4,25 @@ const phase = process.argv[2];
 const base = "http://127.0.0.1:8787";
 const snapshotPath = "/tmp/uniquiz-draw-before.json";
 
+// Each phase logs into the restarted server independently. Sessions are
+// deliberately volatile; the competition data must still persist.
+const login = await fetch(base + "/api/auth/login", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ password: process.env.UNIQUIZ_OPERATOR_PASSWORD }),
+});
+if (!login.ok) throw new Error("Cannot authenticate persistence smoke operator");
+const operatorCookie = login.headers.get("set-cookie")?.split(";")[0];
+if (!operatorCookie) throw new Error("No operator session cookie");
+
+
 async function request(path, method = "GET", body) {
   const response = await fetch(base + path, {
     method,
-    headers: body
-      ? { "content-type": "application/json" }
-      : undefined,
+    headers: {
+      cookie: operatorCookie,
+      ...(body ? { "content-type": "application/json" } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
 
