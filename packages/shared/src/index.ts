@@ -427,3 +427,6 @@ export interface OperationsDiagnosticsSnapshot {
   }>;
   presence: PresenceSnapshot;
 }
+
+export { SETUP_STEP_IDS, getSetupJourney } from "./setup-journey.js";
+export type { SetupJourneyState, SetupStep, SetupStepId, SetupStepStatus } from "./setup-journey.js";
