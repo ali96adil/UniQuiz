@@ -81,7 +81,9 @@ export function openDatabase(databasePath: string) {
     }
   }
 
-  db.exec(`
+  try {
+    db.transaction(() => {
+      db.exec(`
     CREATE TABLE IF NOT EXISTS app_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -519,6 +521,12 @@ export function openDatabase(databasePath: string) {
   }
 
   db.prepare("UPDATE app_meta SET value = '16' WHERE key = 'schema_version'").run();
+    })();
+  } catch (error) {
+    // DDL, data changes and schema_version all roll back as one operation.
+    db.close();
+    throw error;
+  }
   return db;
 }
 
