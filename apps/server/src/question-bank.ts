@@ -14,6 +14,7 @@ import { appendAuditEvent } from "./audit.js";
 import type { AppDatabase } from "./database.js";
 import { getQuestionBankSummary } from "./importer.js";
 import { getCompetitionRules, getRoundRules, getAllRoundRules } from "./competition-rules.js";
+import { getCompetitionGameplayRules, saveCompetitionGameplayRules } from "./competition-gameplay.js";
 
 const allocateSchema = z.object({
   confirm: z.literal("ALLOCATE_QUESTIONS"),
@@ -22,6 +23,13 @@ const allocateSchema = z.object({
 const resetSchema = z.object({
   confirm: z.literal("RESET_QUESTION_SETS"),
 });
+
+const gameplaySchema = z.object({
+  durationSeconds: z.number().int().min(5).max(300),
+  scoringMode: z.enum(["time_decay", "fixed"]),
+  correctPoints: z.number().int().min(1).max(1000),
+  pointsLostPerSecond: z.number().int().min(0).max(100),
+}).strict();
 
 const rulesSchema = z.object({
   categories: z.array(z.object({
@@ -198,6 +206,20 @@ export function registerQuestionBankRoutes(
       return { ok: true, questionBank };
     },
   );
+
+  app.get("/api/competition/gameplay", async () => getCompetitionGameplayRules(db));
+
+  app.put("/api/competition/gameplay", async (request, reply) => {
+    const parsed = gameplaySchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "INVALID_GAMEPLAY_RULES", issues: parsed.error.issues });
+    try {
+      const rules = saveCompetitionGameplayRules(db, parsed.data);
+      io.emit("competition:gameplay", rules);
+      return rules;
+    } catch (error) {
+      return conflict(reply, error instanceof Error ? error.message : "GAMEPLAY_RULES_ERROR", "Gameplay rules cannot be changed after a round starts.");
+    }
+  });
 
   app.get("/api/competition/rules", async () => getCompetitionRules(db));
 
