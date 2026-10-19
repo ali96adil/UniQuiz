@@ -58,7 +58,21 @@ The active competition now stores selected category quotas in `competition_rules
 
 The validated user-configurable limit is currently 1–100 questions per round for operator safety and practical performance. This is an implementation range, **not a requirement to choose 12**. Changing the time limit or scoring independently is a separate upcoming feature.
 
-### M7.5 themes and reusable layouts
+### M7.5 timing and scoring per competition — PR #29 (draft)
+
+Gameplay settings are stored independently from category/round distributions in `competition_gameplay_rules`. They belong to the active competition workspace, copy across Setup Duplicate, survive switching and are retained in archival snapshots.
+
+- `durationSeconds`: integer **5–300**; the legacy competition remains **25 seconds** by default.
+- `scoringMode="time_decay"`: score starts at `correctPoints` (1–1000), subtracts `pointsLostPerSecond` (0–100) after each **whole elapsed second**, and has minimum 1 point if correct before timeout. The old 25-to-1 rule is therefore reproduced exactly with 25 points and loss 1/sec.
+- `scoringMode="fixed"`: each correct answer before the deadline earns `correctPoints`, regardless of response time. Wrong, unanswered and too-late answers always yield zero.
+- Server authoritative monotonic clock, submission cut-off, the configured deadline published to clients, OSC start payload, recorded scoring, tiebreak time and public pre-show text all share these rules.
+- Setup UI and API reject invalid settings and prevent changes once a competition round has started, so changing the rules cannot retroactively alter a partial ranking.
+- Legacy 25-second behavior remains unchanged for existing datasets; older workspace snapshots without the new table receive the defaults.
+- Automated tests include compatibility, 45-second time decay, 60-second fixed points, 40-second live deadline, score computation, ranking tiebreaks, API validation/locking and workspace isolation.
+
+**Boundary:** Duration and scoring are configurable **per competition**. Round-specific question counts and categories are supported in PR #28. Round-specific time/scoring overrides are not part of this phase and should be added only with safe locking and historical transparency.
+
+### M7.6 themes and reusable layouts
 
 Each competition gets editable title, logo, sponsor identity, colors, animation and pre-show pages, using presets. Reuse proven permissively licensed components rather than importing unrelated quiz frameworks wholesale:
 
