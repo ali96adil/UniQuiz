@@ -169,8 +169,7 @@ test("M7.4 supports 5, 15 and 20 questions in separate rounds with no repeats", 
     assert.equal(after.ready,true);
     assert.deepEqual(after.rounds.map((r) => r.questionCount),[5,15,20]);
     assert.deepEqual(after.rounds[1]?.categoryCounts,{sports:12,geo:3});
-    const rows = db.prepare("SELECT question_id AS questionId FROM qualification_round_questions").all()
-      as Array<{questionId:number}>;
+    const rows = db.prepare("SELECT question_id AS questionId FROM qualification_round_questions").all() as Array<{questionId:number}>;
     assert.equal(rows.length,40);
     assert.equal(new Set(rows.map((r) => r.questionId)).size,40);
 
