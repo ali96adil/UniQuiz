@@ -3250,82 +3250,36 @@ function StationAccessPanel() {
 }
 
 function StationPortal() {
-  const [credentials, setCredentials] =
-    useState<StationCredentialResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    void apiRequest<StationCredentialResponse>(
-      "/api/stations/credentials",
-    )
-      .then(setCredentials)
-      .catch((caught) => {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "تعذر تحميل بيانات المحطات",
-        );
-      });
-  }, []);
-
-  const stationUrl = (
-    station: "a" | "b",
-    token: string,
-  ) =>
-    `/team/${station}?token=${encodeURIComponent(token)}`;
-
   return (
     <section className="panel station-portal">
       <div className="station-portal-heading">
         <p className="step-label">Quick Station Access</p>
         <h2>اختيار محطة المسابقة</h2>
         <p className="muted">
-          افتح هذا العنوان على الحاسبات الأخرى ثم اختر المحطة المطلوبة.
+          روابط الدخول الموثقة يصدرها المشغّل من لوحة التحكم. إذا ما تهيأت
+          المحطة سابقاً، افتح رابطها المخصص الذي يرسله المشغّل.
         </p>
       </div>
-
-      {credentials ? (
-        <div className="station-portal-grid">
-          {credentials.teamA ? (
-            <a
-              className="station-portal-card"
-              href={stationUrl("a", credentials.teamA.token)}
-            >
-              <span>Station A</span>
-              <strong>محطة الفريق A</strong>
-              <small>دخول مباشر وآمن بالتوكن</small>
-            </a>
-          ) : null}
-
-          {credentials.teamB ? (
-            <a
-              className="station-portal-card"
-              href={stationUrl("b", credentials.teamB.token)}
-            >
-              <span>Station B</span>
-              <strong>محطة الفريق B</strong>
-              <small>دخول مباشر وآمن بالتوكن</small>
-            </a>
-          ) : null}
-
-          <a
-            className="station-portal-card secondary"
-            href="/display"
-          >
-            <span>Display</span>
-            <strong>شاشة الجمهور</strong>
-            <small>فتح العرض العام بملء الشاشة</small>
-          </a>
-        </div>
-      ) : (
-        <p className="muted">جاري تجهيز روابط المحطات...</p>
-      )}
-
-      <StatusMessage error={error} message={null} />
+      <div className="station-portal-grid">
+        <a className="station-portal-card" href="/team/a">
+          <span>Station A</span>
+          <strong>محطة الفريق A</strong>
+          <small>يتطلب رمز المحطة المحفوظ أو رابط الدخول الموثّق</small>
+        </a>
+        <a className="station-portal-card" href="/team/b">
+          <span>Station B</span>
+          <strong>محطة الفريق B</strong>
+          <small>يتطلب رمز المحطة المحفوظ أو رابط الدخول الموثّق</small>
+        </a>
+        <a className="station-portal-card secondary" href="/display">
+          <span>Display</span>
+          <strong>شاشة الجمهور</strong>
+          <small>العرض العام لا يحتاج صلاحيات المشغّل</small>
+        </a>
+      </div>
     </section>
   );
 }
-
 
 function OperatorHotkeys({
   snapshot,
