@@ -2350,9 +2350,12 @@ function AudiencePreShowSurface({
   participantType: ParticipantType;
 }) {
   const activeCategories = categories.filter((category) =>
-    allocation?.categories.some((item) => item.key === category.key && item.quotaPerRound > 0),
+    allocation?.categories.some((item) => item.key === category.key && item.requiredQuestions > 0),
   );
+  const roundCounts = (allocation?.rounds ?? []).map((round) => round.plannedQuestionCount);
+  const variableRounds = new Set(roundCounts).size > 1;
   const questionsPerRound = allocation?.questionsPerRound ?? 10;
+  const questionCountLabel = variableRounds ? "متغيّر حسب الجولة" : String(roundCounts[0] ?? questionsPerRound);
   const enabledPages = (
     [
       settings.copy.preShow.identityEnabled ? "identity" : null,
@@ -2474,7 +2477,7 @@ function AudiencePreShowSurface({
               <section className="preshow-v3-categories-band">
                 <div className="preshow-v3-band-label">
                   <small>محاور المسابقة</small>
-                  <strong>{activeCategories.length} محاور · {questionsPerRound} سؤالاً للجولة</strong>
+                  <strong>{activeCategories.length} محاور · {questionCountLabel} سؤالاً للجولة</strong>
                 </div>
 
                 <div className="preshow-v3-category-row">
@@ -2513,7 +2516,7 @@ function AudiencePreShowSurface({
 
               <div className="preshow-v3-flow" aria-label="تسلسل آلية المسابقة">
                 <div>
-                  <strong>{questionsPerRound}</strong>
+                  <strong>{questionCountLabel}</strong>
                   <span>أسئلة في الجولة</span>
                 </div>
                 <i aria-hidden="true">←</i>
