@@ -184,22 +184,36 @@ jobs:
             };
 
             const timer = setTimeout(
-              () => fail(new Error("Timed out waiting for server:hello")),
+              () => fail(new Error("Timed out waiting for initial workspace snapshot")),
               5000,
             );
 
+            let receivedHello = false;
+            let receivedWorkspace = false;
+            const complete = () => {
+              if (!receivedHello || !receivedWorkspace) return;
+              clearTimeout(timer);
+              console.log("Realtime hello + active workspace synchronized");
+              socket.close();
+              process.exit(0);
+            };
             socket.on("connect_error", fail);
             socket.on("server:hello", (payload) => {
-              clearTimeout(timer);
-
               if (payload.role !== "operator") {
                 fail(new Error("Unexpected realtime role"));
                 return;
               }
-
-              console.log("Realtime hello:", payload.role);
-              socket.close();
-              process.exit(0);
+              receivedHello = true;
+              complete();
+            });
+            socket.on("competition:workspaces", (items) => {
+              if (!Array.isArray(items) ||
+                  items.find((item) => item.active)?.id !== "legacy") {
+                fail(new Error("New socket did not receive current active workspace"));
+                return;
+              }
+              receivedWorkspace = true;
+              complete();
             });
           '
 
