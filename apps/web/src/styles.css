@@ -3785,6 +3785,13 @@ h2 {
   margin-bottom: 0;
 }
 
+.setup-journey-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: start;
+}
+
 .setup-journey-toggle {
   flex-shrink: 0;
   background: rgba(51, 65, 85, 0.55);
