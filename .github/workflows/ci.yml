@@ -133,6 +133,44 @@ jobs:
             const credentials = await credentialsResponse.json();
             await verifyRole("team-a", credentials.teamA.token, "team-a");
 
+            // Real connection lifecycle: revoke A while A is online, ensure
+            // server disconnects its existing socket immediately and old
+            // bearer token can no longer authenticate on reconnection.
+            const liveA = io("http://127.0.0.1:8787", {
+              auth: { role: "team-a", token: credentials.teamA.token },
+              transports: ["websocket"],
+            });
+            const connectedA = new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => reject(new Error("Station A did not connect")), 5000);
+              liveA.once("server:hello", (payload) => {
+                clearTimeout(timeout);
+                payload.role === "team-a" ? resolve() : reject(new Error("Station A role mismatch"));
+              });
+              liveA.on("connect_error", reject);
+            });
+            await connectedA;
+            const disconnectedA = new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => reject(new Error("Rotated station not disconnected")), 5000);
+              liveA.once("disconnect", (reason) => {
+                clearTimeout(timeout);
+                reason === "io server disconnect" ? resolve() :
+                  reject(new Error("Unexpected station disconnect: " + reason));
+              });
+            });
+            const rotatedResponse = await fetch(
+              "http://127.0.0.1:8787/api/stations/a/rotate",
+              { method: "POST",
+                headers: { cookie, "content-type": "application/json" },
+                body: JSON.stringify({ confirm: "ROTATE_STATION_TOKEN" }),
+              },
+            );
+            if (!rotatedResponse.ok) throw new Error("Cannot rotate CI station: " + rotatedResponse.status);
+            const rotated = await rotatedResponse.json();
+            await disconnectedA;
+            await verifyRole("team-a", credentials.teamA.token, "unknown");
+            await verifyRole("team-a", rotated.credential.token, "team-a");
+            await verifyRole("team-b", credentials.teamB.token, "team-b");
+
             const socket = io("http://127.0.0.1:8787", {
               auth: { role: "operator" },
               extraHeaders: { cookie },
