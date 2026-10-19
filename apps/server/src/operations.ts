@@ -421,6 +421,21 @@ export function getOperationsPreflight(
   const allocation = getQuestionAllocationSummary(db);
   const latestBackup =
     listDatabaseBackups(databasePath)[0] ?? null;
+  // Backups are verified files, but one taken before the current competition
+  // was activated cannot certify this competition's event-day readiness.
+  const activeRow = db.prepare(`
+    SELECT updated_at AS updatedAt
+    FROM competition_workspaces
+    WHERE id = (SELECT value FROM app_meta WHERE key = 'active_workspace_id')
+  `).get() as { updatedAt: string } | undefined;
+  const activeTime = activeRow
+    ? Date.parse(activeRow.updatedAt.includes("T")
+        ? activeRow.updatedAt
+        : activeRow.updatedAt.replace(" ", "T") + "Z")
+    : NaN;
+  const backupReady = latestBackup !== null &&
+    Number.isFinite(activeTime) &&
+    Date.parse(latestBackup.createdAt) >= activeTime;
   const oscTest = getOscTestState(db);
   const oscReady =
     !osc.enabled ||
@@ -533,10 +548,12 @@ export function getOperationsPreflight(
       key: "backup",
       label: "Backup",
       required: true,
-      ready: latestBackup !== null,
-      detail: latestBackup
-        ? `Verified backup: ${latestBackup.fileName}`
-        : "No verified UniQuiz backup is available.",
+      ready: backupReady,
+      detail: backupReady
+        ? `Verified backup for active competition: ${latestBackup!.fileName}`
+        : latestBackup
+          ? "Last verified backup predates this competition's activation or rename; create a fresh backup."
+          : "No verified UniQuiz backup is available.",
     },
   ];
 
