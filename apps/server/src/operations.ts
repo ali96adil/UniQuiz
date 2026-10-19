@@ -1,6 +1,9 @@
 import {
   copyFileSync,
   existsSync,
+  openSync,
+  readSync,
+  closeSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -51,9 +54,20 @@ function sqlStringLiteral(value: string): string {
 }
 
 function sha256File(path: string): string {
-  return createHash("sha256")
-    .update(readFileSync(path))
-    .digest("hex");
+  // Use bounded memory: event databases may accumulate years of results,
+  // and preflight verifies the file on each request.
+  const hash = createHash("sha256");
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  const handle = openSync(path, "r");
+  try {
+    let count: number;
+    while ((count = readSync(handle, buffer, 0, buffer.length, null)) > 0) {
+      hash.update(buffer.subarray(0, count));
+    }
+  } finally {
+    closeSync(handle);
+  }
+  return hash.digest("hex");
 }
 
 export function verifyDatabaseFile(path: string): {
@@ -239,6 +253,11 @@ export function verifyBackupRecord(
   databasePath: string,
   record: OperationsBackupRecord,
 ): boolean {
+  // The candidate normally comes from our private backup directory.
+  // Still reject arbitrary paths in case a caller supplies untrusted data.
+  if (record.fileName !== basename(record.fileName) || !record.fileName.endsWith(".db")) {
+    return false;
+  }
   const path = join(backupDirectory(databasePath), record.fileName);
   try {
     const actual = verifyDatabaseFile(path);
