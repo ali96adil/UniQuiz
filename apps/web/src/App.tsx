@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
 import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { RoundRulesPanel } from "./RoundRules.js";
+import { RoundOverridesPanel } from "./RoundOverrides.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
 import type {
@@ -899,9 +900,10 @@ function QuestionAllocationPanel({
 
   const inventoryReady =
     allocation.roundCount > 0 &&
-    allocation.questionsPerRound > 0 &&
-    allocation.categories.filter((category) => category.quotaPerRound > 0).length > 0 &&
-    allocation.categories.filter((category) => category.quotaPerRound > 0).every(
+    allocation.rounds.length > 0 &&
+    allocation.rounds.every((round) => round.plannedQuestionCount >= 1 && round.plannedQuestionCount <= 100) &&
+    allocation.categories.filter((category) => category.requiredQuestions > 0).length > 0 &&
+    allocation.categories.filter((category) => category.requiredQuestions > 0).every(
       (category) =>
         category.availableQuestions >= category.requiredQuestions,
     );
@@ -935,7 +937,7 @@ function QuestionAllocationPanel({
   const allocate = () => {
     if (
       !window.confirm(
-        `توزيع وقفل ${allocation.questionsPerRound} سؤالاً لكل جولة حسب المحاور المحددة؟ لن يتكرر سؤال بين الجولات.`,
+        `توزيع وقفل ${allocation.rounds.reduce((sum, round) => sum + round.plannedQuestionCount, 0)} سؤالاً على ${allocation.roundCount} جولات حسب خطة كل جولة؟ لن يتكرر سؤال بين الجولات.`,
       )
     ) {
       return;
@@ -987,12 +989,12 @@ function QuestionAllocationPanel({
       </div>
 
       <p className="muted">
-        لكل جولة {allocation.questionsPerRound} سؤالاً حسب التوزيع المحدد، ومن دون
-        تكرار أي سؤال في جولة أخرى.
+        يمكن تخصيص عدد ومحاور كل جولة بصورة مستقلة، ومن دون
+        تكرار أي سؤال بين الجولات.
       </p>
 
       <div className="allocation-categories">
-        {allocation.categories.filter((item) => item.quotaPerRound > 0).map((category) => {
+        {allocation.categories.filter((item) => item.requiredQuestions > 0).map((category) => {
           const enough =
             category.availableQuestions >= category.requiredQuestions;
 
@@ -1034,7 +1036,7 @@ function QuestionAllocationPanel({
             key={round.roundId}
           >
             <strong>جولة {round.roundOrder}</strong>
-            <span>{round.questionCount} / {allocation.questionsPerRound} سؤال</span>
+            <span>{round.questionCount} / {round.plannedQuestionCount} سؤال</span>
             <small>
               {round.locked ? "مقفلة" : "غير موزعة"}
             </small>
@@ -4920,6 +4922,7 @@ export function App() {
           <BulkImportPanel questionBank={questionBank} />
           <CategoryLabelsPanel questionBank={questionBank} />
           <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
+          <RoundOverridesPanel questionBank={questionBank} allocation={questionAllocation} />
           <SetupSurface snapshot={competition} participantType={participantType} />
           <DrawSurface snapshot={competition} />
           <QuestionAllocationPanel allocation={questionAllocation} />
