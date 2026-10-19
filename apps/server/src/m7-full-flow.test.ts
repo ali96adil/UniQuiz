@@ -160,8 +160,7 @@ test("M7 full journey: create teams, draw, varied rounds, score and reopen previ
     ).get() as {total:number};
     const historyId=activeWorkspaceId(db);
     activateCompetitionWorkspace(db,"legacy");
-    const legacyTitle=db.prepare("SELECT event_title AS title FROM audience_settings").get()
-      as {title:string};
+    const legacyTitle = db.prepare("SELECT event_title AS title FROM audience_settings").get() as { title: string };
     assert.equal(legacyTitle.title,"Legacy October Event");
     assert.deepEqual(db.prepare("SELECT * FROM live_submissions").all(),[]);
     assert.equal(getOscTestState(db).confirmedAt,null);
