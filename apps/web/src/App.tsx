@@ -4,6 +4,7 @@ import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
 import { GameplayRulesPanel } from "./GameplayRules.js";
+import { SetupJourney } from "./SetupJourney.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
 import type {
@@ -4931,24 +4932,48 @@ export function App() {
       ) : null}
 
       {surface === "setup" && competition ? (
-        <>
-          <CompetitionWorkspacesPanel onActiveChange={setParticipantType} />
-          <BulkImportPanel questionBank={questionBank} />
-          <CategoryLabelsPanel questionBank={questionBank} />
-          <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
-          <RoundOverridesPanel questionBank={questionBank} allocation={questionAllocation} />
-          <GameplayRulesPanel
-            locked={competition.rounds.some((round) => round.status !== "PENDING") || (liveSnapshot !== null && liveSnapshot.phase !== "IDLE")}
-            onSaved={setGameplayRules}
-          />
-          <SetupSurface snapshot={competition} participantType={participantType} />
-          <DrawSurface snapshot={competition} />
-          <QuestionAllocationPanel allocation={questionAllocation} />
-          <AudienceSettingsPanel settings={audienceSettings} />
-          {/* With independent workspaces, new competitions use Create / Switch above.
-              Keep the legacy reset API available for backup/restore tooling,
-              but do not place a destructive reset beside the workspace controls. */}
-        </>
+        <SetupJourney
+          competition={competition}
+          questionBank={questionBank}
+          allocation={questionAllocation}
+          eventTitle={audienceSettings?.eventTitle ?? null}
+          panels={{
+            identity: (
+              <>
+                <CompetitionWorkspacesPanel onActiveChange={setParticipantType} />
+                <AudienceSettingsPanel settings={audienceSettings} />
+              </>
+            ),
+            participants: (
+              <SetupSurface snapshot={competition} participantType={participantType} />
+            ),
+            questions: (
+              <>
+                <BulkImportPanel questionBank={questionBank} />
+                <CategoryLabelsPanel questionBank={questionBank} />
+                <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
+                <GameplayRulesPanel
+                  locked={competition.rounds.some((round) => round.status !== "PENDING") ||
+                    (liveSnapshot !== null && liveSnapshot.phase !== "IDLE")}
+                  onSaved={setGameplayRules}
+                />
+              </>
+            ),
+            draw: (
+              <>
+                <DrawSurface snapshot={competition} />
+                <RoundOverridesPanel questionBank={questionBank} allocation={questionAllocation} />
+              </>
+            ),
+            readiness: (
+              <>
+                <QuestionAllocationPanel allocation={questionAllocation} />
+                <OperationsPreflightPanel />
+                <StationAccessPanel />
+              </>
+            ),
+          }}
+        />
       ) : null}
 
       {surface === "archives" ? <ArchivesPanel /> : null}
