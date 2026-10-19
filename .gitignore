@@ -13,3 +13,18 @@ data/*.sqlite3
 coverage/
 .vscode/
 .idea/
+
+# SQLite files, companion WAL/SHM, and private M7 upgrade/rehearsal backups.
+# No contestant data, station credentials, or official results in Git.
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+**/migration-backups/
+**/backups/
+**/UniQuiz-M7-Rehearsal/
