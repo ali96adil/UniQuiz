@@ -16,10 +16,10 @@ export default defineConfig(({ mode }) => {
         target: apiTarget,
       },
       "/api": {
-        target: "http://127.0.0.1:8787",
+        target: apiTarget,
       },
       "/socket.io": {
-        target: "http://127.0.0.1:8787",
+        target: apiTarget,
         ws: true,
       },
     },

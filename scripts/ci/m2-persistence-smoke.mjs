@@ -4,12 +4,22 @@ const phase = process.argv[2];
 const base = "http://127.0.0.1:8787";
 const snapshotPath = "/tmp/uniquiz-draw-before.json";
 
+const login = await fetch(base + "/api/auth/login", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ passphrase: process.env.UNIQUIZ_OPERATOR_PASSPHRASE }),
+});
+if (!login.ok) throw new Error("CI operator login failed");
+const sessionCookie = login.headers.get("set-cookie")?.split(";")[0];
+if (!sessionCookie) throw new Error("CI operator session cookie missing");
+
 async function request(path, method = "GET", body) {
   const response = await fetch(base + path, {
     method,
-    headers: body
-      ? { "content-type": "application/json" }
-      : undefined,
+    headers: {
+      cookie: sessionCookie,
+      ...(body ? { "content-type": "application/json" } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
 

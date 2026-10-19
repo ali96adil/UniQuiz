@@ -5,6 +5,7 @@ import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
 import { GameplayRulesPanel } from "./GameplayRules.js";
 import { SetupJourney } from "./SetupJourney.js";
+import { OperatorLogin } from "./OperatorLogin.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
 import type {
@@ -90,7 +91,7 @@ function roleForSurface(surface: Surface): ClientRole {
     case "team-b":
       return "team-b";
     default:
-      return "unknown";
+      return "display";
   }
 }
 
@@ -3249,82 +3250,36 @@ function StationAccessPanel() {
 }
 
 function StationPortal() {
-  const [credentials, setCredentials] =
-    useState<StationCredentialResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    void apiRequest<StationCredentialResponse>(
-      "/api/stations/credentials",
-    )
-      .then(setCredentials)
-      .catch((caught) => {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "تعذر تحميل بيانات المحطات",
-        );
-      });
-  }, []);
-
-  const stationUrl = (
-    station: "a" | "b",
-    token: string,
-  ) =>
-    `/team/${station}?token=${encodeURIComponent(token)}`;
-
   return (
     <section className="panel station-portal">
       <div className="station-portal-heading">
         <p className="step-label">Quick Station Access</p>
         <h2>اختيار محطة المسابقة</h2>
         <p className="muted">
-          افتح هذا العنوان على الحاسبات الأخرى ثم اختر المحطة المطلوبة.
+          روابط الدخول الموثقة يصدرها المشغّل من لوحة التحكم. إذا ما تهيأت
+          المحطة سابقاً، افتح رابطها المخصص الذي يرسله المشغّل.
         </p>
       </div>
-
-      {credentials ? (
-        <div className="station-portal-grid">
-          {credentials.teamA ? (
-            <a
-              className="station-portal-card"
-              href={stationUrl("a", credentials.teamA.token)}
-            >
-              <span>Station A</span>
-              <strong>محطة الفريق A</strong>
-              <small>دخول مباشر وآمن بالتوكن</small>
-            </a>
-          ) : null}
-
-          {credentials.teamB ? (
-            <a
-              className="station-portal-card"
-              href={stationUrl("b", credentials.teamB.token)}
-            >
-              <span>Station B</span>
-              <strong>محطة الفريق B</strong>
-              <small>دخول مباشر وآمن بالتوكن</small>
-            </a>
-          ) : null}
-
-          <a
-            className="station-portal-card secondary"
-            href="/display"
-          >
-            <span>Display</span>
-            <strong>شاشة الجمهور</strong>
-            <small>فتح العرض العام بملء الشاشة</small>
-          </a>
-        </div>
-      ) : (
-        <p className="muted">جاري تجهيز روابط المحطات...</p>
-      )}
-
-      <StatusMessage error={error} message={null} />
+      <div className="station-portal-grid">
+        <a className="station-portal-card" href="/team/a">
+          <span>Station A</span>
+          <strong>محطة الفريق A</strong>
+          <small>يتطلب رمز المحطة المحفوظ أو رابط الدخول الموثّق</small>
+        </a>
+        <a className="station-portal-card" href="/team/b">
+          <span>Station B</span>
+          <strong>محطة الفريق B</strong>
+          <small>يتطلب رمز المحطة المحفوظ أو رابط الدخول الموثّق</small>
+        </a>
+        <a className="station-portal-card secondary" href="/display">
+          <span>Display</span>
+          <strong>شاشة الجمهور</strong>
+          <small>العرض العام لا يحتاج صلاحيات المشغّل</small>
+        </a>
+      </div>
     </section>
   );
 }
-
 
 function OperatorHotkeys({
   snapshot,
@@ -4659,6 +4614,26 @@ export function App() {
     useState<RuntimeMode>("official");
   const [participantType, setParticipantType] = useState<ParticipantType>("college");
   const [gameplayRules, setGameplayRules] = useState<CompetitionGameplayRules | null>(null);
+  const [operatorAuth, setOperatorAuth] = useState<"checking" | "login" | "authenticated">(
+    role === "operator" ? "checking" : "authenticated",
+  );
+
+  useEffect(() => {
+    if (role !== "operator") return;
+    let cancelled = false;
+    void fetch("/api/auth/status", { credentials: "same-origin" })
+      .then((response) => {
+        if (!response.ok) throw new Error("OPERATOR_AUTH_CHECK_FAILED");
+        return response.json() as Promise<{ authenticated: boolean }>;
+      })
+      .then((status) => {
+        if (!cancelled) setOperatorAuth(status.authenticated ? "authenticated" : "login");
+      })
+      .catch(() => {
+        if (!cancelled) setOperatorAuth("login");
+      });
+    return () => { cancelled = true; };
+  }, [role]);
 
   useEffect(() => {
     void fetch("/api/competitions")
@@ -4718,6 +4693,7 @@ export function App() {
   }, [role]);
 
   useEffect(() => {
+    if (role === "operator" && operatorAuth !== "authenticated") return;
     const socket = io({
       auth: {
         role,
@@ -4816,7 +4792,7 @@ export function App() {
       setLiveSocket(null);
       socket.disconnect();
     };
-  }, [role, stationToken]);
+  }, [role, stationToken, operatorAuth]);
 
   const showPresence = surface === "operator";
 
@@ -4852,6 +4828,12 @@ export function App() {
       );
     });
   };
+
+  if (role === "operator" && operatorAuth !== "authenticated") {
+    return operatorAuth === "checking"
+      ? <main className="shell"><section className="panel">جاري التحقق من صلاحية المشغّل...</section></main>
+      : <OperatorLogin onLogin={() => setOperatorAuth("authenticated")} />;
+  }
 
   return (
     <main
@@ -4926,6 +4908,18 @@ export function App() {
               <a className="button-link" href="/archives">
                 أرشيف المسابقات
               </a>
+            </div>
+          ) : null}
+          {role === "operator" ? (
+            <div className="actions">
+              <button type="button" onClick={() => {
+                void fetch("/api/auth/logout", {
+                  method: "POST",
+                  credentials: "same-origin",
+                }).finally(() => setOperatorAuth("login"));
+              }}>
+                تسجيل خروج المشغّل
+              </button>
             </div>
           ) : null}
         </section>

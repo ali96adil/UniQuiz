@@ -51,6 +51,8 @@ jobs:
         shell: bash
         env:
           UNIQUIZ_DB_PATH: /tmp/uniquiz-ci.db
+          # Synthetic CI-only secret, never use it for a real event.
+          UNIQUIZ_OPERATOR_PASSPHRASE: CI_ONLY_TEST_PASSPHRASE_NEVER_USE_IN_PRODUCTION
         run: |
           set -euo pipefail
 
@@ -88,8 +90,57 @@ jobs:
           pnpm --filter @uniquiz/web exec node --input-type=module -e '
             import { io } from "socket.io-client";
 
+            const rejectedOperator = io("http://127.0.0.1:8787", {
+              auth: { role: "operator" },
+              transports: ["websocket"],
+              reconnection: false,
+            });
+            await new Promise((resolve, reject) => {
+              const timer = setTimeout(() => reject(new Error("Unauthenticated operator was not rejected")), 5000);
+              rejectedOperator.on("connect", () => {
+                clearTimeout(timer);
+                rejectedOperator.close();
+                reject(new Error("Unauthenticated operator socket was accepted"));
+              });
+              rejectedOperator.on("connect_error", (error) => {
+                clearTimeout(timer);
+                rejectedOperator.close();
+                if (error.message !== "OPERATOR_AUTH_REQUIRED") return reject(error);
+                resolve();
+              });
+            });
+
+            const rejectedTeam = io("http://127.0.0.1:8787", {
+              auth: { role: "team-a", token: "fake-unauthorized-token" },
+              transports: ["websocket"],
+              reconnection: false,
+            });
+            await new Promise((resolve, reject) => {
+              const timer = setTimeout(() => reject(new Error("Invalid team token was not rejected")), 5000);
+              rejectedTeam.on("connect", () => {
+                clearTimeout(timer);
+                rejectedTeam.close();
+                reject(new Error("Untrusted team socket was accepted"));
+              });
+              rejectedTeam.on("connect_error", (error) => {
+                clearTimeout(timer);
+                rejectedTeam.close();
+                if (error.message !== "STATION_AUTH_REQUIRED") return reject(error);
+                resolve();
+              });
+            });
+
+            const login = await fetch("http://127.0.0.1:8787/api/auth/login", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ passphrase: process.env.UNIQUIZ_OPERATOR_PASSPHRASE }),
+            });
+            if (!login.ok) throw new Error("CI operator login failed");
+            const session = login.headers.get("set-cookie")?.split(";")[0];
+            if (!session) throw new Error("Missing auth cookie");
             const socket = io("http://127.0.0.1:8787", {
               auth: { role: "operator" },
+              extraHeaders: { cookie: session },
               transports: ["websocket"],
             });
 

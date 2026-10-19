@@ -21,6 +21,7 @@ const environmentSchema = z.object({
   UNIQUIZ_HOST: z.string().min(1).default("0.0.0.0"),
   UNIQUIZ_PORT: z.coerce.number().int().min(1).max(65535).default(8787),
   UNIQUIZ_DB_PATH: z.string().min(1).optional(),
+  UNIQUIZ_OPERATOR_PASSPHRASE: z.string().min(12).optional(),
   UNIQUIZ_OSC_ENABLED: z
     .string()
     .default("false")
@@ -40,6 +41,7 @@ export function resolveConfig(
     mode: parsed.UNIQUIZ_MODE,
     host: parsed.UNIQUIZ_HOST,
     port: parsed.UNIQUIZ_PORT,
+    operatorPassphrase: parsed.UNIQUIZ_OPERATOR_PASSPHRASE ?? null,
     databasePath:
       parsed.UNIQUIZ_DB_PATH ??
       defaultDatabasePaths[parsed.UNIQUIZ_MODE],

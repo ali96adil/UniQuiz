@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from "socket.io";
 import type { ClientRole, PresenceSnapshot } from "@uniquiz/shared";
 import { registerCompetitionRoutes, getCompetitionSnapshot } from "./competition.js";
 import { config } from "./config.js";
+import { registerOperatorAuth } from "./operator-auth.js";
 import { openDatabase } from "./database.js";
 import {
   getQuestionBankSummary,
@@ -35,7 +36,12 @@ import {
   validateStationToken,
 } from "./station-auth.js";
 
+// Fail closed BEFORE an M7 database migration or runtime network bind.
+if (!config.operatorPassphrase) {
+  throw new Error("UNIQUIZ_OPERATOR_PASSPHRASE is required (min 12 characters). Set it in the server environment before starting UniQuiz.");
+}
 const app = Fastify({ logger: true });
+const auth = registerOperatorAuth(app, config.operatorPassphrase);
 const database = openDatabase(config.databasePath);
 ensureStationCredentials(database);
 
@@ -56,6 +62,25 @@ const io = new SocketIOServer(app.server, {
 });
 
 const roles = new Map<string, ClientRole>();
+
+// The team bearer token is NOT sufficient to act as operator; the operator
+// authenticates through the same HttpOnly session used for HTTP mutations.
+io.use((socket, next) => {
+  const requested = socket.handshake.auth?.role;
+  if (requested === "operator") {
+    return auth.authenticated(socket.handshake.headers.cookie)
+      ? next()
+      : next(new Error("OPERATOR_AUTH_REQUIRED"));
+  }
+  if (requested === "team-a" || requested === "team-b") {
+    const station = requested === "team-a" ? "A" : "B";
+    return validateStationToken(database, station, socket.handshake.auth?.token)
+      ? next()
+      : next(new Error("STATION_AUTH_REQUIRED"));
+  }
+  if (requested === "display") return next();
+  return next(new Error("UNKNOWN_CLIENT_ROLE"));
+});
 
 function normalizeRole(
   value: unknown,
