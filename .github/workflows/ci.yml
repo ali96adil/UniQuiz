@@ -90,6 +90,46 @@ jobs:
           pnpm --filter @uniquiz/web exec node --input-type=module -e '
             import { io } from "socket.io-client";
 
+            const rejectedOperator = io("http://127.0.0.1:8787", {
+              auth: { role: "operator" },
+              transports: ["websocket"],
+              reconnection: false,
+            });
+            await new Promise((resolve, reject) => {
+              const timer = setTimeout(() => reject(new Error("Unauthenticated operator was not rejected")), 5000);
+              rejectedOperator.on("connect", () => {
+                clearTimeout(timer);
+                rejectedOperator.close();
+                reject(new Error("Unauthenticated operator socket was accepted"));
+              });
+              rejectedOperator.on("connect_error", (error) => {
+                clearTimeout(timer);
+                rejectedOperator.close();
+                if (error.message !== "OPERATOR_AUTH_REQUIRED") return reject(error);
+                resolve();
+              });
+            });
+
+            const rejectedTeam = io("http://127.0.0.1:8787", {
+              auth: { role: "team-a", token: "fake-unauthorized-token" },
+              transports: ["websocket"],
+              reconnection: false,
+            });
+            await new Promise((resolve, reject) => {
+              const timer = setTimeout(() => reject(new Error("Invalid team token was not rejected")), 5000);
+              rejectedTeam.on("connect", () => {
+                clearTimeout(timer);
+                rejectedTeam.close();
+                reject(new Error("Untrusted team socket was accepted"));
+              });
+              rejectedTeam.on("connect_error", (error) => {
+                clearTimeout(timer);
+                rejectedTeam.close();
+                if (error.message !== "STATION_AUTH_REQUIRED") return reject(error);
+                resolve();
+              });
+            });
+
             const login = await fetch("http://127.0.0.1:8787/api/auth/login", {
               method: "POST",
               headers: { "content-type": "application/json" },
