@@ -33,7 +33,7 @@ export function SetupJourney({
     [competition, questionBank, allocation, eventTitle],
   );
   const [activeStep, setActiveStep] = useState<SetupStepId>(() =>
-    initialStep(progress.suggestedStep),
+    initialStep("identity"),
   );
   const [showAll, setShowAll] = useState(false);
   const selectedIndex = SETUP_STEP_IDS.indexOf(activeStep);
@@ -63,14 +63,23 @@ export function SetupJourney({
               بأي وقت، ومراجعة الجاهزية النهائية قبل بدء التشغيل.
             </p>
           </div>
-          <button
-            type="button"
-            className="setup-journey-toggle"
-            onClick={() => setShowAll((previous) => !previous)}
-            aria-pressed={showAll}
-          >
-            {showAll ? "العرض الموجّه" : "عرض جميع الإعدادات"}
-          </button>
+          <div className="setup-journey-head-actions">
+            <button
+              type="button"
+              className="setup-journey-toggle"
+              onClick={() => goTo(progress.suggestedStep)}
+            >
+              تابع المرحلة المطلوبة
+            </button>
+            <button
+              type="button"
+              className="setup-journey-toggle"
+              onClick={() => setShowAll((previous) => !previous)}
+              aria-pressed={showAll}
+            >
+              {showAll ? "العرض الموجّه" : "عرض جميع الإعدادات"}
+            </button>
+          </div>
         </div>
         <div className="setup-journey-track" aria-label="تقدّم إعداد المسابقة">
           {progress.steps.map((step, index) => (
