@@ -5132,6 +5132,18 @@ export function App() {
         <StationPortal />
       ) : null}
 
+      {(surface === "team-a" || surface === "team-b") &&
+        (!connected || effectiveRole !== role) ? (
+          <section className="panel" dir="rtl">
+            <h2>اتصال المحطة غير جاهز</h2>
+            <p className="muted">
+              تأكد أن شبكة المسابقة متصلة. إذا انتهت صلاحية رمز الجهاز،
+              افتح صفحة الاقتران واطلب رمزاً جديداً من المشغّل.
+            </p>
+            <a className="button-link" href="/stations">إعادة اقتران المحطة</a>
+          </section>
+        ) : null}
+
       {surface === "team-a" || surface === "team-b" ? (
         <TeamLivePanel
           snapshot={liveSnapshot}
