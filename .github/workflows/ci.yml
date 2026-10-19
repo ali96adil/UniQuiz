@@ -51,6 +51,7 @@ jobs:
         shell: bash
         env:
           UNIQUIZ_DB_PATH: /tmp/uniquiz-ci.db
+          UNIQUIZ_OPERATOR_PASSWORD: ci-only-offline-operator-test-password
         run: |
           set -euo pipefail
 
@@ -88,8 +89,19 @@ jobs:
           pnpm --filter @uniquiz/web exec node --input-type=module -e '
             import { io } from "socket.io-client";
 
+            const login = await fetch("http://127.0.0.1:8787/api/auth/login", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                password: process.env.UNIQUIZ_OPERATOR_PASSWORD,
+              }),
+            });
+            if (!login.ok) throw new Error("CI operator login failed: " + login.status);
+            const cookie = login.headers.get("set-cookie")?.split(";")[0];
+            if (!cookie) throw new Error("Missing operator session cookie");
             const socket = io("http://127.0.0.1:8787", {
               auth: { role: "operator" },
+              extraHeaders: { cookie },
               transports: ["websocket"],
             });
 
