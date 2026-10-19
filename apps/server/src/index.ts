@@ -86,9 +86,14 @@ io.use((socket, next) => {
   }
   if (requested === "team-a" || requested === "team-b") {
     const station = requested === "team-a" ? "A" : "B";
-    return validateStationToken(database, station, socket.handshake.auth?.token)
-      ? next()
-      : next(new Error("STATION_AUTH_REQUIRED"));
+    const credential = socket.handshake.auth?.token;
+    if (!validateStationToken(database, station, credential))
+      return next(new Error("STATION_AUTH_REQUIRED"));
+    // Signed station sessions expire while connected, not just at handshake.
+    if (typeof credential === "string" && credential.startsWith("uqs1.")) {
+      socket.data.stationSessionExpiresAt = Number(credential.split(".")[2]);
+    }
+    return next();
   }
   if (requested === "display") return next();
   return next(new Error("UNKNOWN_CLIENT_ROLE"));
@@ -243,6 +248,17 @@ io.on("connection", (socket) => {
   }
 
   if (role === "team-a" || role === "team-b") {
+    const expiresAt = socket.data.stationSessionExpiresAt;
+    if (expiresAt !== undefined) {
+      const remainingMs = Number(expiresAt) - Date.now();
+      if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+        socket.disconnect(true);
+        return;
+      }
+      const expiryTimer = setTimeout(() => socket.disconnect(true), remainingMs);
+      expiryTimer.unref();
+      socket.on("disconnect", () => clearTimeout(expiryTimer));
+    }
     void socket.join(role);
   }
 

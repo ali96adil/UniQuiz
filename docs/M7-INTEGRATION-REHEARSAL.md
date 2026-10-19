@@ -14,6 +14,7 @@ This document applies to the stacked PR sequence:
 10. PR #34 — verify on-disk SQLite backup hash and integrity before preflight READY
 11. PR #36 — operator authorization for HTTP and realtime, station tokens protected
 12. PR #37 — revoke live operator WebSocket on logout and protect unrevealed answers
+13. PR #38 — one-time pairing codes and expiring Windows station sessions
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -196,6 +197,27 @@ Automated tests in PR #33 validate 40s fixed/10-point rules, 45s custom
 time-decay, per-round 2/3-question plans, team labels and physical SQLite
 restart/restore of two competitions. These tests **do not** replace the
 manual check against the actual 2026 event copy.
+
+## Windows stations — one-time pairing acceptance
+
+Operator must create one eight-digit pairing code for each Windows A/B station
+from the **authenticated** setup/control panel. Each station opens `/stations`
+and redeems its code without a bearer token in the URL. Confirm:
+
+- A paired session authenticates only the intended team through Socket.IO.
+- The short code expires in five minutes, works once only and a newer code
+  supersedes the previous unused code for the same station.
+- If the station browser is closed, the signed session should reconnect
+  within its seven-day validity period. After expiration the station can
+  re-pair from `/stations`.
+- A new paired station remains online through server restart using the same
+  backed-up master station secret. Do not rotate master secrets mid-show.
+- Old static station tokens continue to work in this **transition** draft,
+  but the operator UI must not show permanent tokenized links.
+- Check the A/B stations during the real event-day rehearsal, not just CI.
+
+See [M7 station pairing rollout](M7-STATION-PAIRING.md) for details and the
+remaining client-storage and master-token rotation considerations.
 
 ## Realtime security and answer confidentiality
 

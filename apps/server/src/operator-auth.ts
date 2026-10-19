@@ -88,6 +88,8 @@ export function registerOperatorAuth(
     if (path === "/api/auth/status" && method === "GET") return true;
     if (path === "/api/auth/login" && method === "POST") return true;
     if (path === "/api/auth/logout" && method === "POST") return true;
+    // One-use operator-issued station code authenticates this redeem request.
+    if (path === "/api/stations/pairing/redeem" && method === "POST") return true;
     // Audience displays and public ranking need read-only access.
     return method === "GET" && ["/api/live", "/api/ranking", "/api/presence"].includes(path);
   };

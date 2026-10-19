@@ -3182,101 +3182,159 @@ function OperationsPreflightPanel() {
   );
 }
 
+interface PairingCodeResponse {
+  station: "A" | "B";
+  code: string;
+  expiresAt: number;
+}
+interface PairingRedeemResponse {
+  station: "A" | "B";
+  token: string;
+  expiresAt: number;
+}
+
 function StationAccessPanel() {
-  const [credentials, setCredentials] =
-    useState<StationCredentialResponse | null>(null);
+  const [pairings, setPairings] = useState<Partial<Record<"A" | "B", PairingCodeResponse>>>({});
+  const [busy, setBusy] = useState<"A" | "B" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void apiRequest<StationCredentialResponse>(
-      "/api/stations/credentials",
-    )
-      .then(setCredentials)
-      .catch((caught) => {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "تعذر تحميل روابط المحطات",
-        );
+  const issueCode = async (station: "A" | "B") => {
+    setBusy(station);
+    setError(null);
+    try {
+      const pairing = await apiRequest<PairingCodeResponse>("/api/stations/pairing/create", {
+        method: "POST",
+        body: JSON.stringify({ station }),
       });
-  }, []);
-
-  const urlFor = (station: "a" | "b", token: string) =>
-    `${window.location.origin}/team/${station}?token=${encodeURIComponent(token)}`;
+      setPairings((old) => ({ ...old, [station]: pairing }));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر إصدار رمز الاقتران");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
-    <section className="panel station-access-panel">
+    <section className="panel station-access-panel" dir="rtl">
       <div className="section-heading">
         <div>
-          <p className="step-label">Station Access</p>
-          <h2>روابط محطات المتسابقين</h2>
+          <p className="step-label">Station Pairing</p>
+          <h2>ربط أجهزة المتسابقين برمز مؤقت</h2>
         </div>
       </div>
-
       <p className="muted">
-        افتح كل رابط على جهاز الفريق المقابل. التوكن يثبت هوية المحطة
-        ويُحفظ في المتصفح بعد أول فتح.
+        افتح <code>/stations</code> على جهاز Windows، وحدد A أو B، ثم أدخل الرمز.
+        الرمز صالح لخمس دقائق ولمرة واحدة فقط؛ توليد رمز جديد يلغي السابق لنفس المحطة.
+        لا تحتاج إرسال روابط تحتوي توكنات دائمة.
       </p>
-
-      {credentials ? (
-        <div className="station-links">
-          {credentials.teamA ? (
-            <div>
-              <strong>Team A</strong>
-              <code>
-                {urlFor("a", credentials.teamA.token)}
-              </code>
-            </div>
-          ) : null}
-          {credentials.teamB ? (
-            <div>
-              <strong>Team B</strong>
-              <code>
-                {urlFor("b", credentials.teamB.token)}
-              </code>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      <p className="muted station-link-note">
-        إذا لوحة التحكم مفتوحة على localhost، استبدل localhost بعنوان
-        IP الماك على شبكة المسابقة قبل فتح الرابط على أجهزة Windows.
+      <div className="station-pairing-operator">
+        {(["A", "B"] as const).map((station) => (
+          <div className="station-pairing-card" key={station}>
+            <strong>محطة {station}</strong>
+            <button type="button" disabled={busy !== null} onClick={() => void issueCode(station)}>
+              {busy === station ? "جاري الإصدار..." : "توليد رمز اقتران"}
+            </button>
+            {pairings[station] ? (
+              <div className="station-pairing-issued">
+                <code aria-label={`رمز محطة ${station}`}>{pairings[station]!.code}</code>
+                <small>ينتهي {new Date(pairings[station]!.expiresAt).toLocaleTimeString("ar-IQ")}</small>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <p className="muted">
+        الاقتران الناجح يخزن جلسة مؤقتة على متصفح المحطة لمدة سبعة أيام؛
+        لإضافة جهاز آخر لنفس الفريق أصدر رمزاً جديداً. لا تغيّر رموز المحطات أثناء العرض.
       </p>
-
       <StatusMessage error={error} message={null} />
     </section>
   );
 }
 
 function StationPortal() {
+  const [station, setStation] = useState<"A" | "B">("A");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [alreadyPaired, setAlreadyPaired] = useState(false);
+
+  useEffect(() => {
+    setAlreadyPaired(Boolean(window.localStorage.getItem(`uniquiz:team-${station.toLowerCase()}:token`)));
+  }, [station]);
+
+  const redeem = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!/^\d{8}$/.test(code)) {
+      setError("رمز الاقتران يتكون من 8 أرقام.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await apiRequest<PairingRedeemResponse>("/api/stations/pairing/redeem", {
+        method: "POST",
+        body: JSON.stringify({ station, code }),
+      });
+      window.localStorage.setItem(`uniquiz:team-${station.toLowerCase()}:token`, result.token);
+      setCode("");
+      window.location.assign(`/team/${station.toLowerCase()}`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "الرمز غير صحيح أو منتهي الصلاحية.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <section className="panel station-portal">
+    <section className="panel station-portal" dir="rtl">
       <div className="station-portal-heading">
-        <p className="step-label">Quick Station Access</p>
-        <h2>اختيار محطة المسابقة</h2>
+        <p className="step-label">One-time Station Pairing</p>
+        <h2>ربط محطة المتسابق</h2>
         <p className="muted">
-          روابط الدخول الموثقة يصدرها المشغّل من لوحة التحكم. إذا ما تهيأت
-          المحطة سابقاً، افتح رابطها المخصص الذي يرسله المشغّل.
+          اطلب رمزاً مؤقتاً من مشغّل المسابقة، ثم أدخله هنا. ما تحتاج تكتب أي توكن برابط المتصفح.
         </p>
       </div>
+      <form className="station-pairing-form" onSubmit={(event) => void redeem(event)}>
+        <label>
+          <span>المحطة</span>
+          <select value={station} onChange={(event) => setStation(event.target.value as "A" | "B")}>
+            <option value="A">محطة الفريق A</option>
+            <option value="B">محطة الفريق B</option>
+          </select>
+        </label>
+        <label>
+          <span>رمز الاقتران — 8 أرقام</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            pattern="[0-9]{8}"
+            maxLength={8}
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
+            placeholder="00000000"
+            required
+          />
+        </label>
+        <button className="primary" type="submit" disabled={busy || code.length !== 8}>
+          {busy ? "جاري التحقق..." : "ربط هذه المحطة"}
+        </button>
+      </form>
+      {alreadyPaired ? (
+        <p className="muted">
+          هذه المحطة سبق اقترانها على نفس المتصفح.{" "}
+          <a href={`/team/${station.toLowerCase()}`}>فتح محطة {station}</a>
+        </p>
+      ) : null}
       <div className="station-portal-grid">
-        <a className="station-portal-card" href="/team/a">
-          <span>Station A</span>
-          <strong>محطة الفريق A</strong>
-          <small>يتطلب رمز المحطة المحفوظ أو رابط الدخول الموثّق</small>
-        </a>
-        <a className="station-portal-card" href="/team/b">
-          <span>Station B</span>
-          <strong>محطة الفريق B</strong>
-          <small>يتطلب رمز المحطة المحفوظ أو رابط الدخول الموثّق</small>
-        </a>
         <a className="station-portal-card secondary" href="/display">
           <span>Display</span>
           <strong>شاشة الجمهور</strong>
-          <small>العرض العام لا يحتاج صلاحيات المشغّل</small>
+          <small>لا تحتاج رمز اقتران</small>
         </a>
       </div>
+      <StatusMessage error={error} message={null} />
     </section>
   );
 }
@@ -4685,7 +4743,12 @@ export function App() {
     ).get("token");
 
     if (queryToken) {
+      // Backwards compatibility with old issued links. Never retain the token
+      // in browser history or pass it to later navigation.
       window.localStorage.setItem(key, queryToken);
+      const sanitized = new URL(window.location.href);
+      sanitized.searchParams.delete("token");
+      window.history.replaceState(window.history.state, "", sanitized.pathname + sanitized.search + sanitized.hash);
       return queryToken;
     }
 
@@ -5068,6 +5131,18 @@ export function App() {
       {surface === "stations" ? (
         <StationPortal />
       ) : null}
+
+      {(surface === "team-a" || surface === "team-b") &&
+        (!connected || effectiveRole !== role) ? (
+          <section className="panel" dir="rtl">
+            <h2>اتصال المحطة غير جاهز</h2>
+            <p className="muted">
+              تأكد أن شبكة المسابقة متصلة. إذا انتهت صلاحية رمز الجهاز،
+              افتح صفحة الاقتران واطلب رمزاً جديداً من المشغّل.
+            </p>
+            <a className="button-link" href="/stations">إعادة اقتران المحطة</a>
+          </section>
+        ) : null}
 
       {surface === "team-a" || surface === "team-b" ? (
         <TeamLivePanel

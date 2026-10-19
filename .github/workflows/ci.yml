@@ -138,6 +138,59 @@ jobs:
             if (!login.ok) throw new Error("CI operator login failed");
             const session = login.headers.get("set-cookie")?.split(";")[0];
             if (!session) throw new Error("Missing auth cookie");
+
+            // Operator issues a short-lived code. Windows redeems it without
+            // receiving a reusable master token or URL query credential.
+            const issued = await fetch("http://127.0.0.1:8787/api/stations/pairing/create", {
+              method: "POST",
+              headers: { cookie: session, "content-type": "application/json" },
+              body: JSON.stringify({ station: "A" }),
+            });
+            if (!issued.ok) throw new Error("Operator could not issue pairing code");
+            const { code } = await issued.json();
+            const redeemArgs = {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ station: "A", code }),
+            };
+            const paired = await fetch("http://127.0.0.1:8787/api/stations/pairing/redeem", redeemArgs);
+            if (!paired.ok) throw new Error("Windows pairing code was rejected");
+            const { token: stationSession } = await paired.json();
+            if (!stationSession.startsWith("uqs1.A.")) throw new Error("Expected signed scoped station session");
+            const repeat = await fetch("http://127.0.0.1:8787/api/stations/pairing/redeem", redeemArgs);
+            if (repeat.status !== 401) throw new Error("One-time code was accepted twice");
+
+            const station = io("http://127.0.0.1:8787", {
+              auth: { role: "team-a", token: stationSession },
+              transports: ["websocket"],
+              reconnection: false,
+            });
+            await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => reject(new Error("Paired team socket did not connect")), 5000);
+              station.on("connect_error", reject);
+              station.on("server:hello", (hello) => {
+                clearTimeout(timeout);
+                station.close();
+                if (hello.role !== "team-a") reject(new Error("Wrong paired team role"));
+                else resolve();
+              });
+            });
+            const otherStation = io("http://127.0.0.1:8787", {
+              auth: { role: "team-b", token: stationSession },
+              transports: ["websocket"],
+              reconnection: false,
+            });
+            await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => reject(new Error("Wrong-station token not rejected")), 5000);
+              otherStation.on("connect", () => reject(new Error("Paired A token authenticated B")));
+              otherStation.on("connect_error", (error) => {
+                clearTimeout(timeout);
+                otherStation.close();
+                if (error.message !== "STATION_AUTH_REQUIRED") reject(error);
+                else resolve();
+              });
+            });
+
             const socket = io("http://127.0.0.1:8787", {
               auth: { role: "operator" },
               extraHeaders: { cookie: session },

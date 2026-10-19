@@ -26,6 +26,10 @@ recorded, and final results are announced only when the operator requests it.
   per competition. The 25-second/25→1 original scoring remains the default.
 - Guided five-stage setup for identity/branding, participants, question bank
   and rules, round draw/plans and actual event-day readiness.
+- Windows stations can be linked through **one-use eight-digit pairing codes**
+  instead of URLs containing permanent tokens. See
+  [M7 station pairing](docs/M7-STATION-PAIRING.md) for rollout and legacy
+  compatibility.
 - Operator administration requires an explicitly configured passphrase and a
   server-side authenticated session; team stations retain independent tokens.
 - SQLite startup migration creates a protected, verified, WAL-consistent
@@ -46,7 +50,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#33](https://github.com/ali96adil/UniQuiz/pull/33) →
 [#34](https://github.com/ali96adil/UniQuiz/pull/34) →
 [#36](https://github.com/ali96adil/UniQuiz/pull/36) →
-[#37](https://github.com/ali96adil/UniQuiz/pull/37).
+[#37](https://github.com/ali96adil/UniQuiz/pull/37) →
+[#38](https://github.com/ali96adil/UniQuiz/pull/38).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
