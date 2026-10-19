@@ -15,6 +15,7 @@ interface ActiveClock {
   questionKey: string;
   startedAtNs: bigint;
   startedAtEpochMs: number;
+  durationMs: number;
 }
 
 export class ServerQuestionClock {
@@ -25,7 +26,7 @@ export class ServerQuestionClock {
     private readonly wallNow: WallNow = Date.now,
   ) {}
 
-  start(questionKey: string): QuestionClockSnapshot {
+  start(questionKey: string, durationMs = QUESTION_DURATION_MS): QuestionClockSnapshot {
     if (!questionKey.trim()) {
       throw new Error("questionKey is required.");
     }
@@ -36,8 +37,12 @@ export class ServerQuestionClock {
       );
     }
 
+    if (!Number.isSafeInteger(durationMs) || durationMs < 1) {
+      throw new Error("Question duration must be a positive integer of milliseconds.");
+    }
     this.active = {
       questionKey,
+      durationMs,
       startedAtNs: this.monotonicNow(),
       startedAtEpochMs: this.wallNow(),
     };
@@ -60,8 +65,8 @@ export class ServerQuestionClock {
       questionKey: this.active.questionKey,
       startedAtEpochMs: this.active.startedAtEpochMs,
       elapsedMs,
-      remainingMs: Math.max(0, QUESTION_DURATION_MS - elapsedMs),
-      expired: elapsedMs >= QUESTION_DURATION_MS,
+      remainingMs: Math.max(0, this.active.durationMs - elapsedMs),
+      expired: elapsedMs >= this.active.durationMs,
     };
   }
 
