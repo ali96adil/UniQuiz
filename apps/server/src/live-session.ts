@@ -21,6 +21,7 @@ import {
   ServerQuestionClock,
 } from "./question-clock.js";
 import { calculateScoreMicros } from "./scoring.js";
+import { getCompetitionGameplayRules } from "./competition-gameplay.js";
 import { getQualificationRanking } from "./ranking.js";
 import {
   NOOP_SHOW_CONTROL,
@@ -104,7 +105,7 @@ export class LiveSessionManager {
     private readonly db: AppDatabase,
     private readonly io: SocketIOServer,
     private readonly countdownMs = 3_000,
-    private readonly questionDurationMs = QUESTION_DURATION_MS,
+    private readonly questionDurationOverrideMs: number | null = null,
     private readonly showControl: ShowControlOutput = NOOP_SHOW_CONTROL,
     private readonly isStationConnected: (
       role: "team-a" | "team-b",
@@ -112,6 +113,10 @@ export class LiveSessionManager {
     private readonly autoRevealDelayMs = 1_500,
   ) {
     this.restorePersistedRuntime();
+  }
+
+  private questionDurationMs(): number {
+    return this.questionDurationOverrideMs ?? getCompetitionGameplayRules(this.db).durationSeconds * 1000;
   }
 
   private restorePersistedRuntime(): void {
@@ -584,6 +589,7 @@ export class LiveSessionManager {
 
     return {
       phase: state.phase,
+      gameplay: getCompetitionGameplayRules(this.db),
       questionsPerRound: state.roundId === null
         ? getCompetitionRules(this.db).questionsPerRound
         : getRoundRules(this.db, state.roundId).questionsPerRound,
@@ -597,7 +603,7 @@ export class LiveSessionManager {
       questionDeadlineEpochMs:
         state.questionStartedAtEpochMs === null
           ? null
-          : state.questionStartedAtEpochMs + this.questionDurationMs,
+          : state.questionStartedAtEpochMs + this.questionDurationMs(),
       questionClosedAtEpochMs: state.questionClosedAtEpochMs,
       closeReason: state.closeReason,
       hasPendingRound: pendingRoundCount > 0,
@@ -1134,6 +1140,7 @@ export class LiveSessionManager {
     this.questionClock.clear();
     const clock = this.questionClock.start(
       `round-${roundId}:question-${position}`,
+      this.questionDurationMs(),
     );
 
     this.updateState({
@@ -1149,7 +1156,7 @@ export class LiveSessionManager {
       position,
       occurredAt: new Date(clock.startedAtEpochMs).toISOString(),
       payload: {
-        durationMs: this.questionDurationMs,
+        durationMs: this.questionDurationMs(),
       },
     });
 
@@ -1159,7 +1166,7 @@ export class LiveSessionManager {
       [
         this.roundOrder(roundId),
         position,
-        this.questionDurationMs,
+        this.questionDurationMs(),
       ],
     );
 
@@ -1171,7 +1178,7 @@ export class LiveSessionManager {
       if (state.phase === "QUESTION_ACTIVE") {
         this.closeActiveQuestion("TIMEOUT");
       }
-    }, this.questionDurationMs + 1);
+    }, this.questionDurationMs() + 1);
   }
 
   closeActiveQuestion(reason: string): LiveSnapshot {
@@ -1524,7 +1531,7 @@ export class LiveSessionManager {
     }
 
     const clock = this.questionClock.snapshot();
-    if (clock.elapsedMs >= this.questionDurationMs) {
+    if (clock.elapsedMs >= this.questionDurationMs()) {
       const current = this.stateRow();
       if (current.phase === "QUESTION_ACTIVE") {
         this.closeActiveQuestion("TIMEOUT");
@@ -1537,6 +1544,7 @@ export class LiveSessionManager {
     const scoreMicros = calculateScoreMicros(
       isCorrect,
       clock.elapsedMs,
+      { ...getCompetitionGameplayRules(this.db), durationSeconds: this.questionDurationMs() / 1000 },
     );
 
     this.db.prepare(`
@@ -1728,7 +1736,7 @@ export function registerLiveSessionRoutes(
     db,
     io,
     3_000,
-    QUESTION_DURATION_MS,
+    null,
     showControl,
     isStationConnected,
   );
