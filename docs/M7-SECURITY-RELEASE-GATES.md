@@ -4,52 +4,39 @@
 in the *existing* local-network operator model that must be reviewed before
 exposing UniQuiz to any untrusted Wi-Fi, VPN or Internet interface.
 
-## Current network trust model
+## Operator authentication implemented in PR #36 (draft)
 
-The authoritative Fastify server defaults to listening on `0.0.0.0:8787`.
-Two Windows answer stations are authenticated at the Socket.IO team role
-through per-station access tokens. However, the same authentication **does not
-currently cover all operator functionality**:
+The original LAN system trusted anyone who claimed the `operator`
+Socket.IO role and exposed team bearer tokens through an unauthenticated
+HTTP endpoint. These were **real pre-release authorization gaps**; no
+exploitation of a university event has been observed or asserted.
 
-- `GET /api/stations/credentials` returns both answer-station bearer tokens
-  without verifying an operator secret.
-- The Socket.IO roles `operator` and `display` currently accept a role label
-  without an operator authentication challenge. Station authentication alone
-  therefore does not authenticate an operator.
-- Routes which create/switch/archive/reset competitions, edit question-bank
-  rules or request backups currently rely primarily on workflow state and
-  explicit confirmation strings, rather than a separate authenticated
-  operator identity.
-- A proxy running on the same Mac can forward requests from a remote browser.
-  Consequently, restricting sensitive Fastify routes to a loopback **socket
-  address alone** would not be sufficient without validating the original
-  caller and providing proper authentication.
+**PR #36 adds** a mandatory operator passphrase, HttpOnly SameSite=Strict
+server-held sessions, login throttling and logout, authorization for all
+privileged `/api` endpoints, and a verified operator Socket.IO handshake.
+Team A/B still authenticate independently with station bearer tokens.
+The public station portal no longer exposes credentials. Unauthorized
+operator/team websocket attempts and HTTP admin requests are tested in CI.
+Full setup and recovery steps:
+[M7 operator login](M7-OPERATOR-AUTH-SETUP.md).
 
-These are release security **gaps**, not evidence of unauthorized access.
-No attack on an actual University competition has been observed or asserted.
+### Remaining gates before Internet/remote operation
 
-## Required hardening before remote exposure
+1. Complete the full live UI / official Mac rehearsal on an **isolated
+   copy** of original results before any code deployment.
+2. Validate TLS, the real Mac Vite/reverse proxy, forwarded-cookie security
+   and same-origin checks if external connections are ever planned.
+3. Replace bearer-token **query URLs** used for first-time station pairing
+   with short-lived one-time pairing, to avoid history/link leakage.
+4. Define separate Owner vs Operator vs Viewer privileges only if needed
+   for future multi-user administration. PR #36 provides one operator
+   credential, not a granular per-project permissions model.
+5. Audit all data emitted to unauthenticated audience/display sockets before
+   operating on untrusted networks.
 
-1. Define and enable explicit, revocable operator credentials and privileges
-   for **both** HTTP mutations and privileged Socket.IO events. Apply the
-   same policy to the team credential issuance/view endpoint.
-2. Make the operator interface authenticate before it can view station tokens
-   or send state-changing requests. Avoid putting bearer tokens in URLs,
-   Git, browser-accessible audience pages or exported archives.
-3. Add tests confirming an unauthenticated/answer-station user cannot alter
-   competitions, question sets, scoring, final results, backups or credentials.
-4. Validate behind the actual operator UI/reverse proxy, so remote access
-   cannot accidentally become trusted merely because a Mac forwards requests.
-5. Keep an explicit session rotation/recovery process for lost operator access
-   that does not require deleting contestant results.
-
-## Interim deployment boundary
-
-Until those gates are implemented and tested, operate only on a **physically
-trusted, isolated LAN**. Do not publish port 8787/5173 or Socket.IO through a
-public tunnel or port-forward, and do not treat team station tokens as
-protecting operator permissions. The offline rehearsal in
-`docs/M7-INTEGRATION-REHEARSAL.md` remains loopback-only with OSC disabled.
+Even with PR #36, the recommended current deployment is a physically
+trusted, isolated LAN. Do **not** publish port 8787/5173 or Socket.IO
+through a public tunnel or port-forward merely because CI passed.
 
 ## Backup preflight verification (PR #34)
 
@@ -61,6 +48,6 @@ CI regression tests corrupt a backup without changing its size and alter its
 metadata hash. Both must cause **NOT READY** until a newly verified backup
 is available.
 
-This protects backup correctness but **does not** resolve the separate
-operator authorization gaps above. Do not equate a green backup preflight
-with authorization of connected devices or administrators.
+Backup correctness and operator authorization are **independent**
+release checks. Both have draft implementations, but neither replaces the
+real Mac/live-network acceptance rehearsal.
