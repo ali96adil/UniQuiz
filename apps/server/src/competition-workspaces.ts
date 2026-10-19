@@ -5,6 +5,8 @@ import { z } from "zod";
 import type { AppDatabase } from "./database.js";
 import type { LiveSessionManager } from "./live-session.js";
 import { getCompetitionSnapshot } from "./competition.js";
+import { getCompetitionRules } from "./competition-rules.js";
+import { getCompetitionGameplayRules } from "./competition-gameplay.js";
 import { getQuestionAllocationSummary } from "./question-bank.js";
 import { getQuestionBankSummary } from "./importer.js";
 import { getAudienceDisplaySettings, DEFAULT_AUDIENCE_COPY } from "./audience-settings.js";
@@ -389,6 +391,10 @@ export function registerCompetitionWorkspaceRoutes(
       io.emit("competition:snapshot", getCompetitionSnapshot(db));
       io.emit("question-bank:snapshot", getQuestionBankSummary(db));
       io.emit("question-allocation:snapshot", getQuestionAllocationSummary(db));
+      // Every connected operator and audience display must see the active
+      // workspace's rules, never the rules cached for the prior tournament.
+      io.emit("competition-rules:snapshot", getCompetitionRules(db));
+      io.emit("competition:gameplay", getCompetitionGameplayRules(db));
       io.emit("audience:settings", getAudienceDisplaySettings(db));
       io.emit("audience:presentation", getAudiencePresentation(db));
       liveSession.publish();
