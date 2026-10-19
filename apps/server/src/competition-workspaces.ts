@@ -136,8 +136,15 @@ function duplicateSetup(
 
 function parseSnapshot(value: string): StoredSnapshot {
   const parsed = JSON.parse(value) as Partial<StoredSnapshot>;
-  if (!parsed || typeof parsed !== "object" ||
-      eventTables.some((table) => !Array.isArray(parsed[table]))) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("WORKSPACE_SNAPSHOT_INVALID");
+  }
+  // A workspace created with M7.2 has no per-round rules table yet. The
+  // additive M7.4 migration treats it as a legacy/default-only competition.
+  if (parsed.qualification_round_rules === undefined) {
+    parsed.qualification_round_rules = [];
+  }
+  if (eventTables.some((table) => !Array.isArray(parsed[table]))) {
     throw new Error("WORKSPACE_SNAPSHOT_INVALID");
   }
   return parsed as StoredSnapshot;
