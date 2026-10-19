@@ -9,7 +9,7 @@ import { getQuestionAllocationSummary } from "./question-bank.js";
 import { getQuestionBankSummary } from "./importer.js";
 import { getAudienceDisplaySettings, DEFAULT_AUDIENCE_COPY } from "./audience-settings.js";
 import { getAudiencePresentation } from "./presentation.js";
-import { createDatabaseBackup } from "./operations.js";
+import { createDatabaseBackup, resetOscTestState } from "./operations.js";
 
 export type ParticipantType = "college" | "department" | "class" | "team";
 export interface Workspace {
@@ -279,6 +279,7 @@ export function activateCompetitionWorkspace(db: AppDatabase, id: string): Works
     `).run(JSON.stringify(snapshot(db)), now, current);
 
     restore(db, next);
+    // A prior competition\'s OSC reception check must never mark a new\n    // competition READY. The operator must verify downstream again.\n    resetOscTestState(db);
     db.prepare("UPDATE app_meta SET value = ? WHERE key = 'active_workspace_id'").run(id);
     db.prepare("UPDATE competition_workspaces SET updated_at=? WHERE id=?")
       .run(now, id);
