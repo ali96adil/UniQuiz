@@ -4910,6 +4910,18 @@ export function App() {
               </a>
             </div>
           ) : null}
+          {role === "operator" ? (
+            <div className="actions">
+              <button type="button" onClick={() => {
+                void fetch("/api/auth/logout", {
+                  method: "POST",
+                  credentials: "same-origin",
+                }).finally(() => setOperatorAuth("login"));
+              }}>
+                تسجيل خروج المشغّل
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
