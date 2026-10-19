@@ -4938,7 +4938,7 @@ export function App() {
           <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
           <RoundOverridesPanel questionBank={questionBank} allocation={questionAllocation} />
           <GameplayRulesPanel
-            locked={competition.rounds.some((round) => round.status !== "PENDING")}
+            locked={competition.rounds.some((round) => round.status !== "PENDING") || (liveSnapshot !== null && liveSnapshot.phase !== "IDLE")}
             onSaved={setGameplayRules}
           />
           <SetupSurface snapshot={competition} participantType={participantType} />
