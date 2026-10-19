@@ -940,8 +940,8 @@ test("M7 fairness: correct answer and rival selected option stay hidden until ex
   const db = seedLiveRound();
   const app = Fastify();
   const io = new SocketIOServer(app.server);
-  // Long auto-reveal delay: inspect the pre-reveal state independently.
-  const manager = new LiveSessionManager(db, io, 20_000, 30_000);
+  // Use a short pre-question countdown; reveal is still a distinct phase.
+  const manager = new LiveSessionManager(db, io, 1, 30_000);
   try {
     manager.prepareRound(1);
     manager.confirmStations();
@@ -951,7 +951,9 @@ test("M7 fairness: correct answer and rival selected option stay hidden until ex
     assert.equal(ready.question?.options, null);
     assert.equal(ready.question?.correctOption, null);
     manager.startQuestion();
-    await new Promise((resolve) => setTimeout(resolve, 15));
+    for (let attempt = 0; attempt < 80 && manager.getSnapshot().phase !== "QUESTION_ACTIVE"; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     const active = manager.getSnapshot();
     assert.equal(active.phase, "QUESTION_ACTIVE");
     assert.equal(active.question?.prompt, "Question 1");
