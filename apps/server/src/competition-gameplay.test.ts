@@ -102,8 +102,8 @@ test("M7.5 validates gameplay API and locks scoring rules once competition start
 
 test("M7.5 live session and ranking use configured 40-second timeout", async () => {
   const db = openDatabase(":memory:");
-  const io = new SocketIOServer();
   const app = Fastify();
+  const io = new SocketIOServer(app.server);
   try {
     db.exec(`
       INSERT INTO colleges(name,sort_order) VALUES('A',1);
@@ -131,6 +131,7 @@ test("M7.5 live session and ranking use configured 40-second timeout", async () 
       manager.startRound();
       manager.prepareNextQuestion();
       manager.startQuestion();
+      await new Promise((resolve) => setTimeout(resolve, 15));
       const snapshot = manager.getSnapshot();
       assert.equal(snapshot.gameplay.durationSeconds,40);
       assert.ok(snapshot.questionDeadlineEpochMs !== null);
