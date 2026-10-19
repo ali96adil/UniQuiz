@@ -2,7 +2,8 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import ExcelJS from "exceljs";
 import type { AppDatabase } from "./database.js";
 import { getQualificationRanking } from "./ranking.js";
-import { QUESTION_DURATION_MS } from "./question-clock.js";
+import { getCompetitionGameplayRules } from "./competition-gameplay.js";
+import { getRoundRules } from "./competition-rules.js";
 import { getAudienceDisplaySettings } from "./audience-settings.js";
 
 function isCurrentCycleRevealedSql(alias: string): string {
@@ -33,6 +34,13 @@ export async function buildResultsWorkbook(
 
   const settings = getAudienceDisplaySettings(db);
   const ranking = getQualificationRanking(db);
+  const gameplay = getCompetitionGameplayRules(db);
+  const participant = db.prepare(`
+    SELECT participant_type AS type
+    FROM competition_workspaces
+    WHERE id=(SELECT value FROM app_meta WHERE key='active_workspace_id')
+  `).get() as { type: "college" | "department" | "class" | "team" } | undefined;
+  const participantType = participant?.type ?? "college";
 
   const summary = workbook.addWorksheet("Summary");
   summary.addRow(["field", "value"]);
@@ -41,17 +49,24 @@ export async function buildResultsWorkbook(
   summary.addRow(["venue", settings.venue]);
   summary.addRow(["season", settings.season]);
   summary.addRow(["generated_at", new Date().toISOString()]);
-  summary.addRow(["question_duration_seconds", QUESTION_DURATION_MS / 1000]);
-  summary.addRow(["maximum_points", 25]);
+  summary.addRow(["question_duration_seconds", gameplay.durationSeconds]);
+  summary.addRow(["maximum_points", gameplay.correctPoints]);
   summary.addRow([
     "scoring",
-    "Correct answer = displayed remaining whole second (25–1 points); wrong/no answer/expiry = 0",
+    gameplay.scoringMode === "fixed"
+      ? `Correct answer = ${gameplay.correctPoints} fixed points before ${gameplay.durationSeconds}s deadline; wrong/no answer/expiry = 0`
+      : gameplay.correctPoints === 25 && gameplay.pointsLostPerSecond === 1 && gameplay.durationSeconds === 25
+        ? "Correct answer = displayed remaining whole second (25–1 points); wrong/no answer/expiry = 0"
+        : `Correct answer = max(1, ${gameplay.correctPoints} - ${gameplay.pointsLostPerSecond} × full elapsed seconds) before ${gameplay.durationSeconds}s deadline; wrong/no answer/expiry = 0`,
   ]);
+  summary.addRow(["scoring_mode", gameplay.scoringMode]);
+  summary.addRow(["points_lost_per_second", gameplay.pointsLostPerSecond]);
+  summary.addRow(["participant_type", participantType]);
 
   const rankingSheet = workbook.addWorksheet("Ranking");
   rankingSheet.addRow([
     "rank",
-    "college",
+    participantType,
     "status",
     "score_points",
     "total_response_time_ms",
@@ -81,6 +96,9 @@ export async function buildResultsWorkbook(
     "college_b",
     "team_a_points",
     "team_b_points",
+    "planned_questions",
+    "allocated_questions",
+    "category_quotas",
   ]);
 
   const roundRows = db.prepare(`
@@ -121,6 +139,10 @@ export async function buildResultsWorkbook(
       (scoreRows.find((row) => row.station === station)?.scoreMicros ?? 0) /
       1_000_000;
 
+    const plan = getRoundRules(db, round.id);
+    const lockedCount = db.prepare(
+      "SELECT COUNT(*) AS count FROM qualification_round_questions WHERE round_id=?",
+    ).get(round.id) as { count: number };
     rounds.addRow([
       round.roundOrder,
       round.status,
@@ -128,6 +150,9 @@ export async function buildResultsWorkbook(
       round.collegeB ?? "",
       scoreFor("A"),
       round.collegeB ? scoreFor("B") : "",
+      plan.questionsPerRound,
+      lockedCount.count,
+      plan.categories.map((item) => `${item.categoryKey}:${item.questions}`).join(", "),
     ]);
   }
 
