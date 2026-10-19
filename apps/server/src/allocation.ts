@@ -140,7 +140,7 @@ export function allocateQualificationQuestions(
  * questions. A category may appear in some rounds but not others.
  */
 export function allocateRoundsByPlan(
-  plans: readonly Array<{ roundId: number; categories: readonly Array<{ categoryId: number; questions: number }> }>,
+  plans: ReadonlyArray<{ roundId: number; categories: ReadonlyArray<{ categoryId: number; questions: number }> }>,
   categoryPools: readonly CategoryQuestionPool[],
   randomIndex: RandomIndex,
 ): AllocatedRound[] {
