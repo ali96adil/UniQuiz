@@ -41,7 +41,10 @@ configured passphrase. A randomly generated session ID is stored in an
 `HttpOnly; SameSite=Strict` cookie lasting up to 12 hours. Browser JavaScript
 cannot read the cookie value; the server holds its SHA-256 digest. Restarting
 the server clears sessions, so a login is needed again. Logging out
-immediately invalidates the session.
+immediately invalidates the session **and disconnects any still-open
+operator WebSocket linked to that session**. An operator connection also
+disconnects automatically at the session expiry time. This is important
+when an operator window remains open after a user logs out elsewhere.
 
 ### Team station and display behavior
 
