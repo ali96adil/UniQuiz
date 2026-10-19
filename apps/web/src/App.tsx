@@ -4749,19 +4749,9 @@ export function App() {
     }
   };
 
-  useEffect(() => {
-    void fetch("/api/competitions")
-      .then((response) => response.ok ? response.json() : null)
-      .then((response: { competitions?: Array<{ id: string; active: boolean; participantType: ParticipantType }> } | null) => {
-        const current = response?.competitions?.find((row) => row.active);
-        if (current) {
-          setParticipantType(current.participantType);
-          setActiveWorkspaceId(current.id);
-        }
-      })
-      .catch(() => { /* Existing legacy runtime can still operate. */ });
-  }, []);
-
+  // Active workspace is supplied on every Socket.IO connection/reconnection
+  // and after each activation. Avoid a racing HTTP response resetting the ID
+  // to the previous competition after a realtime switch.
   useEffect(() => {
     const displayMode = surface === "display";
     const teamMode = surface === "team-a" || surface === "team-b";
