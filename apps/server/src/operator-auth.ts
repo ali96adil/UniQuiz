@@ -47,16 +47,21 @@ export function createOperatorAuth(password: string) {
     }
   }
 
-  function isAuthorized(cookie: string | undefined): boolean {
+  function expiresAt(cookie: string | undefined): number | null {
     const token = cookieValue(cookie);
-    if (!token) return false;
-    const expires = sessions.get(digest(token));
-    if (expires === undefined) return false;
+    if (!token) return null;
+    const key = digest(token);
+    const expires = sessions.get(key);
+    if (expires === undefined) return null;
     if (expires <= Date.now()) {
-      sessions.delete(digest(token));
-      return false;
+      sessions.delete(key);
+      return null;
     }
-    return true;
+    return expires;
+  }
+
+  function isAuthorized(cookie: string | undefined): boolean {
+    return expiresAt(cookie) !== null;
   }
 
   function register(app: FastifyInstance, onSessionRevoked?: (token: string) => void) {
@@ -133,7 +138,7 @@ export function createOperatorAuth(password: string) {
     });
   }
 
-  return { register, isAuthorized, tokenFromCookie: cookieValue };
+  return { register, isAuthorized, expiresAt, tokenFromCookie: cookieValue };
 }
 
 export type OperatorAuth = ReturnType<typeof createOperatorAuth>;
