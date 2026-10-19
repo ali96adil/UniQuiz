@@ -130,6 +130,9 @@ export interface RoundQuestionSetSummary {
   locked: boolean;
   questionCount: number;
   categoryCounts: Record<string, number>;
+  plannedQuestionCount: number;
+  plannedCategoryCounts: Record<string, number>;
+  customized: boolean;
 }
 
 export interface QuestionAllocationSummary {
