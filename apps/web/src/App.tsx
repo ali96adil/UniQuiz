@@ -5,6 +5,7 @@ import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
 import { GameplayRulesPanel } from "./GameplayRules.js";
 import { SetupJourney } from "./SetupJourney.js";
+import { OperatorLogin } from "./OperatorLogin.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
 import type {
@@ -90,7 +91,7 @@ function roleForSurface(surface: Surface): ClientRole {
     case "team-b":
       return "team-b";
     default:
-      return "unknown";
+      return "display";
   }
 }
 
@@ -4659,6 +4660,26 @@ export function App() {
     useState<RuntimeMode>("official");
   const [participantType, setParticipantType] = useState<ParticipantType>("college");
   const [gameplayRules, setGameplayRules] = useState<CompetitionGameplayRules | null>(null);
+  const [operatorAuth, setOperatorAuth] = useState<"checking" | "login" | "authenticated">(
+    role === "operator" ? "checking" : "authenticated",
+  );
+
+  useEffect(() => {
+    if (role !== "operator") return;
+    let cancelled = false;
+    void fetch("/api/auth/status", { credentials: "same-origin" })
+      .then((response) => {
+        if (!response.ok) throw new Error("OPERATOR_AUTH_CHECK_FAILED");
+        return response.json() as Promise<{ authenticated: boolean }>;
+      })
+      .then((status) => {
+        if (!cancelled) setOperatorAuth(status.authenticated ? "authenticated" : "login");
+      })
+      .catch(() => {
+        if (!cancelled) setOperatorAuth("login");
+      });
+    return () => { cancelled = true; };
+  }, [role]);
 
   useEffect(() => {
     void fetch("/api/competitions")
@@ -4718,6 +4739,7 @@ export function App() {
   }, [role]);
 
   useEffect(() => {
+    if (role === "operator" && operatorAuth !== "authenticated") return;
     const socket = io({
       auth: {
         role,
@@ -4816,7 +4838,7 @@ export function App() {
       setLiveSocket(null);
       socket.disconnect();
     };
-  }, [role, stationToken]);
+  }, [role, stationToken, operatorAuth]);
 
   const showPresence = surface === "operator";
 
@@ -4852,6 +4874,12 @@ export function App() {
       );
     });
   };
+
+  if (role === "operator" && operatorAuth !== "authenticated") {
+    return operatorAuth === "checking"
+      ? <main className="shell"><section className="panel">جاري التحقق من صلاحية المشغّل...</section></main>
+      : <OperatorLogin onLogin={() => setOperatorAuth("authenticated")} />;
+  }
 
   return (
     <main
