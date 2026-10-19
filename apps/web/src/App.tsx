@@ -2515,7 +2515,7 @@ function AudiencePreShowSurface({
                   <span>02</span>
                   <b>آلية المسابقة</b>
                 </div>
-                <h2>واضحة، سريعة، وكل ثانية تصنع فرقاً</h2>
+                <h2>{gameplay?.scoringMode === "fixed" ? "قواعد واضحة، وكل إجابة صحيحة تصنع فرقاً" : "واضحة، سريعة، وكل ثانية تصنع فرقاً"}</h2>
               </div>
 
               <div className="preshow-v3-flow" aria-label="تسلسل آلية المسابقة">
@@ -2537,7 +2537,7 @@ function AudiencePreShowSurface({
                 <div>
                   <strong>{gameplay?.scoringMode === "fixed"
                     ? String(gameplay.correctPoints)
-                    : `${gameplay?.correctPoints ?? 25} → 1`}</strong>
+                    : `${gameplay?.correctPoints ?? 25} − ${gameplay?.pointsLostPerSecond ?? 1}/ث`}</strong>
                   <span>{gameplay?.scoringMode === "fixed" ? "نقطة للصحيحة" : "نقاط حسب سرعة الإجابة"}</span>
                 </div>
               </div>
