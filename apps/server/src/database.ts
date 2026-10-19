@@ -85,6 +85,23 @@ export function openDatabase(databasePath: string) {
     VALUES (1, NULL)
     ON CONFLICT(id) DO NOTHING;
 
+    -- Defaults reproduce the October 2026 competition: 25 seconds,
+    -- 25 points at start and lose one point after each elapsed second.
+    CREATE TABLE IF NOT EXISTS competition_gameplay_rules (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      duration_seconds INTEGER NOT NULL DEFAULT 25
+        CHECK (duration_seconds BETWEEN 5 AND 300),
+      scoring_mode TEXT NOT NULL DEFAULT 'time_decay'
+        CHECK (scoring_mode IN ('time_decay', 'fixed')),
+      correct_points INTEGER NOT NULL DEFAULT 25
+        CHECK (correct_points BETWEEN 1 AND 1000),
+      points_lost_per_second INTEGER NOT NULL DEFAULT 1
+        CHECK (points_lost_per_second BETWEEN 0 AND 100)
+    );
+    INSERT INTO competition_gameplay_rules (
+      id, duration_seconds, scoring_mode, correct_points, points_lost_per_second
+    ) VALUES (1,25,'time_decay',25,1) ON CONFLICT(id) DO NOTHING;
+
     CREATE TABLE IF NOT EXISTS questions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category_id INTEGER NOT NULL,
@@ -429,7 +446,7 @@ export function openDatabase(databasePath: string) {
     })();
   }
 
-  db.prepare("UPDATE app_meta SET value = '15' WHERE key = 'schema_version'").run();
+  db.prepare("UPDATE app_meta SET value = '16' WHERE key = 'schema_version'").run();
   return db;
 }
 
