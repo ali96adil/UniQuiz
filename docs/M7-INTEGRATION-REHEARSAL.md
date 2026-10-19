@@ -12,6 +12,7 @@ This document applies to the stacked PR sequence:
 8. PR #32 — full-flow competition verification and event-scoped readiness
 9. PR #33 — accurate Excel results for configurable timing/scoring and variable rounds
 10. PR #34 — verify on-disk SQLite backup hash and integrity before preflight READY
+11. PR #36 — operator authorization for HTTP and realtime, station tokens protected
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -79,6 +80,12 @@ isolated loopback-only port. Keep OSC disabled to avoid sending cues to
 Ableton, VDMX or competition equipment:
 
 ```bash
+# Set a *private* passphrase interactively in this terminal first.
+# Never place it in a Git-tracked file or a command pasted into chat.
+read -s "UNIQUIZ_OPERATOR_PASSPHRASE?Rehearsal operator passphrase: "
+echo
+export UNIQUIZ_OPERATOR_PASSPHRASE
+
 UNIQUIZ_MODE=rehearsal \
 UNIQUIZ_DB_PATH="$HOME/UniQuiz-M7-Rehearsal/rehearsal.db" \
 UNIQUIZ_HOST=127.0.0.1 \
@@ -96,6 +103,12 @@ pnpm --filter @uniquiz/web dev -- --host 127.0.0.1 --port 5174
 ```
 
 Open `http://127.0.0.1:5174/setup` only on the rehearsal Mac.
+Sign in with the operator passphrase. Confirm the operator can see setup, while
+an unauthenticated browser cannot access `/api/stations/credentials`, mutate
+scoring or start the show. Verify the public display and both authenticated
+team stations still connect. See [M7 operator auth setup](M7-OPERATOR-AUTH-SETUP.md)
+for secure passphrase rotation and cookie behavior.
+
 This API points to the **copy**. Never place the rehearsal server or UI on
 `0.0.0.0` during an actual event.
 
