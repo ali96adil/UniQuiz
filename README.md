@@ -45,7 +45,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#32](https://github.com/ali96adil/UniQuiz/pull/32) →
 [#33](https://github.com/ali96adil/UniQuiz/pull/33) →
 [#34](https://github.com/ali96adil/UniQuiz/pull/34) →
-[#36](https://github.com/ali96adil/UniQuiz/pull/36).
+[#36](https://github.com/ali96adil/UniQuiz/pull/36) →
+[#37](https://github.com/ali96adil/UniQuiz/pull/37).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification

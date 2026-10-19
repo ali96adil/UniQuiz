@@ -62,18 +62,26 @@ export function registerOperatorAuth(
   const reference = hashPassphrase(passphrase, salt);
   const sessions = new Map<string, Session>();
   const failures = new Map<string, FailureState>();
-  const authenticated = (header: string | undefined): boolean => {
-    const token = extractSession(header);
-    if (!token) return false;
-    const key = hashToken(token);
-    const session = sessions.get(key);
-    if (!session) return false;
-    if (session.expiresAt <= Date.now()) {
-      sessions.delete(key);
-      return false;
-    }
-    return true;
+  const revokeListeners = new Set<(sessionId: string) => void>();
+  const revoke = (sessionId: string) => {
+    sessions.delete(sessionId);
+    for (const listener of revokeListeners) listener(sessionId);
   };
+  const sessionDetails = (header: string | undefined):
+    { id: string; expiresAt: number } | null => {
+    const token = extractSession(header);
+    if (!token) return null;
+    const id = hashToken(token);
+    const session = sessions.get(id);
+    if (!session) return null;
+    if (session.expiresAt <= Date.now()) {
+      revoke(id);
+      return null;
+    }
+    return { id, expiresAt: session.expiresAt };
+  };
+  const authenticated = (header: string | undefined): boolean =>
+    sessionDetails(header) !== null;
 
   const publicApi = (method: string, url: string): boolean => {
     const path = url.split("?")[0];
@@ -135,7 +143,7 @@ export function registerOperatorAuth(
 
   app.post("/api/auth/logout", async (request, reply) => {
     const token = extractSession(request.headers.cookie);
-    if (token) sessions.delete(hashToken(token));
+    if (token) revoke(hashToken(token));
     reply.header("Cache-Control", "no-store");
     reply.header("Set-Cookie", cookie("", request.protocol === "https", 0));
     return { authenticated: false };
@@ -143,6 +151,13 @@ export function registerOperatorAuth(
 
   return {
     authenticated,
-    clearSessions: () => sessions.clear(),
+    sessionDetails,
+    onRevoked: (listener: (sessionId: string) => void) => {
+      revokeListeners.add(listener);
+      return () => revokeListeners.delete(listener);
+    },
+    clearSessions: () => {
+      for (const id of sessions.keys()) revoke(id);
+    },
   };
 }

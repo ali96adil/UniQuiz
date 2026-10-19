@@ -142,6 +142,7 @@ jobs:
               auth: { role: "operator" },
               extraHeaders: { cookie: session },
               transports: ["websocket"],
+              reconnection: false,
             });
 
             const fail = (error) => {
@@ -158,15 +159,36 @@ jobs:
             socket.on("connect_error", fail);
             socket.on("server:hello", (payload) => {
               clearTimeout(timer);
-
               if (payload.role !== "operator") {
                 fail(new Error("Unexpected realtime role"));
                 return;
               }
-
               console.log("Realtime hello:", payload.role);
-              socket.close();
-              process.exit(0);
+              void (async () => {
+                const disconnected = new Promise((resolve, reject) => {
+                  const killTimer = setTimeout(
+                    () => reject(new Error("Operator socket survived logout")),
+                    5000,
+                  );
+                  socket.once("disconnect", () => {
+                    clearTimeout(killTimer);
+                    resolve();
+                  });
+                });
+                const logout = await fetch("http://127.0.0.1:8787/api/auth/logout", {
+                  method: "POST",
+                  headers: { cookie: session },
+                });
+                if (!logout.ok) throw new Error("Operator logout failed");
+                await disconnected;
+                const revoked = await fetch("http://127.0.0.1:8787/api/stations/credentials", {
+                  headers: { cookie: session },
+                });
+                if (revoked.status !== 401) throw new Error("Logout cookie still authorized");
+                console.log("Operator socket disconnected on logout; HTTP access revoked");
+                socket.close();
+                process.exit(0);
+              })().catch(fail);
             });
           '
 

@@ -63,14 +63,26 @@ const io = new SocketIOServer(app.server, {
 
 const roles = new Map<string, ClientRole>();
 
+// Revocation must immediately disconnect an already-authenticated operator;
+// checking cookies only during the initial handshake is not sufficient.
+auth.onRevoked((sessionId) => {
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.data.operatorSessionId === sessionId) {
+      socket.disconnect(true);
+    }
+  }
+});
+
 // The team bearer token is NOT sufficient to act as operator; the operator
 // authenticates through the same HttpOnly session used for HTTP mutations.
 io.use((socket, next) => {
   const requested = socket.handshake.auth?.role;
   if (requested === "operator") {
-    return auth.authenticated(socket.handshake.headers.cookie)
-      ? next()
-      : next(new Error("OPERATOR_AUTH_REQUIRED"));
+    const session = auth.sessionDetails(socket.handshake.headers.cookie);
+    if (!session) return next(new Error("OPERATOR_AUTH_REQUIRED"));
+    socket.data.operatorSessionId = session.id;
+    socket.data.operatorSessionExpiresAt = session.expiresAt;
+    return next();
   }
   if (requested === "team-a" || requested === "team-b") {
     const station = requested === "team-a" ? "A" : "B";
@@ -218,12 +230,28 @@ io.on("connection", (socket) => {
   );
   roles.set(socket.id, role);
 
+  if (role === "operator") {
+    // An open WebSocket must not outlive its HttpOnly cookie session.
+    const expiresAt = Number(socket.data.operatorSessionExpiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      socket.disconnect(true);
+      return;
+    }
+    const expiration = setTimeout(() => socket.disconnect(true), expiresAt - Date.now());
+    expiration.unref();
+    socket.on("disconnect", () => clearTimeout(expiration));
+  }
+
   if (role === "team-a" || role === "team-b") {
     void socket.join(role);
   }
 
   publishPresence();
-  io.emit("live:snapshot", liveSession.getSnapshot());
+  // Only a newly connected answer station changes live station readiness.
+  // Other joins should not force an extra global cue/UI refresh.
+  if (role === "team-a" || role === "team-b") {
+    io.emit("live:snapshot", liveSession.getSnapshot());
+  }
 
   socket.emit("server:hello", {
     socketId: socket.id,

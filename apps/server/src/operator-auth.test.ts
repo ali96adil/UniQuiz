@@ -100,3 +100,30 @@ test("M7 auth: rejects missing/short operator passphrase at initial registration
     assert.throws(() => registerOperatorAuth(app,"short"),/at least 12/);
   } finally {await app.close();}
 });
+
+test("M7 realtime security: revocation callbacks fire at logout and bulk session invalidation", async () => {
+  const app=Fastify();
+  try {
+    const auth=registerOperatorAuth(app, SECRET);
+    const revoked: string[]=[];
+    const stop=auth.onRevoked((sessionId) => revoked.push(sessionId));
+    await app.ready();
+    const first=await app.inject({method:"POST",url:"/api/auth/login",payload:{passphrase:SECRET}});
+    const firstCookie=sessionCookie(first.headers["set-cookie"]);
+    const firstKey=auth.sessionDetails(firstCookie)?.id;
+    assert.ok(firstKey);
+    assert.equal(auth.sessionDetails(firstCookie)?.expiresAt! > Date.now(),true);
+    await app.inject({method:"POST",url:"/api/auth/logout",headers:{cookie:firstCookie}});
+    assert.deepEqual(revoked,[firstKey]);
+    assert.equal(auth.sessionDetails(firstCookie),null);
+
+    const second=await app.inject({method:"POST",url:"/api/auth/login",payload:{passphrase:SECRET}});
+    const secondCookie=sessionCookie(second.headers["set-cookie"]);
+    const secondKey=auth.sessionDetails(secondCookie)?.id;
+    assert.ok(secondKey);
+    auth.clearSessions();
+    assert.equal(auth.authenticated(secondCookie),false);
+    assert.deepEqual(revoked,[firstKey,secondKey]);
+    stop();
+  } finally {await app.close();}
+});
