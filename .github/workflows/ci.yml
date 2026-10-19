@@ -99,6 +99,40 @@ jobs:
             if (!login.ok) throw new Error("CI operator login failed: " + login.status);
             const cookie = login.headers.get("set-cookie")?.split(";")[0];
             if (!cookie) throw new Error("Missing operator session cookie");
+
+            // An unauthenticated client cannot become an operator by naming
+            // the role. Team A can still connect with only its scoped token.
+            const verifyRole = (requestedRole, token, expectedRole) =>
+              new Promise((resolve, reject) => {
+                const client = io("http://127.0.0.1:8787", {
+                  auth: { role: requestedRole, token },
+                  transports: ["websocket"],
+                });
+                const timeout = setTimeout(() => {
+                  client.disconnect();
+                  reject(new Error("Timed out verifying " + expectedRole));
+                }, 5000);
+                client.on("connect_error", (error) => {
+                  clearTimeout(timeout);
+                  client.disconnect();
+                  reject(error);
+                });
+                client.on("server:hello", (payload) => {
+                  clearTimeout(timeout);
+                  client.disconnect();
+                  payload.role === expectedRole ? resolve() :
+                    reject(new Error("Unexpected role " + payload.role));
+                });
+              });
+            await verifyRole("operator", null, "unknown");
+            const credentialsResponse = await fetch(
+              "http://127.0.0.1:8787/api/stations/credentials",
+              { headers: { cookie } },
+            );
+            if (!credentialsResponse.ok) throw new Error("Team token access failed");
+            const credentials = await credentialsResponse.json();
+            await verifyRole("team-a", credentials.teamA.token, "team-a");
+
             const socket = io("http://127.0.0.1:8787", {
               auth: { role: "operator" },
               extraHeaders: { cookie },
