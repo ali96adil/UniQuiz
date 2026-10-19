@@ -237,6 +237,69 @@ export function registerQuestionBankRoutes(
     return rules;
   });
 
+  // Per-round quotas override the competition default without altering other rounds.
+  app.put<{ Params: { roundId: string } }>(
+    "/api/competition/rounds/:roundId/rules",
+    async (request, reply) => {
+      const roundId = Number(request.params.roundId);
+      const parsed = rulesSchema.safeParse(request.body);
+      if (!Number.isSafeInteger(roundId) || roundId < 1 || !parsed.success) {
+        return reply.code(400).send({ error: "INVALID_ROUND_RULES" });
+      }
+      const round = db.prepare(
+        "SELECT status FROM qualification_rounds WHERE id=?",
+      ).get(roundId) as { status: string } | undefined;
+      if (!round) return reply.code(404).send({ error: "ROUND_NOT_FOUND" });
+      const locked = db.prepare(
+        "SELECT 1 FROM qualification_round_question_sets WHERE round_id=?",
+      ).get(roundId);
+      if (locked || round.status !== "PENDING") {
+        return conflict(reply, "ROUND_RULES_LOCKED", "Round has already been allocated or started.");
+      }
+      const categories = parsed.data.categories;
+      const total = categories.reduce((sum, item) => sum + item.questions, 0);
+      const keys = new Set(categories.map((item) => item.categoryKey));
+      if (total > 100 || keys.size !== categories.length) {
+        return reply.code(400).send({ error: "INVALID_QUOTA_DISTRIBUTION" });
+      }
+      const existing = new Set(
+        (db.prepare("SELECT category_key AS categoryKey FROM categories").all()
+          as Array<{ categoryKey: string }>).map((item) => item.categoryKey),
+      );
+      if (categories.some((item) => !existing.has(item.categoryKey))) {
+        return reply.code(400).send({ error: "UNKNOWN_CATEGORY" });
+      }
+      db.prepare(`
+        INSERT INTO qualification_round_rules (round_id, distribution_json, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(round_id) DO UPDATE SET
+          distribution_json=excluded.distribution_json, updated_at=excluded.updated_at
+      `).run(roundId, JSON.stringify(categories), new Date().toISOString());
+      return { rules: getRoundRules(db, roundId), allocation: publish() };
+    },
+  );
+
+  app.delete<{ Params: { roundId: string } }>(
+    "/api/competition/rounds/:roundId/rules",
+    async (request, reply) => {
+      const roundId = Number(request.params.roundId);
+      if (!Number.isSafeInteger(roundId) || roundId < 1) {
+        return reply.code(400).send({ error: "INVALID_ROUND_ID" });
+      }
+      const round = db.prepare("SELECT status FROM qualification_rounds WHERE id=?")
+        .get(roundId) as { status: string } | undefined;
+      if (!round) return reply.code(404).send({ error: "ROUND_NOT_FOUND" });
+      const locked = db.prepare(
+        "SELECT 1 FROM qualification_round_question_sets WHERE round_id=?",
+      ).get(roundId);
+      if (locked || round.status !== "PENDING") {
+        return conflict(reply, "ROUND_RULES_LOCKED", "Round has already been allocated or started.");
+      }
+      db.prepare("DELETE FROM qualification_round_rules WHERE round_id=?").run(roundId);
+      return { rules: getRoundRules(db, roundId), allocation: publish() };
+    },
+  );
+
   app.get("/api/question-bank/allocation", async () =>
     getQuestionAllocationSummary(db),
   );
