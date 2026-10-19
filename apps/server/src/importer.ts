@@ -478,6 +478,8 @@ function qualificationRequiredPerCategory(
   db: AppDatabase,
 ): Map<string, number> {
   const requirements = new Map<string, number>();
+  // Import previews also run against partial schemas and fresh staging DBs.
+  if (!tableExists(db, "qualification_rounds")) return requirements;
   for (const round of getAllRoundRules(db)) {
     for (const quota of round.categories) {
       const key = normalizeKey(quota.categoryKey);
