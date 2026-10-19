@@ -279,7 +279,9 @@ export function activateCompetitionWorkspace(db: AppDatabase, id: string): Works
     `).run(JSON.stringify(snapshot(db)), now, current);
 
     restore(db, next);
-    // A prior competition\'s OSC reception check must never mark a new\n    // competition READY. The operator must verify downstream again.\n    resetOscTestState(db);
+    // A prior competition's OSC confirmation must never certify a new event.
+    // Clear it in the same transaction as the workspace switch.
+    resetOscTestState(db);
     db.prepare("UPDATE app_meta SET value = ? WHERE key = 'active_workspace_id'").run(id);
     db.prepare("UPDATE competition_workspaces SET updated_at=? WHERE id=?")
       .run(now, id);
