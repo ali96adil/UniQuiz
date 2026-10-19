@@ -143,6 +143,23 @@ test("M7 full journey: create teams, draw, varied rounds, score and reopen previ
     const scores=results.entries.map((entry)=>entry.scorePoints).sort((a,b)=>a-b);
     // The ranking includes contestants with upcoming rounds as zero-score entries.
     assert.deepEqual(scores,[0,0,0,10]);
+    assert.equal(manager.getSnapshot().qualificationComplete,false);
+    assert.throws(() => manager.announceFinalResults(),/FINAL_RESULTS_NOT_READY/);
+
+    // Complete the second round with its independently configured 3 questions.
+    const next=manager.prepareRound(rounds[1]!.id);
+    assert.equal(next.questionsPerRound,3);
+    manager.confirmStations();
+    manager.startRound();
+    for(let i=0;i<3;i++) await question(manager,true);
+    const finished=manager.completeRound();
+    assert.equal(finished.questionsPerRound,3);
+    assert.equal(finished.qualificationComplete,true);
+    // Final results and awards must remain operator controlled, never automatic.
+    assert.equal(finished.resultsAnnounced,false);
+    assert.equal(manager.announceFinalResults().resultsAnnounced,true);
+    assert.equal(getQualificationRanking(db).entries
+      .reduce((sum,entry)=>sum+entry.scorePoints,0),40);
 
     markOscTestSent(db);
     confirmOscTest(db);
@@ -179,7 +196,7 @@ test("M7 full journey: create teams, draw, varied rounds, score and reopen previ
       .get() as {total:number}).total,archiveScore.total);
     assert.equal(getQualificationRanking(db).entries.reduce(
       (sum,entry)=>sum+entry.scorePoints,0,
-    ),10);
+    ),40);
     assert.equal(getOperationsPreflight(db,path,osc,noPresence)
       .checks.find((check)=>check.key==="backup")?.ready,false);
     assert.equal(createDatabaseBackup(db,path).integrity,"ok");
