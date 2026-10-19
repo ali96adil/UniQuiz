@@ -142,3 +142,60 @@ test("M7 integration: failed workspace restore rolls back participant rows, resu
     assert.deepEqual(db.pragma("foreign_key_check"),[]);
   } finally { db.close(); }
 });
+
+test("M7 integration: a deliberate DDL collision rolls back the entire schema migration", () => {
+  const root = mkdtempSync(join(tmpdir(), "uniquiz-m7-ddl-rollback-"));
+  const path = join(root, "official.sqlite3");
+  try {
+    const prepared = openDatabase(path);
+    prepared.exec(`
+      INSERT INTO colleges(name,sort_order) VALUES('Archive Participant',1);
+      INSERT INTO audit_events(event_type,occurred_at)
+        VALUES('LEGACY_RESULT',CURRENT_TIMESTAMP);
+    `);
+    // Re-create one legacy 1..10 table as it existed before M7, and place
+    // a table with the migration's temporary name to force a DDL failure.
+    prepared.pragma("foreign_keys = OFF");
+    const row = prepared.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='qualification_round_questions'",
+    ).get() as {sql:string};
+    prepared.exec("DROP TABLE qualification_round_questions");
+    prepared.exec(row.sql.replace(
+      /CHECK\s*\(\s*position\s*>=\s*1\s*\)/,
+      "CHECK (position BETWEEN 1 AND 10)",
+    ));
+    prepared.exec("CREATE TABLE qualification_round_questions_m7(blocker INTEGER)");
+    prepared.prepare("UPDATE app_meta SET value='10' WHERE key='schema_version'").run();
+    prepared.pragma("foreign_keys = ON");
+    prepared.close();
+
+    assert.throws(
+      () => openDatabase(path),
+      /already exists|M7_POSITION_MIGRATION/,
+    );
+
+    const original = new Database(path, { readonly:true, fileMustExist:true });
+    try {
+      assert.equal(
+        (original.prepare("SELECT value FROM app_meta WHERE key='schema_version'")
+          .get() as {value:string}).value,
+        "10",
+      );
+      const table = original.prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='qualification_round_questions'",
+      ).get() as {sql:string};
+      assert.match(table.sql, /BETWEEN 1 AND 10/);
+      assert.equal(
+        (original.prepare("SELECT event_type AS name FROM audit_events")
+          .get() as {name:string}).name,
+        "LEGACY_RESULT",
+      );
+      assert.equal(
+        (original.prepare("SELECT COUNT(*) AS count FROM colleges")
+          .get() as {count:number}).count,
+        1,
+      );
+    } finally { original.close(); }
+    assert.equal(readdirSync(join(root,"migration-backups")).length,1);
+  } finally { rmSync(root,{recursive:true,force:true}); }
+});
