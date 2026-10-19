@@ -141,7 +141,8 @@ test("M7 full journey: create teams, draw, varied rounds, score and reopen previ
     assert.equal(completed.gameplay.durationSeconds,40);
     const results=getQualificationRanking(db);
     const scores=results.entries.map((entry)=>entry.scorePoints).sort((a,b)=>a-b);
-    assert.deepEqual(scores,[0,10]);
+    // The ranking includes contestants with upcoming rounds as zero-score entries.
+    assert.deepEqual(scores,[0,0,0,10]);
 
     markOscTestSent(db);
     confirmOscTest(db);
