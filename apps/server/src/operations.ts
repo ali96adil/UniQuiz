@@ -230,6 +230,26 @@ export function listDatabaseBackups(
     );
 }
 
+/**
+ * Check the on-disk SQLite content against the signed-by-application backup
+ * metadata. A matching filename and byte length alone do not prove integrity.
+ * Never classify a backup as event-day READY if content or metadata changed.
+ */
+export function verifyBackupRecord(
+  databasePath: string,
+  record: OperationsBackupRecord,
+): boolean {
+  const path = join(backupDirectory(databasePath), record.fileName);
+  try {
+    const actual = verifyDatabaseFile(path);
+    return actual.integrity === "ok" &&
+      actual.sizeBytes === record.sizeBytes &&
+      actual.sha256 === record.sha256;
+  } catch {
+    return false;
+  }
+}
+
 export function restoreDatabaseFromBackup(
   backupPath: string,
   databasePath: string,
@@ -433,9 +453,15 @@ export function getOperationsPreflight(
         ? activeRow.updatedAt
         : activeRow.updatedAt.replace(" ", "T") + "Z")
     : NaN;
-  const backupReady = latestBackup !== null &&
+  const backupFresh = latestBackup !== null &&
     Number.isFinite(activeTime) &&
     Date.parse(latestBackup.createdAt) >= activeTime;
+  // Validate the checksum and SQLite pages *each time readiness is queried*.
+  // Trusting only the metadata's "integrity: ok" field can mark a tampered or
+  // damaged backup as READY after it was originally created.
+  const backupValid = backupFresh && latestBackup !== null &&
+    verifyBackupRecord(databasePath, latestBackup);
+  const backupReady = backupFresh && backupValid;
   const oscTest = getOscTestState(db);
   const oscReady =
     !osc.enabled ||
@@ -551,9 +577,11 @@ export function getOperationsPreflight(
       ready: backupReady,
       detail: backupReady
         ? `Verified backup for active competition: ${latestBackup!.fileName}`
-        : latestBackup
-          ? "Last verified backup predates this competition's activation or rename; create a fresh backup."
-          : "No verified UniQuiz backup is available.",
+        : backupFresh
+          ? "Backup content or checksum could not be verified. Create a new verified backup before going live."
+          : latestBackup
+            ? "Last available backup predates this competition's activation or rename; create a fresh backup."
+            : "No UniQuiz backup is available.",
     },
   ];
 
