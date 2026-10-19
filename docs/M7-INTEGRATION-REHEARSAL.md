@@ -13,6 +13,8 @@ This document applies to the stacked PR sequence:
 9. PR #33 — accurate Excel results for configurable timing/scoring and variable rounds
 10. PR #34 — verify on-disk SQLite backup hash and integrity before preflight READY
 11. PR #39 — operator session login and privileged API/Socket.IO authentication
+12. PR #40 — safe Windows answer-station enrollment and token rotation
+13. PR #41 — synchronized cross-browser active workspace rules and editors
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -155,6 +157,33 @@ conditions. This is **synthetic CI**, not the Mac rehearsal below.
     restart. Confirm that unauthorized browsers cannot retrieve station tokens
     or mutate competition setup, while both team stations and audience
     display remain operational.
+
+## Two-browser workspace-switch acceptance
+
+Before deploying M7, explicitly rehearse a **cross-browser workspace switch**,
+not only the same-browser navigation that does a full reload:
+
+1. In authenticated operator browser A, create two named competitions with
+   different default category quotas and different 25s / 40s scoring rules.
+2. Open browser B (also authenticated as operator) on
+   `/setup?step=questions`. Verify B displays the first competition's
+   round quotas and scoring.
+3. In browser A, switch to the other competition. Without reloading B,
+   check B's round quotas and gameplay draft were **reloaded from the new
+   workspace**, and that old values cannot be saved to the wrong competition.
+4. Repeat for `/setup?step=draw` to confirm stale per-round editor selections
+   do not remain visible after activation.
+5. Disconnect B temporarily from the LAN, switch competition using A, then
+   reconnect B. It must receive the current workspace identity with fresh
+   snapshots, without requiring a manual browser reload.
+6. Verify the audience display and ranking reflect the active event and the
+   original competition remains intact after switching back.
+
+PR #41 adds a physical-SQLite integration test of the activation HTTP route
+and its ordered Socket.IO broadcasts for quotas, scoring, title and active ID.
+GitHub CI also checks that a **newly connected** operator socket receives
+the current active workspace. These automated tests do not replace the
+two-browser manual rehearsal.
 
 ## Backup checksum acceptance
 
