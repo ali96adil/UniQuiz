@@ -68,6 +68,18 @@ test("M7 operator HTTP is fail closed; sessions gate all private routes and stat
       method:"POST",url:"/api/setup/reset-all",
       headers:{cookie,"sec-fetch-site":"cross-site"},payload:{},
     })).statusCode,403);
+    // Same-site alone is not enough: a sibling-domain Origin must not
+    // drive admin state changes using a cookie on a shared LAN hostname.
+    assert.equal((await app.inject({
+      method:"POST",url:"/api/setup/reset-all",
+      headers:{cookie,host:"uniquiz.local:8787",origin:"http://other.local:8787"},
+      payload:{},
+    })).statusCode,403);
+    assert.equal((await app.inject({
+      method:"POST",url:"/api/setup/reset-all",
+      headers:{cookie,host:"uniquiz.local:8787",origin:"http://uniquiz.local:8787"},
+      payload:{},
+    })).statusCode,200);
     const logout=await app.inject({
       method:"POST",url:"/api/auth/logout",headers:{cookie},payload:{},
     });
