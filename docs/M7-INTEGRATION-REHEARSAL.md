@@ -16,6 +16,7 @@ This document applies to the stacked PR sequence:
 12. PR #40 — safe Windows answer-station enrollment and token rotation
 13. PR #41 — synchronized cross-browser active workspace rules and editors
 14. PR #42 — read-only historical-row fingerprint check of a copied DB
+15. PR #43 — actual M7 v12→v16 migration test using frozen main v12 schema
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -199,6 +200,40 @@ conditions. This is **synthetic CI**, not the Mac rehearsal below.
     restart. Confirm that unauthorized browsers cannot retrieve station tokens
     or mutate competition setup, while both team stations and audience
     display remain operational.
+
+## Frozen v12 schema → real M7 migration regression (PR #43)
+
+In addition to synthetic M7-on-M7 tests, CI now uses a **frozen copy of the
+actual UniQuiz `main` branch's SQLite schema version 12**. The checked-in
+file `scripts/fixtures/uniquiz-main-v12-schema.sql` is the exact historical
+schema DDL/DML, **not** a dump of student records or of the event Mac.
+
+The automated integration test `apps/server/src/legacy-v12-migration.test.ts`
+seeds a two-college, completed 10-question event with 20 historical
+submissions, station credentials, original categories, audit events, Arabic
+branding, an image BLOB and a custom metadata field. It keeps the v12 WAL
+active and then:
+
+- Uses the exact safe `scripts/m7_rehearsal_copy.py` CLI and read-only
+  baseline-capture command from this runbook.
+- Runs the **actual** `openDatabase()` v12→v16 migration on the copy, then
+  independently verifies every original row using the new fingerprint audit.
+- Checks pre-migration `migration-backups` is still v12 with the original
+  score rows; all SQLite integrity/foreign-key checks pass.
+- Asserts the **real exported Excel workbook** still contains the original
+  event title, 25-second/25-point legacy scoring, original totals
+  (205 and 100 points in this deliberately synthetic fixture), exact
+  response-time totals, and 10 allocated/planned questions.
+- After passing the baseline comparison, inserts question **position 11**
+  into a new rehearsal round to prove that migrated allocation/reservation/
+  submission tables accept flexible question counts.
+- Verifies the source v12 database file and its WAL have not changed.
+
+**Scope limitation:** This automated test validates the previously shipped
+code schema and synthetic event records. It cannot prove the actual October
+2026 University of Babylon database is identical to `main` v12 or that its
+content renders correctly. **Manual approval still requires the real,
+read-only official-data copy and fingerprint workflow described above.**
 
 ## Migration acceptance gate
 
