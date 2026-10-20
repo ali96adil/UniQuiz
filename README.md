@@ -45,7 +45,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#34](https://github.com/ali96adil/UniQuiz/pull/34) →
 [#39](https://github.com/ali96adil/UniQuiz/pull/39) →
 [#40](https://github.com/ali96adil/UniQuiz/pull/40) →
-[#41](https://github.com/ali96adil/UniQuiz/pull/41).
+[#41](https://github.com/ali96adil/UniQuiz/pull/41) →
+[#42](https://github.com/ali96adil/UniQuiz/pull/42).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -68,6 +69,19 @@ For password setup, local restart/logout and safe rehearsal instructions, see
 **does not make the existing HTTP-only LAN deployment safe to expose** to an
 untrusted network or public tunnel; TLS and a deployment-specific security
 review remain required.
+
+## Verify historical data preservation before M7 rehearsal
+
+After creating a WAL-consistent **copy** of the official SQLite database with
+`scripts/m7_rehearsal_copy.py`, and **before** first starting M7 on the copy,
+capture its original rows using `scripts/m7_rehearsal_verify.py capture`.
+Immediately after M7's first startup, before editing any content, run
+`scripts/m7_rehearsal_verify.py verify` on that same copied database.
+Original questions, scores, participation, archives, images and any custom
+user tables are compared using stable SHA-256 fingerprints; raw records do
+not appear in the private baseline manifest. See
+[the complete read-only Mac procedure](docs/M7-INTEGRATION-REHEARSAL.md).
+This check is a **release gate**, not permission to alter original data.
 
 ## Cross-browser tournament switching (draft)
 
