@@ -6,8 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import Database from "better-sqlite3";
+import ExcelJS from "exceljs";
 import { openDatabase } from "./database.js";
 import { getQualificationRanking } from "./ranking.js";
+import { buildResultsWorkbook } from "./results-export.js";
 
 const projectRoot = new URL("../../../", import.meta.url);
 const sql = readFileSync(new URL("scripts/fixtures/uniquiz-main-v12-schema.sql", projectRoot), "utf8");
@@ -112,7 +114,7 @@ function seedFrozenV12(path: string): Database.Database {
   return legacy;
 }
 
-test("M7 upgrades real main v12 SQLite schema and preserves historic data through actual read-only copier and fingerprints", () => {
+test("M7 upgrades real main v12 SQLite schema and preserves historic data through actual read-only copier and fingerprints", async () => {
   const dir = mkdtempSync(join(tmpdir(), "uniquiz-m7-frozen-v12-"));
   const originalPath = join(dir, "official-v12.db");
   const rehearsalPath = join(dir, "rehearsal-v16.db");
@@ -209,6 +211,30 @@ test("M7 upgrades real main v12 SQLite schema and preserves historic data throug
         ],
         "M7 must preserve exact historical scores, counts and tiebreak timings",
       );
+
+      // Verify the actual XLSX report users will download after migration,
+      // not just underlying SQLite rows. Historical 25s/25-point wording,
+      // participants, rank, points, timings and question totals must remain.
+      const report = new ExcelJS.Workbook();
+      await report.xlsx.load(await buildResultsWorkbook(rehearsal) as any);
+      const summary = report.getWorksheet("Summary")!;
+      const exportedRanking = report.getWorksheet("Ranking")!;
+      const exportedRounds = report.getWorksheet("Rounds")!;
+      assert.equal(summary.getRow(2).getCell(2).value,
+        "بنك المعلومات — جامعة بابل 2026");
+      assert.equal(summary.getRow(7).getCell(2).value, 25);
+      assert.equal(summary.getRow(8).getCell(2).value, 25);
+      assert.equal(summary.getRow(12).getCell(2).value, "college");
+      assert.equal(exportedRanking.getRow(2).getCell(2).value, "كلية التربية");
+      assert.equal(exportedRanking.getRow(2).getCell(4).value, 205);
+      assert.equal(exportedRanking.getRow(2).getCell(5).value, 13_750);
+      assert.equal(exportedRanking.getRow(3).getCell(2).value, "كلية القانون");
+      assert.equal(exportedRanking.getRow(3).getCell(4).value, 100);
+      assert.equal(exportedRanking.getRow(3).getCell(5).value, 22_000);
+      assert.equal(exportedRounds.getRow(2).getCell(5).value, 205);
+      assert.equal(exportedRounds.getRow(2).getCell(6).value, 100);
+      assert.equal(exportedRounds.getRow(2).getCell(7).value, 10);
+      assert.equal(exportedRounds.getRow(2).getCell(8).value, 10);
     } finally {
       rehearsal.close();
     }
