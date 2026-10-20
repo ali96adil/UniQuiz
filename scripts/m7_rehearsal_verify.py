@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from contextlib import closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -62,7 +63,7 @@ def existing_tables(db: sqlite3.Connection) -> set[str]:
         str(row[0])
         for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' "
-            "AND name NOT LIKE 'sqlite_%'"
+            "AND name NOT GLOB 'sqlite_*'"
         )
     }
 
@@ -240,7 +241,9 @@ def main() -> int:
         parser.error("Create the private manifest directory first")
 
     try:
-        with open_read_only(database_path) as db:
+        with closing(open_read_only(database_path)) as db:
+            # A single read transaction keeps baseline rows mutually
+            # consistent even if the local official SQLite process is active.
             db.execute("BEGIN")
             check_database(db)
             if args.command == "capture":
