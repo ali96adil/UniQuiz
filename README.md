@@ -46,7 +46,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#39](https://github.com/ali96adil/UniQuiz/pull/39) →
 [#40](https://github.com/ali96adil/UniQuiz/pull/40) →
 [#41](https://github.com/ali96adil/UniQuiz/pull/41) →
-[#42](https://github.com/ali96adil/UniQuiz/pull/42).
+[#42](https://github.com/ali96adil/UniQuiz/pull/42) →
+[#44](https://github.com/ali96adil/UniQuiz/pull/44).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -69,6 +70,19 @@ For password setup, local restart/logout and safe rehearsal instructions, see
 **does not make the existing HTTP-only LAN deployment safe to expose** to an
 untrusted network or public tunnel; TLS and a deployment-specific security
 review remain required.
+
+## M7 real migration CI check (synthetic)
+
+GitHub CI now exercises the real Node M7 SQLite startup/upgrade on an
+isolated synthetic v15-marker rehearsal copy, including a historical
+`question_position BETWEEN 1 AND 10` table constraint. It checks that the
+upgrade widens the constraint, retains the original score and BLOB values,
+creates a pre-migration physical backup, and passes the Python preservation
+fingerprint verification. Deliberate tampering with the score must fail.
+
+The test uses synthetic data and a representative historical table
+constraint; it is **not** a substitute for an offline upgrade rehearsal on
+the original October 2026 competition database copy.
 
 ## Verify historical data preservation before M7 rehearsal
 
