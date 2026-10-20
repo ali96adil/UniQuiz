@@ -254,6 +254,28 @@ class HistoricalMigrationAuditTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_baseline_cannot_be_reused_for_another_rehearsal_copy(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="uniquiz-m7-crosscopy-") as root:
+            first = pathlib.Path(root) / "first.db"
+            second = pathlib.Path(root) / "second.db"
+            manifest = pathlib.Path(root) / "baseline.json"
+            original = old_fixture(first)
+            other = old_fixture(second)
+            try:
+                captured = execute(
+                    "capture", "--database", str(first), "--manifest", str(manifest),
+                )
+                self.assertEqual(captured.returncode, 0, captured.stderr)
+                migrate_fixture(other)
+                rejected = execute(
+                    "verify", "--database", str(second), "--manifest", str(manifest),
+                )
+                self.assertNotEqual(rejected.returncode, 0)
+                self.assertIn("BASELINE_DATABASE_PATH_MISMATCH", rejected.stderr)
+            finally:
+                original.close()
+                other.close()
+
     def test_non_uniquiz_database_is_not_accepted(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uniquiz-m7-notdb-") as root:
             dbpath = pathlib.Path(root) / "other.db"
