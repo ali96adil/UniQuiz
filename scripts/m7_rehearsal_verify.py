@@ -22,10 +22,10 @@ import sys
 from typing import Any
 
 FORMAT_VERSION = 1
-# Version metadata and OSC diagnostics legitimately change during startup.
-# Every other preexisting table, including future or unknown event tables,
-# must remain present and contain all its prior records.
-STARTUP_MUTABLE_TABLES = frozenset({"app_meta", "operations_state"})
+# Runtime version metadata and OSC diagnostics legitimately change at boot.
+# Preserve arbitrary historical app_meta keys; exempt only the known schema
+# version and newly installed active-workspace pointer.
+STARTUP_MUTABLE_TABLES = frozenset({"operations_state"})
 # Newer runtimes may backfill reservations or mint initially missing station
 # tokens. Existing records and bearer tokens must still be preserved.
 APPEND_ONLY_MIGRATION_TABLES = frozenset({
@@ -93,9 +93,14 @@ def table_fingerprint(
     keep_rows: bool = False,
 ) -> dict[str, Any]:
     select = ", ".join(quote(column) for column in columns)
+    # Schema version is intentionally updated to 16 and the active workspace
+    # pointer is created on first upgrade. Every other existing metadata row
+    # is part of the original event and must remain bit-for-bit equivalent.
+    where = (" WHERE key NOT IN ('schema_version', 'active_workspace_id')"
+             if name == "app_meta" else "")
     digest_rows = sorted(
         fingerprint_row(tuple(row))
-        for row in db.execute(f"SELECT {select} FROM {quote(name)}")
+        for row in db.execute(f"SELECT {select} FROM {quote(name)}{where}")
     )
     combined = hashlib.sha256()
     for row_hash in digest_rows:
@@ -193,8 +198,12 @@ def verify(db: sqlite3.Connection, manifest: dict[str, Any]) -> tuple[list[str],
         ).fetchone()
         if not version or not version[0].isdigit() or int(version[0]) < 16:
             errors.append("M7_SCHEMA_VERSION_NOT_INSTALLED")
-        if not active or not workspace:
+        if not workspace:
             errors.append("LEGACY_WORKSPACE_NOT_INITIALIZED")
+        if (not active or not db.execute(
+            "SELECT 1 FROM competition_workspaces WHERE id=?", (active[0],)
+        ).fetchone()):
+            errors.append("ACTIVE_WORKSPACE_POINTER_INVALID")
     else:
         errors.append("M7_METADATA_NOT_INSTALLED")
     return errors, notes
