@@ -60,6 +60,33 @@ try {
     db.prepare(
       "INSERT INTO audience_assets(slot,mime_type,bytes,updated_at) VALUES('university','image/png',?,CURRENT_TIMESTAMP)",
     ).run(Buffer.from([0x89,0x50,0x4e,0x47,0,255,76,79,71,79]));
+
+    // Reconstruct one genuine M6-style constraint so startup must widen
+    // CHECK(question_position BETWEEN 1 AND 10) to >= 1. The original
+    // historical answer is preserved across the table rebuild.
+    const table = db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='live_submissions'",
+    ).get().sql;
+    assert.match(table, /CHECK\\s*\\(\\s*question_position\\s*>=\\s*1\\s*\\)/i);
+    const oldDDL = table
+      .replace(/^(CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?)(?:\\w+)/i,
+        (_, prefix) => prefix + "live_submissions_legacy_ci")
+      .replace(/CHECK\\s*\\(\\s*question_position\\s*>=\\s*1\\s*\\)/i,
+        "CHECK (question_position BETWEEN 1 AND 10)");
+    assert.match(oldDDL, /live_submissions_legacy_ci/);
+    db.transaction(() => {
+      db.exec("DROP INDEX IF EXISTS idx_live_submissions_round_question");
+      db.exec(oldDDL);
+      db.exec("INSERT INTO live_submissions_legacy_ci SELECT * FROM live_submissions");
+      db.exec("DROP TABLE live_submissions");
+      db.exec("ALTER TABLE live_submissions_legacy_ci RENAME TO live_submissions");
+      db.exec("CREATE INDEX idx_live_submissions_round_question ON live_submissions(round_id, question_position)");
+    })();
+    assert.match(
+      db.prepare("SELECT sql FROM sqlite_master WHERE name='live_submissions'").get().sql,
+      /question_position\\s+BETWEEN\\s+1\\s+AND\\s+10/i,
+    );
+    assert.deepEqual(db.pragma("foreign_key_check"), []);
   } finally {
     db.close();
   }
@@ -74,8 +101,9 @@ try {
     /M7_BASELINE_CAPTURE_OK/,
   );
   // The preexisting installation is an intentionally synthetic v15 version
-  // marker over a valid snapshot of today's table definitions. This exercises
-  // the real backup/startup migration, not reconstruction of every old DDL.
+  // marker plus the historical 1..10 constraint on the submissions table.
+  // This exercises the real backup/startup table-rebuild migration; it does
+  // not reconstruct every historical M6 DDL or replace actual Mac rehearsal.
   db = openDatabase(rehearsal);
   try {
     assert.equal(
@@ -86,6 +114,13 @@ try {
       db.prepare("SELECT score_micros FROM live_submissions").get().score_micros,
       24600000,
     );
+    const migratedDDL = db.prepare(
+      "SELECT sql FROM sqlite_master WHERE name='live_submissions'",
+    ).get().sql;
+    assert.match(migratedDDL, /CHECK\\s*\\(\\s*question_position\\s*>=\\s*1\\s*\\)/i,
+      "M7 must lift the 10-question restriction without losing old answers");
+    assert.doesNotMatch(migratedDDL, /question_position\\s+BETWEEN\\s+1\\s+AND\\s+10/i);
+    assert.deepEqual(db.pragma("foreign_key_check"), []);
   } finally {
     db.close();
   }
