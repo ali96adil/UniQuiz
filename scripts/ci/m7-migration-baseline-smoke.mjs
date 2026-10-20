@@ -67,11 +67,11 @@ try {
     const table = db.prepare(
       "SELECT sql FROM sqlite_master WHERE type='table' AND name='live_submissions'",
     ).get().sql;
-    assert.match(table, /CHECK\\s*\\(\\s*question_position\\s*>=\\s*1\\s*\\)/i);
+    assert.match(table, /CHECK\s*\(\s*question_position\s*>=\s*1\s*\)/i);
     const oldDDL = table
-      .replace(/^(CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?)(?:\\w+)/i,
+      .replace(/^(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)(?:\w+)/i,
         (_, prefix) => prefix + "live_submissions_legacy_ci")
-      .replace(/CHECK\\s*\\(\\s*question_position\\s*>=\\s*1\\s*\\)/i,
+      .replace(/CHECK\s*\(\s*question_position\s*>=\s*1\s*\)/i,
         "CHECK (question_position BETWEEN 1 AND 10)");
     assert.match(oldDDL, /live_submissions_legacy_ci/);
     db.transaction(() => {
@@ -84,7 +84,7 @@ try {
     })();
     assert.match(
       db.prepare("SELECT sql FROM sqlite_master WHERE name='live_submissions'").get().sql,
-      /question_position\\s+BETWEEN\\s+1\\s+AND\\s+10/i,
+      /question_position\s+BETWEEN\s+1\s+AND\s+10/i,
     );
     assert.deepEqual(db.pragma("foreign_key_check"), []);
   } finally {
@@ -117,9 +117,9 @@ try {
     const migratedDDL = db.prepare(
       "SELECT sql FROM sqlite_master WHERE name='live_submissions'",
     ).get().sql;
-    assert.match(migratedDDL, /CHECK\\s*\\(\\s*question_position\\s*>=\\s*1\\s*\\)/i,
+    assert.match(migratedDDL, /CHECK\s*\(\s*question_position\s*>=\s*1\s*\)/i,
       "M7 must lift the 10-question restriction without losing old answers");
-    assert.doesNotMatch(migratedDDL, /question_position\\s+BETWEEN\\s+1\\s+AND\\s+10/i);
+    assert.doesNotMatch(migratedDDL, /question_position\s+BETWEEN\s+1\s+AND\s+10/i);
     assert.deepEqual(db.pragma("foreign_key_check"), []);
   } finally {
     db.close();
