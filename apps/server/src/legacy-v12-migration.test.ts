@@ -180,13 +180,101 @@ test("M7 upgrades real main v12 SQLite schema and preserves historic data throug
       ).get() as { token: string }).token, "test-only-token-A-2026");
       const ranking = getQualificationRanking(rehearsal);
       assert.equal(ranking.entries.length, 2);
-      assert.ok(ranking.entries[0]!.scorePoints > ranking.entries[1]!.scorePoints);
+      assert.deepEqual(
+        ranking.entries.map((entry) => ({
+          name: entry.college.name,
+          scorePoints: entry.scorePoints,
+          correctAnswers: entry.correctAnswers,
+          wrongAnswers: entry.wrongAnswers,
+          totalResponseTimeMs: entry.totalResponseTimeMs,
+          revealedQuestions: entry.revealedQuestions,
+        })),
+        [
+          {
+            name: "كلية التربية",
+            scorePoints: 205,
+            correctAnswers: 10,
+            wrongAnswers: 0,
+            totalResponseTimeMs: 13_750,
+            revealedQuestions: 10,
+          },
+          {
+            name: "كلية القانون",
+            scorePoints: 100,
+            correctAnswers: 5,
+            wrongAnswers: 5,
+            totalResponseTimeMs: 22_000,
+            revealedQuestions: 10,
+          },
+        ],
+        "M7 must preserve exact historical scores, counts and tiebreak timings",
+      );
     } finally {
       rehearsal.close();
     }
 
     assert.match(runPython(auditScript, "verify", "--database", rehearsalPath,
       "--manifest", baselinePath), /M7_REHEARSAL_VERIFY_OK/);
+    // Only AFTER proving the historical baseline is unchanged may the
+    // rehearsal DB be edited to validate that v12's 10-slot constraints have
+    // actually been widened (including all three legacy position tables).
+    const expanded = openDatabase(rehearsalPath);
+    try {
+      expanded.transaction(() => {
+        expanded.prepare(`
+          INSERT INTO qualification_rounds(
+            round_order,college_a_id,college_b_id,status
+          ) VALUES(2,1,2,'PENDING')
+        `).run();
+        const round = (expanded.prepare(
+          "SELECT id FROM qualification_rounds WHERE round_order=2",
+        ).get() as {id:number}).id;
+        expanded.prepare(
+          "INSERT INTO qualification_round_question_sets(round_id,locked_at) VALUES(?,CURRENT_TIMESTAMP)",
+        ).run(round);
+        const question = expanded.prepare(`
+          INSERT INTO questions(
+            category_id,prompt,option_a,option_b,option_c,option_d,correct_option
+          ) VALUES(1,'Question 11 after migration','A','B','C','D','A')
+        `).run();
+        const id = Number(question.lastInsertRowid);
+        expanded.prepare(`
+          INSERT INTO qualification_round_questions(round_id,position,question_id,category_id)
+          VALUES(?,11,?,1)
+        `).run(round,id);
+        expanded.prepare(`
+          INSERT INTO qualification_question_reservations(
+            question_id,round_id,position,disposition,reserved_at
+          ) VALUES(?,?,11,'ALLOCATED',CURRENT_TIMESTAMP)
+        `).run(id,round);
+        expanded.prepare(`
+          INSERT INTO live_submissions(
+            round_id,question_position,station,question_id,selected_option,
+            submitted_at_epoch_ms,response_time_ms,is_correct,score_micros
+          ) VALUES(?,11,'A',?,'A',1760354400011,100,1,25000000)
+        `).run(round,id);
+      })();
+      assert.deepEqual(expanded.pragma("foreign_key_check"), []);
+      assert.equal((expanded.prepare(`
+        SELECT COUNT(*) AS count FROM qualification_round_questions
+        WHERE position=11
+      `).get() as {count:number}).count,1);
+      assert.equal((expanded.prepare(`
+        SELECT COUNT(*) AS count FROM qualification_question_reservations
+        WHERE position=11
+      `).get() as {count:number}).count,1);
+      assert.equal((expanded.prepare(`
+        SELECT COUNT(*) AS count FROM live_submissions
+        WHERE question_position=11
+      `).get() as {count:number}).count,1);
+      // M7's newly created round must not rewrite the scores saved for the
+      // historically completed first round.
+      assert.equal((expanded.prepare(`
+        SELECT SUM(score_micros) AS points FROM live_submissions
+        WHERE round_id=1 AND station='A'
+      `).get() as {points:number}).points,205_000_000);
+    } finally {expanded.close();}
+
     const backups = readdirSync(join(dir, "migration-backups")).filter(
       (name) => name.endsWith(".sqlite3"),
     );
