@@ -16,6 +16,7 @@ This document applies to the stacked PR sequence:
 12. PR #40 — safe Windows answer-station enrollment and token rotation
 13. PR #41 — synchronized cross-browser active workspace rules and editors
 14. PR #42 — read-only historical-row fingerprint check of a copied DB
+15. PR #43 — prevent applying a baseline to a different rehearsal copy
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -84,7 +85,7 @@ python3 scripts/m7_rehearsal_verify.py capture \
 
 Require `M7_BASELINE_CAPTURE_OK`. The private baseline file has permissions
 `0600`; it contains row digests, not the names, question texts or logos.
-The command will **refuse to overwrite** an existing manifest. Never upload
+The command will **refuse to overwrite** an existing manifest and binds it to the exact resolved rehearsal database path. Do not move or rename the rehearsal DB between capture and verification. Never upload
 the private manifest or competition database to a public issue.
 
 Start the M7 rehearsal server as instructed below, confirm that its
