@@ -46,7 +46,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#39](https://github.com/ali96adil/UniQuiz/pull/39) →
 [#40](https://github.com/ali96adil/UniQuiz/pull/40) →
 [#41](https://github.com/ali96adil/UniQuiz/pull/41) →
-[#42](https://github.com/ali96adil/UniQuiz/pull/42).
+[#42](https://github.com/ali96adil/UniQuiz/pull/42) →
+[#43](https://github.com/ali96adil/UniQuiz/pull/43).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -69,6 +70,21 @@ For password setup, local restart/logout and safe rehearsal instructions, see
 **does not make the existing HTTP-only LAN deployment safe to expose** to an
 untrusted network or public tunnel; TLS and a deployment-specific security
 review remain required.
+
+## Real v12 migration CI coverage (draft PR #43)
+
+CI now tests the exact `main` branch's v12 SQLite schema from the frozen
+`scripts/fixtures/uniquiz-main-v12-schema.sql`, seeded with **synthetic**
+historical rounds, rankings, scores, media and question assignments.
+The test copies a WAL-active v12 DB using the safe rehearsal copier,
+fingerprints its rows before and after running the **actual M7 database
+migration**, reads back the legacy Excel results report and verifies that
+position 11 can be saved in all upgraded question tables. The pre-migration
+backup and untouched original v12 DB/WAL are verified independently.
+
+This does **not** replace checking the actual Mac's SQLite version, copying
+the University's real completed tournament and comparing its results. See
+[docs/M7-INTEGRATION-REHEARSAL.md](docs/M7-INTEGRATION-REHEARSAL.md).
 
 ## Verify historical data preservation before M7 rehearsal
 
