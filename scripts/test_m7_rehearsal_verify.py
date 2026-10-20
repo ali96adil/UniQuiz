@@ -48,6 +48,7 @@ def old_fixture(path: pathlib.Path) -> sqlite3.Connection:
         CREATE TABLE app_meta(key TEXT PRIMARY KEY, value TEXT);
         CREATE TABLE operations_state(id INTEGER PRIMARY KEY, updated_at TEXT);
         INSERT INTO app_meta VALUES('schema_version','15');
+        INSERT INTO app_meta VALUES('custom_festival_config','preserve-this-setting');
         INSERT INTO colleges VALUES(1,'كلية التربية',1);
         INSERT INTO qualification_rounds VALUES(1,1,1,'COMPLETED');
         INSERT INTO questions VALUES(9,4,'ما عاصمة العراق؟','B');
@@ -176,6 +177,53 @@ class HistoricalMigrationAuditTests(unittest.TestCase):
                 self.assertNotEqual(verified.returncode, 0)
                 self.assertIn("REMOVED_OR_RENAMED_COLUMNS: questions", verified.stderr)
                 self.assertIn("MISSING_TABLE: custom_historical_festival", verified.stderr)
+            finally:
+                db.close()
+
+    def test_custom_metadata_is_preserved_but_schema_version_can_advance(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="uniquiz-m7-appmeta-") as root:
+            dbpath = pathlib.Path(root) / "rehearsal.db"
+            manifest = pathlib.Path(root) / "baseline.json"
+            db = old_fixture(dbpath)
+            try:
+                captured = execute(
+                    "capture", "--database", str(dbpath), "--manifest", str(manifest),
+                )
+                self.assertEqual(captured.returncode, 0, captured.stderr)
+                saved = json.loads(manifest.read_text())
+                self.assertEqual(saved["protectedTables"]["app_meta"]["rowCount"], 1)
+                self.assertNotIn("preserve-this-setting", manifest.read_text())
+                migrate_fixture(db)
+                good = execute("verify", "--database", str(dbpath),
+                               "--manifest", str(manifest))
+                self.assertEqual(good.returncode, 0, good.stderr)
+                db.execute(
+                    "UPDATE app_meta SET value='lost-value' WHERE key='custom_festival_config'"
+                )
+                db.commit()
+                failed = execute("verify", "--database", str(dbpath),
+                                 "--manifest", str(manifest))
+                self.assertNotEqual(failed.returncode, 0)
+                self.assertIn("DATA_CHANGED: app_meta", failed.stderr)
+            finally:
+                db.close()
+
+    def test_active_workspace_pointer_must_reference_real_workspace(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="uniquiz-m7-pointer-") as root:
+            dbpath = pathlib.Path(root) / "rehearsal.db"
+            manifest = pathlib.Path(root) / "baseline.json"
+            db = old_fixture(dbpath)
+            try:
+                self.assertEqual(execute(
+                    "capture", "--database", str(dbpath), "--manifest", str(manifest),
+                ).returncode, 0)
+                migrate_fixture(db)
+                db.execute("UPDATE app_meta SET value='nonexistent' WHERE key='active_workspace_id'")
+                db.commit()
+                failed = execute("verify", "--database", str(dbpath),
+                                 "--manifest", str(manifest))
+                self.assertNotEqual(failed.returncode, 0)
+                self.assertIn("ACTIVE_WORKSPACE_POINTER_INVALID", failed.stderr)
             finally:
                 db.close()
 
