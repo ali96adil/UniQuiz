@@ -56,6 +56,9 @@ jobs:
       - name: Upgrade real M6 schema fixture and preserve ranking
         run: node scripts/ci/m7-exact-m6-upgrade-smoke.mjs
 
+      - name: Compare pre-upgrade M6 and post-upgrade M7 ranking exactly
+        run: node scripts/ci/m7-m6-ranking-parity-smoke.mjs
+
       - name: Server, realtime and M2 persistence smoke test
         shell: bash
         env:
