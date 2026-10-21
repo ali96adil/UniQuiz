@@ -260,6 +260,10 @@ entrants in a pending round. It then migrates a WAL-aware copy with the
 real M7 code and compares every public ranking entry (name, ID, status,
 rank, score, total time, revealed questions and answer counts) to the
 old M6 result, including after closing and reopening the migrated DB.
+The test also opens the resulting M7 **Excel workbook** and compares each
+exported ranking row with the original M6 reference, including name,
+order, score, response time, correct/wrong totals and pending rows.
+The old round totals must also match the new workbook's round export.
 
 This blocks unintended changes to historical result calculations that
 cannot be caught by raw SQLite data fingerprints alone. For an actual
