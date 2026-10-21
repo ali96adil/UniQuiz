@@ -1768,7 +1768,11 @@ export function registerLiveSessionRoutes(
         code,
         code === "QUALIFICATION_COMPLETE"
           ? "All qualification rounds are completed."
-          : "Unable to prepare the selected round.",
+          : code === "ROUND_QUESTION_SET_NOT_READY"
+            ? "Round questions are not allocated or locked. Open Setup > Readiness, allocate questions, then prepare the round."
+            : code === "ROUND_NOT_PENDING"
+              ? "Selected round is not pending. Choose a round that has not started."
+              : "Unable to prepare the selected round.",
       );
     }
   });

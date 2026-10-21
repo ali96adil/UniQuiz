@@ -7,6 +7,7 @@ import { GameplayRulesPanel } from "./GameplayRules.js";
 import { SetupJourney } from "./SetupJourney.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
+import { participantAwareAudienceText } from "@uniquiz/shared";
 import type {
   AudienceDisplaySettings,
   AudiencePresentationSnapshot,
@@ -1666,10 +1667,12 @@ function AudienceDrawSurface({
   snapshot,
   presentation,
   settings,
+  participantType,
 }: {
   snapshot: CompetitionSetupSnapshot;
   presentation: DrawPresentationEvent | null;
   settings: AudienceDisplaySettings;
+  participantType: ParticipantType;
 }) {
   const participantNames = snapshot.colleges
     .filter((college) => snapshot.participantCollegeIds.includes(college.id))
@@ -1680,13 +1683,13 @@ function AudienceDrawSurface({
       <section className="audience-stage">
         <div className="audience-kicker">{settings.eventTitle}</div>
         <h2 className="audience-title">{settings.copy.welcomeTitle}</h2>
-        <p className="audience-copy">{settings.copy.waitingParticipantsText}</p>
+        <p className="audience-copy">{participantAwareAudienceText(settings.copy.waitingParticipantsText, participantType)}</p>
 
         {participantNames.length > 0 ? (
           <>
             <p className="audience-live-participant-count">
               {audienceText(
-                settings.copy.participatingCollegeCountText,
+                participantAwareAudienceText(settings.copy.participatingCollegeCountText, participantType),
                 { count: participantNames.length },
               )}
             </p>
@@ -1696,7 +1699,7 @@ function AudienceDrawSurface({
               ))}
             </div>
             <div className="draw-waiting">
-              بانتظار تثبيت قائمة الكليات المشاركة
+              بانتظار تثبيت قائمة {PARTICIPANT_LABELS[participantType].plural} المشاركة
             </div>
           </>
         ) : null}
@@ -1710,7 +1713,7 @@ function AudienceDrawSurface({
         <div className="audience-kicker">{settings.copy.drawPhaseLabel}</div>
         <h2 className="audience-title">{settings.copy.drawOfficialTitle}</h2>
         <p className="audience-copy">
-          {audienceText(settings.copy.participatingCollegeCountText, { count: participantNames.length })}
+          {audienceText(participantAwareAudienceText(settings.copy.participatingCollegeCountText, participantType), { count: participantNames.length })}
         </p>
         <div className="audience-participants">
           {participantNames.map((name) => (
@@ -3616,8 +3619,10 @@ function OperatorHotkeys({
 
 function OperatorLivePanel({
   snapshot,
+  allocation,
 }: {
   snapshot: LiveSnapshot | null;
+  allocation: QuestionAllocationSummary | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3778,6 +3783,13 @@ function OperatorLivePanel({
         </div>
         <span className="live-phase">{phaseLabel(snapshot.phase)}</span>
       </div>
+      {snapshot.hasPendingRound && allocation && !allocation.ready ? (
+        <p className="status-message">
+          أسئلة الجولات لم توزّع وتُقفل بالكامل بعد. 
+          <a href="/setup?step=readiness">انتقل إلى إعداد الأسئلة والجاهزية</a>
+          ، ثم ارجع لتجهيز الجولة.
+        </p>
+      ) : null}
 
       {snapshot.round ? (
         <div className="live-round-map">
@@ -5253,6 +5265,7 @@ export function App() {
                 snapshot={competition}
                 presentation={drawPresentation}
                 settings={audienceSettings}
+                participantType={participantType}
               />
             </AudienceSceneTransition>
           )}
@@ -5273,7 +5286,7 @@ export function App() {
         <>
           <PresentationControlPanel settings={audienceSettings} />
           <OperationsPreflightPanel />
-          <OperatorLivePanel snapshot={liveSnapshot} />
+          <OperatorLivePanel snapshot={liveSnapshot} allocation={questionAllocation} />
           <StationAccessPanel />
         </>
       ) : null}
