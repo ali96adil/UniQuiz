@@ -29,6 +29,7 @@ import { OscOutput } from "./osc-output.js";
 import { registerOperationsRoutes } from "./operations.js";
 import { registerResultsExportRoutes } from "./results-export.js";
 import { registerCompetitionArchiveRoutes } from "./competition-archives.js";
+import { registerQuestionEditorRoutes } from "./question-editor.js";
 import { registerCompetitionWorkspaceRoutes, listCompetitionWorkspaces } from "./competition-workspaces.js";
 import {
   ensureStationCredentials,
@@ -152,6 +153,7 @@ const oscOutput = new OscOutput(
 
 registerCompetitionRoutes(app, database, io, oscOutput);
 registerImportRoutes(app, database, io);
+registerQuestionEditorRoutes(app, database, io);
 registerStationAuthRoutes(app, database, (station) => {
   const role = station === "A" ? "team-a" : "team-b";
   for (const socket of io.sockets.sockets.values()) {

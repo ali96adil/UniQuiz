@@ -143,6 +143,7 @@ export function allocateRoundsByPlan(
   plans: ReadonlyArray<{ roundId: number; categories: ReadonlyArray<{ categoryId: number; questions: number }> }>,
   categoryPools: readonly CategoryQuestionPool[],
   randomIndex: RandomIndex,
+  options: { difficultyMode?: "random" | "ascending"; difficultyByQuestion?: ReadonlyMap<number, number> } = {},
 ): AllocatedRound[] {
   if (plans.length === 0) throw new Error("At least one qualification round is required.");
   if (new Set(plans.map((plan) => plan.roundId)).size !== plans.length) {
@@ -197,9 +198,19 @@ export function allocateRoundsByPlan(
       }
       pool.offset += quota.questions;
     }
+    const randomized = shuffled(questions, randomIndex);
+    // A stable sort keeps the randomized order *within* each difficulty.
+    // Existing competition workspaces use random, preserving M6 behavior.
+    if (options.difficultyMode === "ascending") {
+      if (!options.difficultyByQuestion || randomized.some((question) => !options.difficultyByQuestion!.has(question.questionId))) {
+        throw new Error("QUESTION_DIFFICULTY_METADATA_MISSING");
+      }
+      randomized.sort((a, b) =>
+        options.difficultyByQuestion!.get(a.questionId)! - options.difficultyByQuestion!.get(b.questionId)!);
+    }
     return {
       roundId: plan.roundId,
-      questions: shuffled(questions, randomIndex).map((question, index) => ({
+      questions: randomized.map((question, index) => ({
         ...question,
         position: index + 1,
       })),

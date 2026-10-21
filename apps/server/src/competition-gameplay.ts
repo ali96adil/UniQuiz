@@ -1,12 +1,14 @@
 import type { AppDatabase } from "./database.js";
 
 export type ScoringMode = "time_decay" | "fixed";
+export type DifficultyMode = "random" | "ascending";
 
 export interface CompetitionGameplayRules {
   durationSeconds: number;
   scoringMode: ScoringMode;
   correctPoints: number;
   pointsLostPerSecond: number;
+  difficultyMode?: DifficultyMode;
 }
 
 export const DEFAULT_GAMEPLAY_RULES: CompetitionGameplayRules = {
@@ -14,6 +16,7 @@ export const DEFAULT_GAMEPLAY_RULES: CompetitionGameplayRules = {
   scoringMode: "time_decay",
   correctPoints: 25,
   pointsLostPerSecond: 1,
+  difficultyMode: "random",
 };
 
 export function getCompetitionGameplayRules(db: AppDatabase): CompetitionGameplayRules {
@@ -22,7 +25,8 @@ export function getCompetitionGameplayRules(db: AppDatabase): CompetitionGamepla
       duration_seconds AS durationSeconds,
       scoring_mode AS scoringMode,
       correct_points AS correctPoints,
-      points_lost_per_second AS pointsLostPerSecond
+      points_lost_per_second AS pointsLostPerSecond,
+      difficulty_mode AS difficultyMode
     FROM competition_gameplay_rules WHERE id = 1
   `).get() as CompetitionGameplayRules | undefined;
   return row ?? DEFAULT_GAMEPLAY_RULES;
@@ -48,8 +52,9 @@ export function saveCompetitionGameplayRules(
       duration_seconds = ?,
       scoring_mode = ?,
       correct_points = ?,
-      points_lost_per_second = ?
+      points_lost_per_second = ?,
+      difficulty_mode = ?
     WHERE id = 1
-  `).run(rules.durationSeconds, rules.scoringMode, rules.correctPoints, rules.pointsLostPerSecond);
+  `).run(rules.durationSeconds, rules.scoringMode, rules.correctPoints, rules.pointsLostPerSecond, rules.difficultyMode ?? "random");
   return getCompetitionGameplayRules(db);
 }

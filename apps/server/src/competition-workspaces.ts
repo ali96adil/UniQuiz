@@ -96,7 +96,7 @@ function emptySnapshot(
     id: 1, participants_locked: 0, draw_created_at: null, selected_round_id: null,
   }];
   saved.competition_rules = [{ id: 1, distribution_json: null }];
-  saved.competition_gameplay_rules = [{ id: 1, duration_seconds: 25, scoring_mode: "time_decay", correct_points: 25, points_lost_per_second: 1 }];
+  saved.competition_gameplay_rules = [{ id: 1, duration_seconds: 25, scoring_mode: "time_decay", correct_points: 25, points_lost_per_second: 1, difficulty_mode: "ascending" }];
   saved.live_state = [{
     id: 1, phase: "IDLE", round_id: null, question_position: null,
     stations_confirmed: 0, countdown_started_at_epoch_ms: null,

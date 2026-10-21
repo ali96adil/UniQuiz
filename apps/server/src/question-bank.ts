@@ -29,6 +29,7 @@ const gameplaySchema = z.object({
   scoringMode: z.enum(["time_decay", "fixed"]),
   correctPoints: z.number().int().min(1).max(1000),
   pointsLostPerSecond: z.number().int().min(0).max(100),
+  difficultyMode: z.enum(["random", "ascending"]).optional(),
 }).strict();
 
 const rulesSchema = z.object({
@@ -410,18 +411,15 @@ export function registerQuestionBankRoutes(
       );
     }
 
-    const pools: CategoryQuestionPool[] = [...required.keys()].map((key) => ({
-      categoryId: categoryMap.get(key)!.id,
-      questionIds: (
-        db.prepare(`
-          SELECT id
-          FROM questions
-          WHERE category_id = ?
-            AND active = 1
-          ORDER BY id
-        `).all(categoryMap.get(key)!.id) as Array<{ id: number }>
-      ).map((row) => row.id),
-    }));
+    const difficultyByQuestion = new Map<number, number>();
+    const pools: CategoryQuestionPool[] = [...required.keys()].map((key) => {
+      const rows = db.prepare(`
+        SELECT id, difficulty
+        FROM questions WHERE category_id = ? AND active = 1 ORDER BY id
+      `).all(categoryMap.get(key)!.id) as Array<{ id: number; difficulty: number }>;
+      for (const row of rows) difficultyByQuestion.set(row.id, row.difficulty);
+      return { categoryId: categoryMap.get(key)!.id, questionIds: rows.map((row) => row.id) };
+    });
 
     const allocation = allocateRoundsByPlan(
       plans.map((plan) => ({
@@ -433,6 +431,7 @@ export function registerQuestionBankRoutes(
       })),
       pools,
       (upperExclusive) => randomInt(upperExclusive),
+      { difficultyMode: getCompetitionGameplayRules(db).difficultyMode ?? "random", difficultyByQuestion },
     );
 
     const lockedAt = new Date().toISOString();

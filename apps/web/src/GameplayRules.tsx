@@ -89,6 +89,17 @@ export function GameplayRulesPanel({
             value={draft.correctPoints}
             onChange={(event) => setDraft((current) => current && ({ ...current, correctPoints: Number(event.target.value) }))} />
         </label>
+        <label>
+          <span>ترتيب صعوبة الأسئلة داخل كل جولة</span>
+          <select disabled={disabled} value={draft.difficultyMode ?? "random"}
+            onChange={(event) => setDraft((current) => current && ({
+              ...current, difficultyMode: event.target.value as "random" | "ascending",
+            }))}>
+            <option value="ascending">من السهل إلى الصعب (تصاعدي)</option>
+            <option value="random">عشوائي (النظام الأصلي)</option>
+          </select>
+          <small className="muted">يُرتب النظام الأسئلة المختارة حسب مستوى الصعوبة، مع توزيع عشوائي ضمن المستوى الواحد. الأسئلة القديمة تبدأ بالمستوى 3 حتى تُصنَّف.</small>
+        </label>
         {draft.scoringMode === "time_decay" ? (
           <label>
             <span>مقدار النقاط المخصومة لكل ثانية كاملة (0–100)</span>

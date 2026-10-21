@@ -39,6 +39,7 @@ interface ImportedQuestion {
   optionC: string;
   optionD: string;
   correctOption: "A" | "B" | "C" | "D";
+  difficulty: number;
   sourceRef: string | null;
 }
 
@@ -212,16 +213,6 @@ function validateQuestions(
   const prompts = new Set<string>();
   const sourceRefs = new Set<string>();
 
-  if (records.some((record) => Object.hasOwn(record, "difficulty"))) {
-    issue(
-      issues,
-      "error",
-      sheet,
-      null,
-      "difficulty is not supported. All official questions have one level.",
-    );
-  }
-
   records.forEach((record, index) => {
     const row = index + 2;
     const categoryReference = text(record.category_key);
@@ -238,6 +229,12 @@ function validateQuestions(
     const optionD = text(record.option_d);
     const correctOption = text(record.correct_option).toUpperCase();
     const sourceRef = text(record.source_ref) || null;
+    const difficultyText = text(record.difficulty);
+    const difficulty = difficultyText === "" ? 3 : Number(difficultyText);
+    if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 5) {
+      issue(issues, "error", sheet, row, "difficulty must be an integer between 1 and 5.");
+      return;
+    }
 
     if (
       !categoryReference ||
@@ -317,6 +314,7 @@ function validateQuestions(
       optionC,
       optionD,
       correctOption: correctOption as "A" | "B" | "C" | "D",
+      difficulty,
       sourceRef,
     });
   });
@@ -737,6 +735,7 @@ async function sendTemplate(reply: FastifyReply) {
     "option_c",
     "option_d",
     "correct_option",
+    "difficulty",
     "source_ref",
   ]);
 
@@ -795,6 +794,7 @@ async function sendSampleWorkbook(reply: FastifyReply) {
     "option_c",
     "option_d",
     "correct_option",
+    "difficulty",
     "source_ref",
   ]);
 
@@ -810,6 +810,7 @@ async function sendSampleWorkbook(reply: FastifyReply) {
         `الخيار C-${index}`,
         `الخيار D-${index}`,
         correctOptions[(index - 1) % correctOptions.length],
+        ((index - 1) % 5) + 1,
         "",
       ]);
     }
@@ -890,6 +891,7 @@ async function sendExport(
     "option_c",
     "option_d",
     "correct_option",
+    "difficulty",
     "source_ref",
   ]);
 
@@ -902,6 +904,7 @@ async function sendExport(
       q.option_c AS optionC,
       q.option_d AS optionD,
       q.correct_option AS correctOption,
+      q.difficulty AS difficulty,
       q.source_ref AS sourceRef
     FROM questions q
     JOIN categories c ON c.id = q.category_id
@@ -915,6 +918,7 @@ async function sendExport(
     optionC: string;
     optionD: string;
     correctOption: string;
+    difficulty: number;
     sourceRef: string | null;
   }>;
 
@@ -927,6 +931,7 @@ async function sendExport(
       question.optionC,
       question.optionD,
       question.correctOption,
+      question.difficulty,
       question.sourceRef ?? "",
     ]);
   }
@@ -1108,9 +1113,10 @@ export function registerImportRoutes(
             option_c,
             option_d,
             correct_option,
+            difficulty,
             source_ref
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         for (const question of staged.parsed.questions) {
@@ -1132,6 +1138,7 @@ export function registerImportRoutes(
             question.optionC,
             question.optionD,
             question.correctOption,
+            question.difficulty,
             question.sourceRef,
           );
         }

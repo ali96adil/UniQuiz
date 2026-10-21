@@ -49,7 +49,7 @@ test("CSV question import accepts four options and correct answer", async () => 
   db.close();
 });
 
-test("CSV import rejects difficulty column", async () => {
+test("CSV import accepts difficulty from 1 to 5", async () => {
   const db = testDatabase();
   db.exec(`
     INSERT INTO categories (category_key, name, sort_order) VALUES
@@ -71,13 +71,8 @@ test("CSV import rejects difficulty column", async () => {
     Buffer.from(csv),
   );
 
-  assert.match(
-    parsed.issues
-      .filter((entry) => entry.level === "error")
-      .map((entry) => entry.message)
-      .join(" "),
-    /difficulty/,
-  );
+  assert.equal(parsed.questions?.[0]?.difficulty, 1);
+  assert.equal(parsed.issues.filter((entry) => entry.level === "error").length, 0);
 
   db.close();
 });
@@ -209,5 +204,20 @@ test("CSV question import accepts visible category names and canonicalizes them"
     0,
   );
 
+  db.close();
+});
+
+
+test("CSV import rejects out-of-range difficulty and preserves default for old files", async () => {
+  const db = testDatabase();
+  db.exec("INSERT INTO categories (category_key, name, sort_order) VALUES ('sports','Sports',1)");
+  const header = "category_key,question,option_a,option_b,option_c,option_d,correct_option,difficulty";
+  const bad = await parseImportBuffer(db as never, "questions.csv", Buffer.from(
+    [header, "sports,Q1,A1,B1,C1,D1,A,6"].join("\n")));
+  assert.ok(bad.issues.some((entry) => entry.level === "error" && entry.message.includes("difficulty")));
+  const old = await parseImportBuffer(db as never, "questions.csv", Buffer.from(
+    ["category_key,question,option_a,option_b,option_c,option_d,correct_option",
+     "sports,Q2,A1,B1,C1,D1,A"].join("\n")));
+  assert.equal(old.questions?.[0]?.difficulty, 3);
   db.close();
 });

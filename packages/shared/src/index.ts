@@ -149,6 +149,7 @@ export interface CompetitionGameplayRules {
   scoringMode: "time_decay" | "fixed";
   correctPoints: number;
   pointsLostPerSecond: number;
+  difficultyMode?: "random" | "ascending";
 }
 
 export type LivePhase =
