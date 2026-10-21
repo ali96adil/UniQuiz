@@ -50,6 +50,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Block premature answers on public HTTP and actual WebSocket connections
+        run: node scripts/ci/m7-live-wire-secrecy-smoke.mjs
+
       - name: Verify migration preservation with actual M7 startup
         run: node scripts/ci/m7-migration-baseline-smoke.mjs
 
