@@ -108,7 +108,7 @@ try {
   try {
     assert.equal(
       db.prepare("SELECT value FROM app_meta WHERE key='schema_version'").get().value,
-      "16",
+      "17",
     );
     assert.equal(
       db.prepare("SELECT score_micros FROM live_submissions").get().score_micros,

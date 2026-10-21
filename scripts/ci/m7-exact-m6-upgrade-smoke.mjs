@@ -43,7 +43,7 @@ try {
   try {
     assert.equal(db.prepare(
       "SELECT value FROM app_meta WHERE key='schema_version'",
-    ).get().value, "16");
+    ).get().value, "17");
     assert.equal(activeWorkspaceId(db), "legacy");
     assert.equal(db.prepare(
       "SELECT event_title AS title FROM audience_settings WHERE id=1",

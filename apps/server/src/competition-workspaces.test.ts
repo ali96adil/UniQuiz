@@ -81,7 +81,7 @@ test("M7.2 keeps results and sponsorship isolated while retaining the shared que
     assert.equal((db.prepare("SELECT event_title AS title FROM audience_settings").get() as {title:string}).title,"جامعة بابل 2026");
     assert.equal(getCompetitionRules(db).questionsPerRound,12);
     assert.equal(getRoundRules(db,1).questionsPerRound,5);
-    assert.deepEqual(getCompetitionGameplayRules(db), { durationSeconds:40,scoringMode:"fixed",correctPoints:10,pointsLostPerSecond:0 });
+    assert.deepEqual(getCompetitionGameplayRules(db), { durationSeconds:40,scoringMode:"fixed",correctPoints:10,pointsLostPerSecond:0,difficultyMode:"random" });
     assert.deepEqual((db.prepare("SELECT bytes FROM audience_assets").get() as {bytes:Buffer}).bytes,logo);
     assert.deepEqual(db.pragma("foreign_key_check"),[]);
 

@@ -57,14 +57,22 @@ function hasProtectedReferences(db: AppDatabase, id: number): boolean {
   // Old archived questions are frozen in archive snapshots. However, a source
   // question is still considered historically used even if its live allocation
   // was later reset and only an archive retained it.
+  // Inactive competitions can still reference a shared question. Protect
+  // saved draws even when the currently active competition is empty.
+  const saved = db.prepare("SELECT payload_json AS payload FROM competition_workspaces WHERE payload_json IS NOT NULL").all() as Array<{ payload: string }>;
   const archives = db.prepare("SELECT payload_json AS payload FROM competition_archives").all() as Array<{ payload: string }>;
-  for (const archive of archives) {
+  for (const snapshot of [...saved, ...archives]) {
     try {
-      const parsed = JSON.parse(archive.payload) as Record<string, unknown>;
-      const allocations = JSON.stringify(parsed.qualification_round_questions ?? parsed);
-      if (new RegExp('"question_id"\\s*:\\s*' + id + '(?![0-9])').test(allocations)) return true;
+      const parsed = JSON.parse(snapshot.payload) as Record<string, unknown>;
+      const related = JSON.stringify([
+        parsed.qualification_round_questions,
+        parsed.qualification_question_reservations,
+        parsed.live_submissions,
+        parsed.payload,
+      ]);
+      if (new RegExp('"question_id"\\s*:\\s*' + id + '(?![0-9])').test(related)) return true;
     } catch {
-      // Broken archives must not authorize historical question rewrites.
+      // Malformed archived history must not authorize historical rewrites.
       return true;
     }
   }

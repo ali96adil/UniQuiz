@@ -62,7 +62,7 @@ test("CSV import accepts difficulty from 1 to 5", async () => {
 
   const csv = [
     "category_key,question,option_a,option_b,option_c,option_d,correct_option,difficulty",
-    "sports,Question 1,A1,B1,C1,D1,A,easy",
+    "sports,Question 1,A1,B1,C1,D1,A,1",
   ].join("\n");
 
   const parsed = await parseImportBuffer(

@@ -15,7 +15,7 @@ test("M7.5 preserves original 25-second countdown scoring exactly", () => {
   try {
     assert.deepEqual(getCompetitionGameplayRules(db), {
       durationSeconds: 25, scoringMode: "time_decay",
-      correctPoints: 25, pointsLostPerSecond: 1,
+      correctPoints: 25, pointsLostPerSecond: 1, difficultyMode: "random",
     });
     assert.equal(scoreMicrosToPoints(calculateScoreMicros(true, 0)), 25);
     assert.equal(scoreMicrosToPoints(calculateScoreMicros(true, 999)), 25);
@@ -69,10 +69,10 @@ test("M7.5 validates gameplay API and locks scoring rules once competition start
     };
     const save = await app.inject({method:"PUT",url:"/api/competition/gameplay",payload:rules});
     assert.equal(save.statusCode,200,save.body);
-    assert.deepEqual(getCompetitionGameplayRules(db),rules);
+    assert.deepEqual(getCompetitionGameplayRules(db),{...rules,difficultyMode:"random"});
     const read = await app.inject({method:"GET",url:"/api/competition/gameplay"});
     assert.equal(read.statusCode,200);
-    assert.deepEqual(read.json(),rules);
+    assert.deepEqual(read.json(),{...rules,difficultyMode:"random"});
     for (const payload of [
       {...rules,durationSeconds:4},
       {...rules,durationSeconds:301},
@@ -92,7 +92,7 @@ test("M7.5 validates gameplay API and locks scoring rules once competition start
       payload:{...rules,scoringMode:"fixed"},
     });
     assert.equal(blocked.statusCode,409);
-    assert.deepEqual(getCompetitionGameplayRules(db),rules);
+    assert.deepEqual(getCompetitionGameplayRules(db),{...rules,difficultyMode:"random"});
   } finally {
     io.close();
     await app.close();
