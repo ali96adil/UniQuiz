@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
 import { openDatabase } from "./database.js";
-import { ensureStationCredentials, registerStationAuthRoutes } from "./station-auth.js";
+import { ensureStationCredentials, registerStationAuthRoutes, validateStationToken } from "./station-auth.js";
 import { createOperatorAuth } from "./operator-auth.js";
 
 const PASSWORD = "ci-offline-test-password-very-long";
@@ -138,7 +138,7 @@ test("6-digit station pairing is operator-issued, one-use, scoped, and rate-limi
     });
     assert.equal(issue.statusCode,200,issue.body);
     const code=issue.json().code as string;
-    assert.match(code,/^\\d{6}$/);
+    assert.match(code,/^\d{6}$/);
     const mismatch=await app.inject({
       method:"POST",url:"/api/stations/enroll",payload:{station:"B",code},
     });

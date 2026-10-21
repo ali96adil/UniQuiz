@@ -4867,7 +4867,7 @@ export function App() {
     setStationEnrollBusy(true);
     try {
       let token = entered;
-      if (/^\\d{6}$/.test(entered)) {
+      if (/^\d{6}$/.test(entered)) {
         const response = await fetch("/api/stations/enroll", {
           method: "POST",
           headers: { "content-type": "application/json" },

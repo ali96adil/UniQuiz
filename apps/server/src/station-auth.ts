@@ -81,7 +81,7 @@ const MAX_PAIRING_FAILURES = 5;
 const issuePairingSchema = z.object({}).strict();
 const enrollSchema = z.object({
   station: z.enum(["A", "B"]),
-  code: z.string().regex(/^\\d{6}$/),
+  code: z.string().regex(/^\d{6}$/),
 }).strict();
 
 /**
