@@ -2296,6 +2296,11 @@ interface StationCredentialResponse {
   teamA: { station: "A"; token: string } | null;
   teamB: { station: "B"; token: string } | null;
 }
+interface StationPairingCode {
+  station: "A" | "B";
+  code: string;
+  expiresAt: number;
+}
 
 
 
@@ -3206,6 +3211,7 @@ function StationAccessPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<"A" | "B" | null>(null);
   const [showTokens, setShowTokens] = useState(false);
+  const [pairingCodes, setPairingCodes] = useState<Partial<Record<"A" | "B", StationPairingCode>>>({});
 
   useEffect(() => {
     void apiRequest<StationCredentialResponse>("/api/stations/credentials")
@@ -3237,6 +3243,21 @@ function StationAccessPanel() {
     }
   };
 
+  const issuePairingCode = async (station: "A" | "B") => {
+    setError(null); setNotice(null);
+    setBusy(station);
+    try {
+      const issued = await apiRequest<StationPairingCode>(
+        "/api/stations/" + station.toLowerCase() + "/pairing-code",
+        { method: "POST", body: "{}" },
+      );
+      setPairingCodes(previous => ({ ...previous, [station]: issued }));
+      setNotice("اكتب الأرقام الستة بمحطة " + station + " خلال 5 دقائق. الرمز لمرة واحدة.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر إنشاء رمز الربط");
+    } finally { setBusy(null); }
+  };
+
   const shareToken = async (token: string) => {
     setError(null);
     try {
@@ -3257,8 +3278,8 @@ function StationAccessPanel() {
         </div>
       </div>
       <p className="muted">
-        افتح صفحة الفريق بدون رمز داخل الرابط، ثم أدخل الرمز على جهاز Windows.
-        لا تشارك الرمز في رابط أو رسالة عامة.
+        الطريقة الأسهل: ولّد رمز ربط من 6 أرقام للمحطة، ثم أدخله على جهازها خلال 5 دقائق.
+        الرمز يستخدم مرة واحدة فقط. يبقى الرمز الطويل للاتصال محفوظاً داخلياً.
       </p>
       <button type="button" onClick={() => setShowTokens(!showTokens)}>
         {showTokens ? "إخفاء الرموز" : "إظهار الرموز للمشغّل"}
@@ -3272,11 +3293,18 @@ function StationAccessPanel() {
               <div key={station}>
                 <strong>Station {station}</strong>
                 <code>{`${window.location.origin}/team/${station.toLowerCase()}`}</code>
+                {pairingCodes[station] && pairingCodes[station]!.expiresAt > Date.now() ? (
+                  <p className="status-message">رمز الربط المؤقت {station}: <strong dir="ltr">{pairingCodes[station]!.code}</strong> (5 دقائق / مرة واحدة)</p>
+                ) : null}
                 {showTokens ? (
                   <input aria-label={`رمز المحطة ${station}`} readOnly value={credential.token}
                     onFocus={(event) => event.target.select()} dir="ltr" />
                 ) : null}
                 <div className="actions">
+                  <button type="button" className="primary" disabled={busy !== null}
+                    onClick={() => void issuePairingCode(station)}>
+                    إنشاء رمز ربط 6 أرقام {station}
+                  </button>
                   <button type="button" onClick={() => void shareToken(credential.token)}>
                     نسخ رمز {station}
                   </button>
@@ -4820,6 +4848,8 @@ export function App() {
     return window.localStorage.getItem(key);
   });
   const [stationTokenDraft, setStationTokenDraft] = useState("");
+  const [stationEnrollError, setStationEnrollError] = useState<string | null>(null);
+  const [stationEnrollBusy, setStationEnrollBusy] = useState(false);
   useEffect(() => {
     if (role !== "team-a" && role !== "team-b") return;
     const url = new URL(window.location.href);
@@ -4829,14 +4859,36 @@ export function App() {
     }
   }, [role]);
 
-  const enrollStation = (event: FormEvent<HTMLFormElement>) => {
+  const enrollStation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (role !== "team-a" && role !== "team-b") return;
-    const token = stationTokenDraft.trim();
-    if (!/^[A-Za-z0-9_-]{32}$/.test(token)) return;
-    window.localStorage.setItem(`uniquiz:${role}:token`, token);
-    setStationTokenDraft("");
-    setStationToken(token);
+    const entered = stationTokenDraft.trim();
+    setStationEnrollError(null);
+    setStationEnrollBusy(true);
+    try {
+      let token = entered;
+      if (/^\\d{6}$/.test(entered)) {
+        const response = await fetch("/api/stations/enroll", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ station: role === "team-a" ? "A" : "B", code: entered }),
+        });
+        if (!response.ok) {
+          throw new Error(response.status === 429
+            ? "محاولات كثيرة. انتظر دقيقة واطلب رمزاً جديداً من المشغّل."
+            : "رمز الربط غير صحيح، منتهي الصلاحية أو مستخدم مسبقاً.");
+        }
+        const paired = await response.json() as { token: string };
+        token = paired.token;
+      } else if (!/^[A-Za-z0-9_-]{32}$/.test(entered)) {
+        throw new Error("أدخل رمز الربط المكوّن من 6 أرقام.");
+      }
+      window.localStorage.setItem(`uniquiz:${role}:token`, token);
+      setStationTokenDraft("");
+      setStationToken(token);
+    } catch (error) {
+      setStationEnrollError(error instanceof Error ? error.message : "تعذّر الربط");
+    } finally { setStationEnrollBusy(false); }
   };
 
   const clearStationToken = () => {
@@ -5003,19 +5055,22 @@ export function App() {
       <main className="shell">
         <section className="panel station-enrollment" dir="rtl">
           <h1>تهيئة محطة الفريق {role === "team-a" ? "A" : "B"}</h1>
-          <p>أدخل الرمز الذي يظهر في لوحة المشغّل. لا تضع الرمز داخل عنوان الصفحة.</p>
+          <p>أدخل رمز الربط المؤقت المكوّن من 6 أرقام من لوحة المشغّل. لا تضعه بالرابط.</p>
           {stationToken && effectiveRole !== role ? (
             <p className="status-message error">
               الرمز السابق غير صالح أو تم إلغاؤه. أدخل الرمز الجديد من المشغّل.
             </p>
           ) : null}
-          <form onSubmit={enrollStation}>
-            <label htmlFor="station-access-token">رمز المحطة</label>
-            <input id="station-access-token" type="password" autoComplete="off"
-              value={stationTokenDraft} minLength={32} maxLength={32}
+          <form onSubmit={(event) => void enrollStation(event)}>
+            <label htmlFor="station-access-token">رمز الربط (6 أرقام)</label>
+            <input id="station-access-token" type="text" autoComplete="off"
+              inputMode="numeric" value={stationTokenDraft} maxLength={32}
               onChange={(event) => setStationTokenDraft(event.target.value)}
-              placeholder="ألصق الرمز هنا" required dir="ltr" />
-            <button className="primary" type="submit">ربط محطة الفريق</button>
+              placeholder="مثال: 123456" required dir="ltr" />
+            <button className="primary" type="submit" disabled={stationEnrollBusy}>
+              {stationEnrollBusy ? "جاري الربط..." : "ربط محطة الفريق"}
+            </button>
+            {stationEnrollError ? <p className="status-message error">{stationEnrollError}</p> : null}
           </form>
           {stationToken ? (
             <button type="button" onClick={clearStationToken}>

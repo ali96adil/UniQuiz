@@ -86,7 +86,8 @@ export function createOperatorAuth(password: string) {
       if (!path.startsWith("/api/")) return;
       if ((request.method === "GET" && publicGetRoutes.has(path)) ||
         (request.method === "POST" &&
-          (path === "/api/auth/login" || path === "/api/auth/logout"))) {
+          (path === "/api/auth/login" || path === "/api/auth/logout" ||
+           path === "/api/stations/enroll"))) {
         return;
       }
       if (!isAuthorized(request.headers.cookie)) {
