@@ -53,6 +53,9 @@ jobs:
       - name: Verify migration preservation with actual M7 startup
         run: node scripts/ci/m7-migration-baseline-smoke.mjs
 
+      - name: Upgrade real M6 schema fixture and preserve ranking
+        run: node scripts/ci/m7-exact-m6-upgrade-smoke.mjs
+
       - name: Server, realtime and M2 persistence smoke test
         shell: bash
         env:
