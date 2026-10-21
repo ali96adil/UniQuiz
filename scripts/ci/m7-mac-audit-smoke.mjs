@@ -3,13 +3,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const repo=resolve(fileURLToPath(new URL("../..",import.meta.url)));
 const root=mkdtempSync(join(tmpdir(),"uniquiz-m7-mac-audit-ci-"));
-const source=join(root,"synthetic-m6-v12.db");
+const sourceDir=join(root,"synthetic-source");
+mkdirSync(sourceDir);
+const source=join(sourceDir,"synthetic-m6-v12.db");
 const output=join(root,"private-audit");
 function run(cmd,args) {
   const p=spawnSync(cmd,args,{cwd:repo,encoding:"utf8",timeout:120000});
