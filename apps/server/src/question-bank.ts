@@ -51,6 +51,11 @@ interface CategoryRow {
   key: string;
   name: string;
   availableQuestions: number;
+  level1: number;
+  level2: number;
+  level3: number;
+  level4: number;
+  level5: number;
 }
 
 interface RoundRow {
@@ -85,7 +90,12 @@ export function getQuestionAllocationSummary(
       c.id,
       c.category_key AS key,
       COALESCE(NULLIF(TRIM(c.display_name), ''), c.name) AS name,
-      COUNT(q.id) AS availableQuestions
+      COUNT(q.id) AS availableQuestions,
+      SUM(CASE WHEN q.difficulty = 1 THEN 1 ELSE 0 END) AS level1,
+      SUM(CASE WHEN q.difficulty = 2 THEN 1 ELSE 0 END) AS level2,
+      SUM(CASE WHEN q.difficulty = 3 THEN 1 ELSE 0 END) AS level3,
+      SUM(CASE WHEN q.difficulty = 4 THEN 1 ELSE 0 END) AS level4,
+      SUM(CASE WHEN q.difficulty = 5 THEN 1 ELSE 0 END) AS level5
     FROM categories c
     LEFT JOIN questions q
       ON q.category_id = c.id
@@ -104,6 +114,21 @@ export function getQuestionAllocationSummary(
     }
   }
   const requiredPerCategory = rounds.length * 2; // Kept for older clients.
+  const ascending = getCompetitionGameplayRules(db).difficultyMode === "ascending";
+  const warnings: string[] = [];
+  if (ascending) {
+    for (const category of categories) {
+      const appearances = roundPlans.filter((round) =>
+        round.categories.some((quota) => quota.categoryKey === category.key)).length;
+      if (!appearances) continue;
+      const easy = category.level1 + category.level2;
+      const hard = category.level4 + category.level5;
+      if (easy < appearances) warnings.push(
+        `المحور ${category.name}: توجد ${easy} أسئلة سهلة مقابل ${appearances} جولات تحتاج هذا المحور. قد لا تبدأ جميع الجولات بمستوى سهل.`);
+      if (hard === 0) warnings.push(
+        `المحور ${category.name}: لا توجد أسئلة صعبة (4–5)، لذلك قد لا يصل التدرج إلى مستوى صعب.`);
+    }
+  }
 
   const roundSummaries: RoundQuestionSetSummary[] = rounds.map((round) => {
     const plan = getRoundRules(db, round.id);
@@ -147,6 +172,7 @@ export function getQuestionAllocationSummary(
     roundCount: rounds.length,
     questionsPerRound: rules.questionsPerRound,
     requiredPerCategory,
+    difficultyWarnings: warnings,
     ready:
       rounds.length > 0 &&
       roundPlans.every((plan) => plan.categories.length > 0 &&
@@ -166,6 +192,10 @@ export function getQuestionAllocationSummary(
       availableQuestions: category.availableQuestions,
       requiredQuestions: requiredByCategory.get(category.key) ?? 0,
       quotaPerRound: quotas.get(category.key) ?? 0,
+      difficultyCounts: {
+        1: category.level1, 2: category.level2, 3: category.level3,
+        4: category.level4, 5: category.level5,
+      },
     })),
     rounds: roundSummaries,
   };

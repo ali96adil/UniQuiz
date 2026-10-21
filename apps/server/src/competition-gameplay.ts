@@ -42,9 +42,12 @@ export function saveCompetitionGameplayRules(
   const submissions = (db.prepare(
     "SELECT COUNT(*) AS count FROM live_submissions",
   ).get() as { count: number }).count;
+  const allocated = (db.prepare(
+    "SELECT COUNT(*) AS count FROM qualification_round_question_sets",
+  ).get() as { count: number }).count;
   const state = db.prepare("SELECT phase FROM live_state WHERE id = 1")
     .get() as { phase: string } | undefined;
-  if (locked > 0 || submissions > 0 || (state?.phase !== "IDLE" && state?.phase !== undefined)) {
+  if (locked > 0 || submissions > 0 || allocated > 0 || (state?.phase !== "IDLE" && state?.phase !== undefined)) {
     throw new Error("GAMEPLAY_RULES_LOCKED");
   }
   db.prepare(`

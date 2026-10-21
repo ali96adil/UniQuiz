@@ -158,3 +158,27 @@ test("M7.5 live session and ranking use configured 40-second timeout", async () 
     db.close();
   }
 });
+
+test("M7.7 difficulty/score settings freeze as soon as a round's questions are allocated", async () => {
+  const db = openDatabase(":memory:");
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  try {
+    registerQuestionBankRoutes(app, db, io);
+    await app.ready();
+    db.exec(`
+      INSERT INTO colleges(name,sort_order) VALUES ('A',1);
+      INSERT INTO qualification_rounds(round_order,college_a_id,status) VALUES(1,1,'PENDING');
+      INSERT INTO qualification_round_question_sets(round_id,locked_at) VALUES(1,CURRENT_TIMESTAMP);
+    `);
+    const before = getCompetitionGameplayRules(db);
+    const response = await app.inject({ method:"PUT", url:"/api/competition/gameplay", payload:{
+      durationSeconds: 40, scoringMode:"fixed", correctPoints: 10,
+      pointsLostPerSecond: 0, difficultyMode:"ascending",
+    }});
+    assert.equal(response.statusCode, 409, response.body);
+    assert.deepEqual(getCompetitionGameplayRules(db), before);
+  } finally {
+    io.close(); await app.close(); db.close();
+  }
+});

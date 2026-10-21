@@ -122,6 +122,7 @@ export interface QuestionAllocationCategorySummary {
   availableQuestions: number;
   requiredQuestions: number;
   quotaPerRound: number;
+  difficultyCounts?: Record<number, number>;
 }
 
 export interface RoundQuestionSetSummary {
@@ -139,6 +140,7 @@ export interface QuestionAllocationSummary {
   roundCount: number;
   questionsPerRound: number;
   requiredPerCategory: number;
+  difficultyWarnings?: string[];
   ready: boolean;
   categories: QuestionAllocationCategorySummary[];
   rounds: RoundQuestionSetSummary[];

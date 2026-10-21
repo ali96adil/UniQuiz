@@ -50,29 +50,38 @@ function readId(raw: string): number | null {
   return /^[1-9][0-9]*$/.test(raw) && Number.isSafeInteger(n) ? n : null;
 }
 function hasProtectedReferences(db: AppDatabase, id: number): boolean {
+  // The active competition's current, reserved and submitted questions.
   for (const table of ["qualification_round_questions", "qualification_question_reservations", "live_submissions"] as const) {
-    const row = db.prepare("SELECT 1 FROM " + table + " WHERE question_id = ? LIMIT 1").get(id);
-    if (row) return true;
+    if (db.prepare("SELECT 1 FROM " + table + " WHERE question_id=? LIMIT 1").get(id)) return true;
   }
-  // Old archived questions are frozen in archive snapshots. However, a source
-  // question is still considered historically used even if its live allocation
-  // was later reset and only an archive retained it.
-  // Inactive competitions can still reference a shared question. Protect
-  // saved draws even when the currently active competition is empty.
-  const saved = db.prepare("SELECT payload_json AS payload FROM competition_workspaces WHERE payload_json IS NOT NULL").all() as Array<{ payload: string }>;
-  const archives = db.prepare("SELECT payload_json AS payload FROM competition_archives").all() as Array<{ payload: string }>;
-  for (const snapshot of [...saved, ...archives]) {
+
+  // Historical workspaces keep references in event-scoped table arrays.
+  // Archives keep identical rows below payload.tables (rather than at root).
+  const records = [
+    ...(db.prepare("SELECT payload_json AS payload FROM competition_workspaces WHERE payload_json IS NOT NULL").all() as Array<{ payload: string }>),
+    ...(db.prepare("SELECT payload_json AS payload FROM competition_archives").all() as Array<{ payload: string }>),
+  ];
+  for (const record of records) {
     try {
-      const parsed = JSON.parse(snapshot.payload) as Record<string, unknown>;
-      const related = JSON.stringify([
-        parsed.qualification_round_questions,
-        parsed.qualification_question_reservations,
-        parsed.live_submissions,
-        parsed.payload,
-      ]);
-      if (new RegExp('"question_id"\\s*:\\s*' + id + '(?![0-9])').test(related)) return true;
+      const root = JSON.parse(record.payload) as Record<string, unknown>;
+      const tables = root.tables && typeof root.tables === "object"
+        ? root.tables as Record<string, unknown>
+        : root;
+      if (!tables || typeof tables !== "object") return true;
+      for (const name of ["qualification_round_questions", "qualification_question_reservations", "live_submissions"] as const) {
+        const rows = tables[name];
+        if (rows === undefined) continue;
+        if (!Array.isArray(rows)) return true;
+        for (const row of rows) {
+          if (!row || typeof row !== "object") return true;
+          const reference = (row as Record<string, unknown>).question_id ??
+            (row as Record<string, unknown>).questionId;
+          if (reference === id) return true;
+        }
+      }
     } catch {
-      // Malformed archived history must not authorize historical rewrites.
+      // An unreadable historical snapshot must never authorize a destructive
+      // edit. Fail closed, preserving questions until repair.
       return true;
     }
   }

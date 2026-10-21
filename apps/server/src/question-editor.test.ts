@@ -5,6 +5,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { openDatabase } from "./database.js";
 import { registerQuestionEditorRoutes } from "./question-editor.js";
 import { createCompetitionWorkspace, activateCompetitionWorkspace } from "./competition-workspaces.js";
+import { saveCompetitionArchive } from "./competition-archives.js";
 test("manual category/question create-edit-soft-delete and history protection", async () => {
   const db=openDatabase(":memory:");
   const app=Fastify();
@@ -45,4 +46,33 @@ test("manual category/question create-edit-soft-delete and history protection", 
     payload:{...q,prompt:"Overwrite stored old tournament question"}});
   assert.equal(historicalEdit.statusCode,409,historicalEdit.body);
   await app.close();io.close();db.close();
+});
+
+test("M7.7 archived question remains immutable after live allocations are removed", async () => {
+  const db=openDatabase(":memory:");
+  const app=Fastify();
+  const io=new SocketIOServer(app.server);
+  try {
+    registerQuestionEditorRoutes(app,db,io); await app.ready();
+    db.exec(`
+      INSERT INTO categories(category_key,name,sort_order) VALUES ('sports','Sport',1);
+      INSERT INTO questions(category_id,prompt,option_a,option_b,option_c,option_d,correct_option)
+      VALUES (1,'Archived question','A','B','C','D','A');
+      INSERT INTO colleges(name,sort_order) VALUES('College A',1);
+      INSERT INTO qualification_rounds(round_order,college_a_id,status) VALUES(1,1,'PENDING');
+      INSERT INTO qualification_round_question_sets(round_id,locked_at) VALUES(1,CURRENT_TIMESTAMP);
+      INSERT INTO qualification_round_questions(round_id,position,question_id,category_id) VALUES (1,1,1,1);
+    `);
+    const saved=saveCompetitionArchive(db,"Historical sports quiz");
+    assert.ok(saved);
+    db.prepare("DELETE FROM qualification_round_question_sets").run(); // cascades allocations
+    assert.equal((db.prepare("SELECT COUNT(*) AS n FROM qualification_round_questions").get() as {n:number}).n,0);
+    const response=await app.inject({method:"PUT",url:"/api/question-bank/items/1",payload:{
+      categoryKey:"sports",prompt:"Change historical answer",optionA:"A",optionB:"B",optionC:"C",optionD:"D",
+      correctOption:"B",difficulty:5,
+    }});
+    assert.equal(response.statusCode,409,response.body);
+    assert.equal(response.json().error,"QUESTION_HISTORICALLY_USED");
+    assert.equal((db.prepare("SELECT correct_option AS answer FROM questions WHERE id=1").get() as {answer:string}).answer,"A");
+  } finally { await app.close(); io.close(); db.close(); }
 });

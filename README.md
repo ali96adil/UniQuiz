@@ -216,3 +216,15 @@ rehearsal document for exact commands.
 
 > Real question banks, contestant answers, official results, station tokens
 > and database backups must not be committed to Git.
+
+### M7.7 difficulty allocation hardening (draft)
+
+The ascending allocator now **selects a spread across difficulty levels**
+before ordering the chosen questions from easiest to hardest. It continues
+to respect exact category quotas and prevents repeats across rounds. When
+a category lacks enough easy or hard questions for the planned rounds, the
+operator readiness panel displays explicit warnings and counts per level.
+Legacy events keep random allocation unchanged. Competition difficulty and
+scoring configuration locks immediately when a question set is allocated,
+not only when the first question has begun. Archived question references
+under `tables.*`, as well as inactive workspace references, block unsafe edits.

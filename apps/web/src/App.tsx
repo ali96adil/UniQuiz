@@ -1002,6 +1002,14 @@ function QuestionAllocationPanel({
         تكرار أي سؤال بين الجولات.
       </p>
 
+      {allocation.difficultyWarnings && allocation.difficultyWarnings.length > 0 ? (
+        <div className="status-message error">
+          <strong>ملاحظات حول التدرج بالصعوبة:</strong>
+          {allocation.difficultyWarnings.map((warning,index) =>
+            <p key={index}>{warning}</p>)}
+        </div>
+      ) : null}
+
       <div className="allocation-categories">
         {allocation.categories.filter((item) => item.requiredQuestions > 0).map((category) => {
           const enough =
@@ -1023,6 +1031,8 @@ function QuestionAllocationPanel({
                   ? "المطلوب يتحدد بعد القرعة"
                   : `المطلوب ${category.requiredQuestions}`}
               </span>
+              {category.difficultyCounts ? <small>الصعوبة 1–5: {[1,2,3,4,5].map((level) =>
+                `${level}: ${category.difficultyCounts?.[level] ?? 0}`).join(" · ")}</small> : null}
             </div>
           );
         })}

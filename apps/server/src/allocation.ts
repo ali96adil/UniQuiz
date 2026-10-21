@@ -189,6 +189,55 @@ export function allocateRoundsByPlan(
     if (!inventory.has(categoryId)) throw new Error(`Missing question inventory for category ${categoryId}.`);
   }
 
+  // In the legacy mode, preserve the original random selection and order
+  // byte-for-byte. Only ascending mode uses difficulty-aware sampling.
+  if (options.difficultyMode === "ascending") {
+    const grades = options.difficultyByQuestion;
+    if (!grades) throw new Error("QUESTION_DIFFICULTY_METADATA_MISSING");
+    const pools = new Map<number, number[]>();
+    for (const pool of categoryPools) {
+      for (const questionId of pool.questionIds) {
+        const level = grades.get(questionId);
+        if (!Number.isInteger(level) || level! < 1 || level! > 5)
+          throw new Error("QUESTION_DIFFICULTY_METADATA_MISSING");
+      }
+      pools.set(pool.categoryId, shuffled(pool.questionIds, randomIndex));
+    }
+    const assigned = new Set<number>();
+    return plans.map((plan) => {
+      // Spread category slots randomly across the rising target levels,
+      // selecting available questions nearest each target. This samples
+      // across levels *before* sorting, rather than selecting at random and
+      // merely sorting a potentially all-hard sample afterwards.
+      const slots = shuffled(plan.categories.flatMap((quota) =>
+        Array.from({length:quota.questions}, () => quota.categoryId)), randomIndex);
+      const questions: Array<{ questionId: number; categoryId: number }> = [];
+      for (let index = 0; index < slots.length; index++) {
+        const categoryId = slots[index]!;
+        const candidates = pools.get(categoryId);
+        if (!candidates || candidates.length === 0)
+          throw new Error("INSUFFICIENT_QUESTION_INVENTORY");
+        const target = slots.length === 1 ? 1 : 1 + Math.round(4 * index / (slots.length - 1));
+        let best = 0;
+        for (let i = 1; i < candidates.length; i++) {
+          const left = grades.get(candidates[i]!)!;
+          const right = grades.get(candidates[best]!)!;
+          if (Math.abs(left - target) < Math.abs(right - target) ||
+              (Math.abs(left - target) === Math.abs(right - target) && left < right)) best = i;
+        }
+        const [questionId] = candidates.splice(best, 1);
+        if (questionId === undefined || assigned.has(questionId))
+          throw new Error("DUPLICATE_QUESTION_ALLOCATION");
+        assigned.add(questionId);
+        questions.push({ questionId, categoryId });
+      }
+      const randomWithinGrade = shuffled(questions, randomIndex);
+      randomWithinGrade.sort((a,b) => grades.get(a.questionId)! - grades.get(b.questionId)!);
+      return { roundId: plan.roundId, questions: randomWithinGrade.map((question, index) =>
+        ({...question, position: index+1})) };
+    });
+  }
+
   return plans.map((plan) => {
     const questions: Array<{ questionId: number; categoryId: number }> = [];
     for (const quota of plan.categories) {
@@ -199,15 +248,6 @@ export function allocateRoundsByPlan(
       pool.offset += quota.questions;
     }
     const randomized = shuffled(questions, randomIndex);
-    // A stable sort keeps the randomized order *within* each difficulty.
-    // Existing competition workspaces use random, preserving M6 behavior.
-    if (options.difficultyMode === "ascending") {
-      if (!options.difficultyByQuestion || randomized.some((question) => !options.difficultyByQuestion!.has(question.questionId))) {
-        throw new Error("QUESTION_DIFFICULTY_METADATA_MISSING");
-      }
-      randomized.sort((a, b) =>
-        options.difficultyByQuestion!.get(a.questionId)! - options.difficultyByQuestion!.get(b.questionId)!);
-    }
     return {
       roundId: plan.roundId,
       questions: randomized.map((question, index) => ({
