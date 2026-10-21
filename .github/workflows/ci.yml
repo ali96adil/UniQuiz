@@ -38,6 +38,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Ensure rehearsal UI HTTP and WebSocket use only isolated API
+        run: node scripts/ci/m7-rehearsal-proxy-smoke.mjs
+
       - name: Test
         run: pnpm test
 

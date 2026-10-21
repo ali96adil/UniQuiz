@@ -150,8 +150,13 @@ pnpm --filter @uniquiz/web dev -- --host 127.0.0.1 --port 5174
 ```
 
 Open `http://127.0.0.1:5174/setup` only on the rehearsal Mac.
-This API points to the **copy**. Never place the rehearsal server or UI on
-`0.0.0.0` during an actual event.
+The same `UNIQUIZ_API_PROXY_TARGET` is now applied to `/api`, `/health`
+and `/socket.io` (including WebSockets). The CI rehearsal-proxy
+regression checks this route isolation because a mistaken hardcoded default
+could otherwise send operator writes to a concurrently running official
+server. Verify `curl http://127.0.0.1:5174/health` reports
+`"mode":"rehearsal"` before opening an operator window.
+Never place the rehearsal server or UI on `0.0.0.0` during an actual event.
 
 ## Workspace-specific event-day verification
 
