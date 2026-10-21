@@ -153,7 +153,7 @@ test("6-digit station pairing is operator-issued, one-use, scoped, and rate-limi
       method:"POST",url:"/api/stations/enroll",payload:{station:"A",code},
     });
     assert.equal(replay.statusCode,401);
-    for(let i=0;i<3;i++) {
+    for(let i=0;i<4;i++) {
       const wrong=await app.inject({method:"POST",url:"/api/stations/enroll",
         payload:{station:"A",code:"999999"===code?"888888":"999999"}});
       assert.equal(wrong.statusCode,401);
