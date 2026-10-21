@@ -17,6 +17,7 @@ This document applies to the stacked PR sequence:
 13. PR #41 — synchronized cross-browser active workspace rules and editors
 14. PR #42 — read-only historical-row fingerprint check of a copied DB
 15. PR #44 — bind preservation baseline to its exact rehearsal database and test startup migration
+16. PR #45 — verify M7 against pinned exact M6/v12 schema and historical ranking
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -217,6 +218,29 @@ This exercises migration code end to end but is **not a byte-for-byte M6
 fixture**. Other historical schema variants might behave differently. It
 does not certify the real University 2026 database until the separate Mac
 rehearsal procedure above is completed successfully.
+
+## Pinned main/M6 schema upgrade regression
+
+PR #45 upgrades the actual pinned SQL table definitions from the existing
+repository's `main:apps/server/src/database.ts` (Git blob
+`1a81e22ba6279eaed81ae9ebd334f722d60b6ec7`, M6 schema version 12).
+The fixture is preserved as
+`scripts/fixtures/m6-main-schema.sql` and seeded **only** with invented
+test colleges, historical answers and a test logo. This is separate from the
+earlier constructed-v15 constraint test.
+
+The real M7 `openDatabase` migration is run against a WAL-aware copy, then
+CI checks that all three legacy position constraints (allocated questions,
+reservations and answer submissions) are widened beyond 10, that no original
+rows are lost, that a verified physical migration backup exists and that the
+historical leaderboard remains 24.6 / 24.2 points with correct/wrong counts
+unchanged. The original test database checksum must not change.
+
+The SQL is pinned to the **observed main source**, so future modifications
+to `main` do not quietly alter the regression fixture. A successful test
+proves this particular M6 schema upgrade but does not prove that the real
+2026 Mac database is identical or undamaged. Always run the private copied
+database rehearsal and manually compare original final results.
 
 ## Migration acceptance gate
 
