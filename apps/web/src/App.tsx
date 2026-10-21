@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
-import { CategoryLabelsPanel } from "./CategoryLabels.js";
+import { QuestionEditorPanel } from "./QuestionEditor.js";
 import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
 import { GameplayRulesPanel } from "./GameplayRules.js";
@@ -31,6 +31,7 @@ import type {
 type Surface =
   | "home"
   | "setup"
+  | "question-bank"
   | "archives"
   | "draw"
   | "operator"
@@ -43,6 +44,7 @@ type Surface =
 const surfaceTitles: Record<Surface, string> = {
   home: "مسابقة بنك المعلومات",
   setup: "إعداد المسابقة",
+  "question-bank": "إدارة بنك الأسئلة والمحاور",
   archives: "أرشيف المسابقات",
   draw: "القرعة",
   operator: "لوحة التحكم",
@@ -64,6 +66,7 @@ const roleTitles: Record<ClientRole, string> = {
 
 function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/setup")) return "setup";
+  if (pathname.startsWith("/question-bank")) return "question-bank";
   if (pathname.startsWith("/archives")) return "archives";
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
@@ -78,6 +81,7 @@ function surfaceFromPath(pathname: string): Surface {
 function roleForSurface(surface: Surface): ClientRole {
   switch (surface) {
     case "setup":
+    case "question-bank":
     case "archives":
     case "draw":
     case "operator":
@@ -5084,6 +5088,9 @@ export function App() {
               <a className="button-link" href="/archives">
                 أرشيف المسابقات
               </a>
+              <a className="button-link" href="/question-bank">
+                تحرير بنك الأسئلة
+              </a>
             </div>
           ) : surface === "draw" ? (
             <div className="surface-switcher">
@@ -5105,6 +5112,14 @@ export function App() {
               <a className="button-link" href="/archives">
                 أرشيف المسابقات
               </a>
+              <a className="button-link" href="/question-bank">
+                بنك الأسئلة
+              </a>
+            </div>
+          ) : surface === "question-bank" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/setup?step=questions">إعدادات الأسئلة والجولات</a>
+              <a className="button-link" href="/operator">لوحة التشغيل</a>
             </div>
           ) : null}
         </section>
@@ -5130,7 +5145,7 @@ export function App() {
             questions: (
               <>
                 <BulkImportPanel questionBank={questionBank} />
-                <CategoryLabelsPanel questionBank={questionBank} />
+                <a className="button-link" href="/question-bank">فتح محرر الأسئلة والمحاور (إضافة / تعديل / تعطيل)</a>
                 <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
                 <GameplayRulesPanel
                   locked={competition.rounds.some((round) => round.status !== "PENDING") ||
@@ -5155,6 +5170,8 @@ export function App() {
           }}
         />
       ) : null}
+
+      {surface === "question-bank" ? <QuestionEditorPanel questionBank={questionBank} /> : null}
 
       {surface === "archives" ? <ArchivesPanel /> : null}
 
@@ -5279,6 +5296,7 @@ export function App() {
       ) : null}
 
       {surface !== "setup" &&
+      surface !== "question-bank" &&
       surface !== "archives" &&
       surface !== "draw" &&
       surface !== "operator" &&

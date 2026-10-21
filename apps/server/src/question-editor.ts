@@ -161,6 +161,18 @@ export function registerQuestionEditorRoutes(app: FastifyInstance, db: AppDataba
     return { ok: true };
   });
 
+  app.patch<{ Params: { id: string } }>("/api/question-bank/items/:id/restore", async (request, reply) => {
+    const id = readId(request.params.id);
+    if (id === null) return reply.code(400).send({ error: "INVALID_QUESTION_ID" });
+    if (!editAllowed(db)) return reply.code(409).send({ error: "LIVE_SESSION_ACTIVE" });
+    const item = db.prepare("SELECT prompt FROM questions WHERE id=? AND active=0").get(id) as { prompt: string } | undefined;
+    if (!item) return reply.code(404).send({ error: "INACTIVE_QUESTION_NOT_FOUND" });
+    if (duplicatePrompt(db, item.prompt, id)) return reply.code(409).send({ error: "DUPLICATE_QUESTION" });
+    db.prepare("UPDATE questions SET active=1 WHERE id=?").run(id);
+    publish();
+    return { ok: true };
+  });
+
   app.post("/api/question-bank/categories", async (request, reply) => {
     const parsed = categorySchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "INVALID_CATEGORY", issues: parsed.error.issues });
