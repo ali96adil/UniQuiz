@@ -47,7 +47,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#40](https://github.com/ali96adil/UniQuiz/pull/40) →
 [#41](https://github.com/ali96adil/UniQuiz/pull/41) →
 [#42](https://github.com/ali96adil/UniQuiz/pull/42) →
-[#44](https://github.com/ali96adil/UniQuiz/pull/44).
+[#44](https://github.com/ali96adil/UniQuiz/pull/44) →
+[#45](https://github.com/ali96adil/UniQuiz/pull/45).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -70,6 +71,19 @@ For password setup, local restart/logout and safe rehearsal instructions, see
 **does not make the existing HTTP-only LAN deployment safe to expose** to an
 untrusted network or public tunnel; TLS and a deployment-specific security
 review remain required.
+
+## Exact historical M6/v12 schema upgrade CI
+
+The M7 CI release gate now seeds synthetic official-era question/answer
+records using the **exact pinned M6 SQLite DDL** extracted from
+`main:apps/server/src/database.ts` (source blob SHA
+`1a81e22ba6279eaed81ae9ebd334f722d60b6ec7`). The upgrade confirms
+correct historical rankings (24.6 and 24.2 test points), unchanged
+correct/wrong counts, preserved rows/media, all three widened position
+constraints, healthy foreign keys, the physical migration backup, and the
+read-only baseline verification. This is a test fixture, **not** the original
+2026 database. See
+[docs/M7-INTEGRATION-REHEARSAL.md](docs/M7-INTEGRATION-REHEARSAL.md).
 
 ## M7 real migration CI check (synthetic)
 
