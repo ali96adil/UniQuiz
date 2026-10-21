@@ -382,3 +382,35 @@ schema backup fails, or switching causes partial data restoration. When all
 checks pass, merge the **stacked PRs in dependency order** into `main` only
 after explicit release approval. Deployment to the actual tournament Mac is
 a separate, explicitly authorized action.
+
+## One-command Mac offline migration audit (M7.7 / schema v17)
+
+After running `pnpm install --frozen-lockfile` and `pnpm build`, the operator
+can audit the real 2026 source database without starting any UniQuiz server:
+
+```bash
+export UNIQUIZ_OFFICIAL_SOURCE="/ACTUAL/ABSOLUTE/PATH/TO/uniquiz.db"
+node scripts/m7-mac-offline-audit.mjs --source "$UNIQUIZ_OFFICIAL_SOURCE"
+```
+
+The tool creates a new private folder in `$HOME/UniQuiz-M7-Rehearsal`.
+It refuses a folder containing the source. The original is opened *only* by
+the read-only WAL-aware SQLite copier. Before migration it captures a
+read-only fingerprint manifest and the actual M6 ranking using pinned SQL.
+It runs the normal database schema v17 migration on the COPY and checks
+original rows, scores, tie-break time, correct/wrong counts, source rank order,
+SQLite integrity, foreign keys, and a physical pre-migration backup.
+It writes `report-private.json` without participant names or question text.
+
+Expected result is `M7_MAC_OFFLINE_AUDIT_OK` with the private folder path.
+Anything else is a release blocker. The command explicitly requires the
+original M6 schema version **12**; any other schema version is rejected
+instead of guessing historical ranking rules.
+
+**Do not upload** the copied SQLite DB, private manifest or report.
+This is only an offline migration/ranking acceptance check. It does not
+certify real Windows station timing, operator controls, visual screens, OSC
+hardware or recovery; complete the manual Mac rehearsal separately.
+
+CI runs the identical entrypoint on a synthetic M6/v12 fixture with
+`node scripts/ci/m7-mac-audit-smoke.mjs` (no user data).
