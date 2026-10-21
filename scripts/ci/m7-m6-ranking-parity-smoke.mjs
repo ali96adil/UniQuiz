@@ -9,10 +9,17 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { openDatabase } from "../../apps/server/dist/database.js";
 import { getQualificationRanking } from "../../apps/server/dist/ranking.js";
+import { buildResultsWorkbook } from "../../apps/server/dist/results-export.js";
 
 const repo = resolve(fileURLToPath(new URL("../..", import.meta.url)));
+// ExcelJS is a server dependency, resolved from the server's own package.
+const requireServer = createRequire(
+  fileURLToPath(new URL("../../apps/server/package.json", import.meta.url)),
+);
+const ExcelJS = requireServer("exceljs");
 const sourcePath = (p) => join(repo, p);
 const root = mkdtempSync(join(tmpdir(), "uniquiz-m7-m6-ranking-parity-"));
 const oldDB = join(root, "m6-parity-original.db");
@@ -64,6 +71,37 @@ try {
     const current = getQualificationRanking(db);
     assert.deepEqual(current.entries, expected,
       "M7 changed historical M6 score, tie-break, timeout, ranking or answers");
+
+    // The Excel export must display the same historical scores and time
+    // tiebreak ordering. Row hashes alone cannot protect rendering bugs.
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await buildResultsWorkbook(db));
+    const rankingSheet = workbook.getWorksheet("Ranking");
+    const summarySheet = workbook.getWorksheet("Summary");
+    assert.ok(rankingSheet && summarySheet);
+    assert.equal(summarySheet.getRow(7).getCell(2).value, 25);
+    assert.equal(summarySheet.getRow(12).getCell(2).value, "college");
+    assert.equal(rankingSheet.rowCount, expected.length + 1);
+    for (const [index, entry] of expected.entries()) {
+      const row = rankingSheet.getRow(index + 2);
+      assert.equal(row.getCell(1).value, entry.rank ?? "");
+      assert.equal(row.getCell(2).value, entry.college.name);
+      assert.equal(row.getCell(3).value, entry.status);
+      assert.equal(row.getCell(4).value,
+        entry.status === "NOT_STARTED" ? "" : entry.scorePoints);
+      assert.equal(row.getCell(5).value,
+        entry.status === "NOT_STARTED" ? "" : entry.totalResponseTimeMs);
+      assert.equal(row.getCell(6).value, entry.correctAnswers);
+      assert.equal(row.getCell(7).value, entry.wrongAnswers);
+      assert.equal(row.getCell(8).value, entry.revealedQuestions);
+    }
+    const roundSheet = workbook.getWorksheet("Rounds");
+    assert.ok(roundSheet);
+    assert.deepEqual(
+      [roundSheet.getRow(2).getCell(5).value,roundSheet.getRow(2).getCell(6).value],
+      [24.6,24.2],
+      "The historic round export must match M6 official scores",
+    );
     assert.equal(db.prepare(
       "SELECT value FROM app_meta WHERE key='schema_version'",
     ).get().value,"16");
