@@ -228,3 +228,11 @@ Legacy events keep random allocation unchanged. Competition difficulty and
 scoring configuration locks immediately when a question set is allocated,
 not only when the first question has begun. Archived question references
 under `tables.*`, as well as inactive workspace references, block unsafe edits.
+
+### M7.7 import race/duplicate safeguards
+
+CSV/XLSX previews reject an already-active identical prompt or source reference
+from the shared bank. A Preview that was valid earlier may become stale after
+another operator changes the bank; Apply repeats the check within one SQLite
+transaction, responds with HTTP 409 and rolls back the complete import rather
+than partially adding questions.
