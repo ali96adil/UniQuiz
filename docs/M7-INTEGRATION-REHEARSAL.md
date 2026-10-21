@@ -113,10 +113,10 @@ with manual rehearsal operations. Do **not** rerun this baseline comparison
 after intentionally editing the rehearsal database; it is designed to detect
 such edits.
 
-Install and validate the reviewed branch before starting its test runtime:
+Install and validate the reviewed branch before starting its test runtime. The current public repository does **not** contain `pnpm-lock.yaml`, so `--frozen-lockfile` would fail; match the GitHub CI install command instead:
 
 ```bash
-pnpm install --frozen-lockfile
+pnpm install --no-frozen-lockfile
 pnpm typecheck
 pnpm test
 pnpm build
@@ -385,7 +385,7 @@ a separate, explicitly authorized action.
 
 ## One-command Mac offline migration audit (M7.7 / schema v17)
 
-After running `pnpm install --frozen-lockfile` and `pnpm build`, the operator
+After running `pnpm install --no-frozen-lockfile` and `pnpm build`, the operator
 can audit the real 2026 source database without starting any UniQuiz server:
 
 ```bash
