@@ -19,6 +19,7 @@ This document applies to the stacked PR sequence:
 15. PR #44 — bind preservation baseline to its exact rehearsal database and test startup migration
 16. PR #45 — verify M7 against pinned exact M6/v12 schema and historical ranking
 17. PR #46 — compare the exact M6 leaderboard before migration with M7 after upgrade
+18. PR #47 — redact public live answers until explicit Reveal, with real Socket.IO security smoke
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -279,6 +280,35 @@ these conditions hold: `REHEARSAL_COPY_OK`, `M7_BASELINE_CAPTURE_OK`,
 commit is green. The first three results refer only to a **separate copied
 SQLite database**. Do not interpret synthetic tests as proof that your real
 2026 tournament data has been checked until you run this procedure locally.
+
+## Public question-answer secrecy acceptance
+
+PR #47 adds two layers of pre-release protection:
+`publicLiveSnapshot` explicitly constructs the safe public data shape rather
+than spreading internal fields into the public HTTP/Socket.IO response,
+and a real server/socket CI smoke tests actual audience and station clients.
+
+During local Mac rehearsal, open the anonymous audience view, both Windows
+station views and an unauthorized browser attempting to declare itself
+`operator` over Socket.IO. Verify the following without changing any
+official 2026 records:
+
+1. `QUESTION_READY` and `QUESTION_COUNTDOWN`: no question text/options
+   and **no** correct option or team score/grade in any public response.
+2. `QUESTION_ACTIVE`: public question and options visible, but no
+   `correctOption` or team `isCorrect` / `selectedOption` grading.
+3. After Team A answers and Team B is still working: Team B sees only
+   its own private submission state. An unknown client cannot answer.
+4. `QUESTION_CLOSED`, before operator Reveal: no correct answer or
+   graded team result on `GET /api/live` or `live:snapshot` frames.
+5. Only after `QUESTION_REVEAL`: the correct option, graded team
+   results and earned points become visible to audience stations.
+6. Verify an unauthorized browser cannot retrieve station credentials,
+   change quiz settings or trigger Reveal.
+
+CI verifies these rules on **synthetic** question data through the actual
+Fastify/Socket.IO transport. A clean result cannot replace event-day
+hardware, network encryption or a trusted-LAN deployment review.
 
 ## Two-browser workspace-switch acceptance
 
