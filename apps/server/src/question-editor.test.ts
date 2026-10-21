@@ -4,6 +4,7 @@ import Fastify from "fastify";
 import { Server as SocketIOServer } from "socket.io";
 import { openDatabase } from "./database.js";
 import { registerQuestionEditorRoutes } from "./question-editor.js";
+import { createCompetitionWorkspace, activateCompetitionWorkspace } from "./competition-workspaces.js";
 test("manual category/question create-edit-soft-delete and history protection", async () => {
   const db=openDatabase(":memory:");
   const app=Fastify();
@@ -36,5 +37,12 @@ test("manual category/question create-edit-soft-delete and history protection", 
   db.prepare("INSERT INTO qualification_round_questions (round_id,position,question_id,category_id) VALUES (1,1,?,1)").run(oldId);
   const protectedEdit=await app.inject({method:"PUT",url:"/api/question-bank/items/"+oldId,payload:{...q,prompt:"تغيير الخطأ"}});
   assert.equal(protectedEdit.statusCode,409);
+  // The source event's rows now live in an inactive workspace JSON snapshot.
+  // They must remain protected even when the active event has no allocations.
+  const next = createCompetitionWorkspace(db, "New event", "team");
+  activateCompetitionWorkspace(db, next.id);
+  const historicalEdit = await app.inject({method:"PUT",url:"/api/question-bank/items/"+oldId,
+    payload:{...q,prompt:"Overwrite stored old tournament question"}});
+  assert.equal(historicalEdit.statusCode,409,historicalEdit.body);
   await app.close();io.close();db.close();
 });

@@ -56,8 +56,8 @@ export function SetupJourney({
       <section className="setup-journey-head" aria-label="مراحل إعداد المسابقة">
         <div className="setup-journey-headline">
           <div>
-            <p className="eyebrow">UniQuiz · Competition Setup</p>
-            <h2>إعداد البطولة خطوة بخطوة</h2>
+            <p className="eyebrow">UniQuiz · Mode 01 · Ranked Duel</p>
+            <h2>إعداد مسابقة «المواجهة بالنقاط»</h2>
             <p className="muted">
               كل مرحلة تحفظ إعداداتها داخل المسابقة الحالية. تگدر تنتقل بين المراحل
               بأي وقت، ومراجعة الجاهزية النهائية قبل بدء التشغيل.

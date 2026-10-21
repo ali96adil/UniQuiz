@@ -5057,9 +5057,9 @@ export function App() {
           <p className="eyebrow">University Knowledge Competition</p>
           <h1>{surfaceTitles[surface]}</h1>
           <p className="subtitle">
-            {surface === "setup" || surface === "draw"
-              ? "M2 — Participants & Draw"
-              : "Realtime Competition Runtime"}
+            {["setup", "draw", "operator", "question-bank"].includes(surface)
+              ? "المواجهة بالنقاط · Ranked Duel · Mode 01"
+              : "UniQuiz · Realtime Competition Runtime"}
           </p>
           <div className="connection">
             <span
