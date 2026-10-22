@@ -207,7 +207,7 @@ registerOperationsRoutes(app, database, {
 });
 
 registerResultsExportRoutes(app, database);
-registerCompetitionArchiveRoutes(app, database);
+registerCompetitionArchiveRoutes(app, database, config.databasePath);
 registerCompetitionWorkspaceRoutes(app, database, io, liveSession, config.databasePath);
 
 io.on("connection", (socket) => {

@@ -105,13 +105,43 @@ export function CompetitionWorkspacesPanel({
 
   const rename = (workspace: Workspace) => {
     const name = window.prompt("اسم المسابقة الجديد:", workspace.name);
-    if (!name?.trim() || name.trim() === workspace.name) return;
+    if (!name?.trim()) return;
+    const type = window.prompt(
+      "نوع المتنافسين: college للكليات / department للأقسام / class للشعب / team للفرق",
+      workspace.participantType,
+    );
+    if (type === null) return;
+    if (!["college","department","class","team"].includes(type.trim())) {
+      setError("نوع المتنافسين غير صحيح. استخدم college أو department أو class أو team.");
+      return;
+    }
+    if (name.trim() === workspace.name && type.trim() === workspace.participantType) return;
     void run(async () => {
       await api("/api/competitions/" + encodeURIComponent(workspace.id), {
         method: "PATCH",
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({ name: name.trim(), participantType: type.trim() }),
       });
-    }, "تم تحديث اسم المسابقة دون تغيير بياناتها.");
+    }, "تم تعديل اسم المسابقة أو نوع المتنافسين دون تغيير نتائجها.");
+  };
+
+  const remove = (workspace: Workspace) => {
+    if (workspace.active || workspace.id === "legacy") return;
+    const typedName = window.prompt(
+      `حذف «${workspace.name}» من قائمة المسابقات؟ سيتم إنشاء نسخة احتياطية كاملة أولاً، لكن بيانات هذه المسابقة ستختفي من القائمة. لا يُحذف الأرشيف المستقل أو بنك الأسئلة. لتأكيد الحذف اكتب اسم المسابقة كاملاً:`,
+      "",
+    );
+    if (typedName === null) return;
+    if (typedName !== workspace.name) {
+      setError("الاسم غير مطابق، لم يحدث حذف.");
+      return;
+    }
+    if (!window.confirm("تأكيد أخير: حذف هذه المسابقة غير النشطة بعد إنشاء Backup موثّق؟")) return;
+    void run(async () => {
+      await api("/api/competitions/" + encodeURIComponent(workspace.id), {
+        method: "DELETE",
+        body: JSON.stringify({ confirm: "DELETE_COMPETITION", name: typedName }),
+      });
+    }, "تم حذف المسابقة من القائمة بعد النسخة الاحتياطية. بقي الأرشيف وبنك الأسئلة محفوظين.");
   };
 
   return (
@@ -157,6 +187,11 @@ export function CompetitionWorkspacesPanel({
         </button>
       </div>
 
+      <p className="muted">
+        المسابقة المفتوحة لا يمكن حذفها؛ افتح مسابقة أخرى أولاً. 
+        نسخة 2026 الأساسية (legacy) محمية دائماً.
+        الحذف يتطلب كتابة الاسم، ويتبعه Backup موثّق، ولا يحذف الأرشيف أو بنك الأسئلة.
+      </p>
       <div className="round-allocation-grid">
         {workspaces.map((workspace) => (
           <div className="round-allocation" key={workspace.id}>
@@ -170,11 +205,16 @@ export function CompetitionWorkspacesPanel({
                 </button>
               )}
               <button disabled={busy} onClick={() => rename(workspace)}>
-                تغيير الاسم
+                تعديل الاسم والنوع
               </button>
               <button disabled={busy} onClick={() => duplicate(workspace)}>
                 نسخ الإعدادات
               </button>
+              {!workspace.active && workspace.id !== "legacy" ? (
+                <button className="danger-outline" disabled={busy} onClick={() => remove(workspace)}>
+                  حذف المسابقة
+                </button>
+              ) : null}
             </div>
           </div>
         ))}

@@ -78,6 +78,44 @@ export function ArchivesPanel() {
     }
   };
 
+  const renameArchive = async (archive: CompetitionArchive) => {
+    const title = window.prompt("العنوان الجديد في الأرشيف (لا يغيّر النقاط أو ترتيب الفائزين):", archive.title);
+    if (!title?.trim() || title.trim() === archive.title) return;
+    setBusy(true); setError(null); setMessage(null);
+    try {
+      await requestJson("/api/archives/" + encodeURIComponent(archive.id), {
+        method: "PATCH", body: JSON.stringify({ title: title.trim() }),
+      });
+      await refresh();
+      setDetails(existing => existing?.archive.id === archive.id
+        ? { ...existing, archive: { ...existing.archive, title: title.trim() } }
+        : existing);
+      setMessage("تم تعديل عنوان الأرشيف فقط، وبقيت النتائج محفوظة دون تغيير.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر تعديل العنوان"); }
+    finally { setBusy(false); }
+  };
+
+  const deleteArchive = async (archive: CompetitionArchive) => {
+    const entered = window.prompt(
+      `حذف الأرشيف التاريخي «${archive.title}»؟ نتائج هذا السجل وصوره وأسئلته ستزال من الأرشيف. نزّل نسخة JSON أولاً للاحتفاظ بها. لتأكيد الحذف اكتب العنوان كاملاً:`,
+      "",
+    );
+    if (entered === null) return;
+    if (entered !== archive.title) { setError("العنوان غير مطابق؛ لم يُحذف شيء."); return; }
+    if (!window.confirm("تأكيد نهائي: حذف هذا الأرشيف بعد إنشاء نسخة احتياطية موثّقة للقاعدة؟")) return;
+    setBusy(true); setError(null); setMessage(null);
+    try {
+      await requestJson("/api/archives/" + encodeURIComponent(archive.id), {
+        method: "DELETE",
+        body: JSON.stringify({ confirm: "DELETE_ARCHIVE", title: entered }),
+      });
+      setDetails(existing => existing?.archive.id === archive.id ? null : existing);
+      await refresh();
+      setMessage("تم حذف الأرشيف بعد أخذ Backup موثّق. بقي بنك الأسئلة والمسابقات كما هما.");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر حذف الأرشيف"); }
+    finally { setBusy(false); }
+  };
+
   const openArchive = async (id: string) => {
     setBusy(true);
     setError(null);
@@ -103,6 +141,7 @@ export function ArchivesPanel() {
       </div>
       {error ? <div className="status-message error">{error}</div> : null}
       {message ? <div className="status-message success">{message}</div> : null}
+      <p className="muted">يمكن تغيير عنوان الأرشيف أو حذفه بتأكيد مضاعف وBackup. لا يمكن تعديل النقاط أو الإجابات التاريخية داخل الأرشيف.</p>
       {archives.length === 0 ? (
         <p className="muted">لا توجد مسابقات محفوظة بعد.</p>
       ) : (
@@ -123,6 +162,10 @@ export function ArchivesPanel() {
                 <a className="button-link" href={"/api/archives/" + archive.id + "/export"} download>
                   تصدير نسخة JSON كاملة
                 </a>
+                <button disabled={busy} onClick={() => void renameArchive(archive)}>تعديل العنوان</button>
+                <button className="danger-outline" disabled={busy} onClick={() => void deleteArchive(archive)}>
+                  حذف الأرشيف
+                </button>
               </div>
             </div>
           ))}
