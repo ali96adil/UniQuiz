@@ -221,8 +221,8 @@ test("M7 workspace deletion blocks active/legacy, requires exact name, backs up 
     assert.equal(cannotLegacy.json().error,"LEGACY_WORKSPACE_PROTECTED");
     assert.equal((await remove(old.id,"Wrong Name")).statusCode,409);
     assert.equal((await remove(old.id,"Old Tournament","NO")).statusCode,400);
-    assert.equal(readdirSync(join(root,"backups")).filter(x=>x.includes("pre-reset")).length,0,
-      "Invalid confirmations must not write backups");
+    assert.equal(existsSync(join(root,"backups")),false,
+      "Invalid confirmations must not create any backup directory");
     const ok=await remove(old.id,"Old Tournament");
     assert.equal(ok.statusCode,200,ok.body);
     assert.equal(ok.json().deleted,true);
