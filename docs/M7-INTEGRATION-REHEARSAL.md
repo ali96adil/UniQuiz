@@ -419,3 +419,27 @@ hardware or recovery; complete the manual Mac rehearsal separately.
 
 CI runs the identical entrypoint on a synthetic M6/v12 fixture with
 `node scripts/ci/m7-mac-audit-smoke.mjs` (no user data).
+
+## M7 tournament and historical archive management
+
+"إدارة المسابقات" workspaces are editable via **تعديل الاسم والنوع**. To
+delete an OLD workspace, first activate a different workspace. The active
+workspace and the original protected `legacy` (2026) workspace cannot be
+deleted. A delete requires the exact competition name and a second confirmation,
+followed by a physically verified `pre-reset` SQLite backup **before** the
+transaction deletes the inactive workspace. The central bank, other workspaces,
+and independent historical archives are never deleted.
+
+"أرشيف المسابقات" is an independent, immutable historical snapshot.
+`تعديل العنوان` changes only archive metadata and top-level export title,
+not the event title, score totals, ranking or stored questions/media.
+`حذف الأرشيف` is explicitly destructive: export the JSON first, enter its
+exact title, confirm again and require a verified pre-delete SQLite backup.
+The procedure is intentionally separate from workspace deletion.
+
+**Warning:** backups live next to the isolated database, not in a public
+repository. Deleting an inactive workspace that has results without an
+independent archive removes the easy UI access to those results. Export or
+archive the results FIRST; restoration requires a separate verified backup
+restore procedure. These features are **draft** and must be rehearsed on the
+private copy before applying to the official event.
