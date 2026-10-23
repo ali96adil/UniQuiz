@@ -21,7 +21,7 @@ designs only** and are not selectable or implemented in this release
 The protected Mac/data rehearsal completion gate is tracked in
 [#50](https://github.com/ali96adil/UniQuiz/issues/50).
 
-## M7.7 question library (draft PR #51)
+## M7.7 question library
 
 A private operator-only page at `/question-bank` can create or edit
 questions and categories without a CSV or Excel file, with difficulty
@@ -35,9 +35,10 @@ under competition gameplay rules before locking rounds. The ordering
 is nondecreasing by level **among the selected questions**, not a
 promise that all five levels are available in inventory.
 
-**Still a draft:** The M7.7 code, tests and migration have not passed
-the real Mac/Windows stage acceptance yet; do not run it against
-the original 2026 production SQLite database.
+**Code merged, deployment separate:** M7 source code is integrated in
+`main`, but the original 2026 official SQLite database must remain
+untouched until the [official Mac deployment preflight](docs/M7-OFFICIAL-MAC-DEPLOYMENT.md)
+completes and the operator starts the controlled upgrade.
 
 ## Official historical rules and M7 extension
 
@@ -47,7 +48,7 @@ per round, 5 categories × 2, 25 seconds per question and 25→1 time-decay
 points. Correctness, response time, cumulative score and tiebreak order are
 recorded, and final results are announced only when the operator requests it.
 
-**Draft M7 changes are configurable and do not rewrite historical results:**
+**M7 changes are configurable and do not rewrite historical results:**
 
 - Independent named competition workspaces (one live workspace at a time),
   including participant labels for colleges, departments, classes and teams.
@@ -64,33 +65,24 @@ recorded, and final results are announced only when the operator requests it.
   database backup before changing any older schema. Migration changes are
   atomic; workspace switching is guarded and transactional.
 
-## Important: M7 is not deployed
+## M7 code merged into `main` — Mac deployment is a separate step
 
-All M7 work is currently in **stacked draft PRs**. Review in this order:
-[#25](https://github.com/ali96adil/UniQuiz/pull/25) →
-[#26](https://github.com/ali96adil/UniQuiz/pull/26) →
-[#27](https://github.com/ali96adil/UniQuiz/pull/27) →
-[#28](https://github.com/ali96adil/UniQuiz/pull/28) →
-[#29](https://github.com/ali96adil/UniQuiz/pull/29) →
-[#30](https://github.com/ali96adil/UniQuiz/pull/30) →
-[#31](https://github.com/ali96adil/UniQuiz/pull/31) →
-[#32](https://github.com/ali96adil/UniQuiz/pull/32) →
-[#33](https://github.com/ali96adil/UniQuiz/pull/33) →
-[#34](https://github.com/ali96adil/UniQuiz/pull/34) →
-[#39](https://github.com/ali96adil/UniQuiz/pull/39) →
-[#40](https://github.com/ali96adil/UniQuiz/pull/40) →
-[#41](https://github.com/ali96adil/UniQuiz/pull/41) →
-[#42](https://github.com/ali96adil/UniQuiz/pull/42) →
-[#44](https://github.com/ali96adil/UniQuiz/pull/44) →
-[#45](https://github.com/ali96adil/UniQuiz/pull/45) →
-[#46](https://github.com/ali96adil/UniQuiz/pull/46) →
-[#47](https://github.com/ali96adil/UniQuiz/pull/47).
+All 19 reviewed stacked M7 PRs were merged with preserved ancestry on
+**23 October 2026**, finishing at merge commit
+`0b096edf2fd07dbe2cd3213bc7fb040b9ba19ec2`. Final `main` CI
+[passed](https://github.com/ali96adil/UniQuiz/actions/runs/39953557405).
+Its source tree exactly matched the Mac-rehearsed M7 release branch.
 
-A green CI check on synthetic data is **not** acceptance for upgrading the
-official Mac. Follow the offline rehearsal and original-result verification
-steps in [docs/M7-INTEGRATION-REHEARSAL.md](docs/M7-INTEGRATION-REHEARSAL.md)
-before approval. Never point an unapproved development build at the original
-event database.
+The original pre-M7 `main` code remains available on
+`release/m6-main-before-m7-20261023`. This is a *code* rollback
+reference, **not** a copy of the Mac's official SQLite data.
+
+**Code integration does not deploy the Mac service, update its running
+binary, or migrate its original 2026 database.** See the
+[official deployment and rollback checklist](docs/M7-OFFICIAL-MAC-DEPLOYMENT.md)
+and keep the old runtime and source database intact until the
+operator has taken a fresh WAL-consistent offline backup, verified its
+integrity and explicitly executes the production upgrade.
 
 ## Live question-answer secrecy (draft M7)
 

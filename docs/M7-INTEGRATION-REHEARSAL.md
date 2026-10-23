@@ -21,9 +21,13 @@ This document applies to the stacked PR sequence:
 17. PR #46 — compare the exact M6 leaderboard before migration with M7 after upgrade
 18. PR #47 — redact public live answers until explicit Reveal, with real Socket.IO security smoke
 
-**Status: DRAFT.** Do not merge or install on the official tournament Mac
-until an operator has rehearsed the upgrade on an isolated copy of the actual
-official competition database and recorded the results.
+**Release update (23 Oct 2026):** The 19 approved M7 ancestor-chain PRs
+were merged to `main` and CI passed. The operator reported successful
+isolated Mac rehearsal, including OSC, archived reports, and restoration.
+This document preserves the original pre-merge test instructions for audit.
+**Mac production deployment remains separate**: consult
+[M7 official Mac deployment](M7-OFFICIAL-MAC-DEPLOYMENT.md) before using
+the new runtime against the original 2026 database.
 
 For release review and the required ancestor-preserving merge sequence,
 see [M7 ordered merge runbook](M7-MERGE-RUNBOOK.md).

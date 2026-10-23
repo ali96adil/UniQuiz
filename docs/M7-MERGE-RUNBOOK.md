@@ -1,6 +1,11 @@
 # M7 release review and ordered merge runbook
 
-**Status:** REVIEW PREPARED; DO NOT DEPLOY TO THE OFFICIAL 2026 DATABASE.
+**Outcome, 23 October 2026:** all 19 documented PRs were merged into `main`
+with merge commits; final `main` SHA `0b096edf2fd07dbe2cd3213bc7fb040b9ba19ec2`
+matched the reviewed branch Git tree exactly and passed CI.
+This document remains the historical merge procedure, **not a Mac deployment
+authorization**. For the next stage use [M7 official Mac deployment](M7-OFFICIAL-MAC-DEPLOYMENT.md).
+Do not point M7 at the original 2026 DB without a verified standalone backup.
 This runbook describes the tested Mode 01 / **المواجهة بالنقاط (Ranked Duel)**
 revision. It is not permission to auto-merge unreviewed PRs.
 
