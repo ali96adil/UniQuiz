@@ -1,7 +1,11 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Rehearsal runs can use a private API port without touching official 8787.
+  const env = loadEnv(mode, ".", "UNIQUIZ_");
+  const apiTarget = env.UNIQUIZ_API_PROXY_TARGET || "http://127.0.0.1:8787";
+  return {
   plugins: [react()],
   server: {
     host: "0.0.0.0",
@@ -9,7 +13,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/health": {
-        target: "http://127.0.0.1:8787",
+        target: apiTarget,
       },
       "/api": {
         target: "http://127.0.0.1:8787",
@@ -20,4 +24,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });
