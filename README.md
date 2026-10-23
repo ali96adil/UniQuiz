@@ -41,13 +41,31 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#30](https://github.com/ali96adil/UniQuiz/pull/30) →
 [#31](https://github.com/ali96adil/UniQuiz/pull/31) →
 [#32](https://github.com/ali96adil/UniQuiz/pull/32) →
-[#33](https://github.com/ali96adil/UniQuiz/pull/33).
+[#33](https://github.com/ali96adil/UniQuiz/pull/33) →
+[#34](https://github.com/ali96adil/UniQuiz/pull/34) →
+[#39](https://github.com/ali96adil/UniQuiz/pull/39).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
 steps in [docs/M7-INTEGRATION-REHEARSAL.md](docs/M7-INTEGRATION-REHEARSAL.md)
 before approval. Never point an unapproved development build at the original
 event database.
+
+## Operator authentication (draft M7)
+
+The server now requires a **privately configured** operator password of at
+least 16 characters (environment variable `UNIQUIZ_OPERATOR_PASSWORD`).
+Without it the server refuses to start; no insecure/default operator account
+is created. The Mac's operator browser logs in through a dedicated form, and
+privileged API routes and operator Socket.IO now require an HttpOnly session
+cookie. Windows answer stations retain their scoped team tokens, while the
+audience display stays read-only.
+
+For password setup, local restart/logout and safe rehearsal instructions, see
+[docs/M7-OPERATOR-AUTH.md](docs/M7-OPERATOR-AUTH.md). A successful CI test
+**does not make the existing HTTP-only LAN deployment safe to expose** to an
+untrusted network or public tunnel; TLS and a deployment-specific security
+review remain required.
 
 ## Development
 

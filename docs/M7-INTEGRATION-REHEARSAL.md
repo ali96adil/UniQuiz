@@ -12,6 +12,7 @@ This document applies to the stacked PR sequence:
 8. PR #32 — full-flow competition verification and event-scoped readiness
 9. PR #33 — accurate Excel results for configurable timing/scoring and variable rounds
 10. PR #34 — verify on-disk SQLite backup hash and integrity before preflight READY
+11. PR #39 — operator session login and privileged API/Socket.IO authentication
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -76,9 +77,14 @@ pnpm build
 
 Run the backend in a separate terminal with the rehearsal database and an
 isolated loopback-only port. Keep OSC disabled to avoid sending cues to
-Ableton, VDMX or competition equipment:
+Ableton, VDMX or competition equipment. The operator password is **mandatory**
+in M7; enter a unique secret interactively in the **same server terminal**
+rather than committing it to the repo:
 
 ```bash
+read -r -s -p 'Rehearsal operator password: ' UNIQUIZ_OPERATOR_PASSWORD
+echo
+export UNIQUIZ_OPERATOR_PASSWORD
 UNIQUIZ_MODE=rehearsal \
 UNIQUIZ_DB_PATH="$HOME/UniQuiz-M7-Rehearsal/rehearsal.db" \
 UNIQUIZ_HOST=127.0.0.1 \
@@ -145,6 +151,10 @@ conditions. This is **synthetic CI**, not the Mac rehearsal below.
    the guided progress tracker must not claim operational READY.
 9. **Recovery:** restart only the rehearsal server and repeat checks for
    the archived event and new workspaces.
+10. **Authentication:** verify operator login, logout, and login after server
+    restart. Confirm that unauthorized browsers cannot retrieve station tokens
+    or mutate competition setup, while both team stations and audience
+    display remain operational.
 
 ## Backup checksum acceptance
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
 import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { RoundRulesPanel } from "./RoundRules.js";
@@ -82,6 +82,8 @@ function roleForSurface(surface: Surface): ClientRole {
     case "draw":
     case "operator":
     case "report":
+    case "stations":
+    case "home":
       return "operator";
     case "display":
       return "display";
@@ -4631,6 +4633,12 @@ function TeamLivePanel({
 export function App() {
   const surface = useMemo(() => surfaceFromPath(window.location.pathname), []);
   const role = useMemo(() => roleForSurface(surface), [surface]);
+  const operatorSurface = role === "operator";
+  const [operatorAccess, setOperatorAccess] =
+    useState<"checking" | "required" | "authorized">("checking");
+  const [operatorPassword, setOperatorPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginBusy, setLoginBusy] = useState(false);
   const [connected, setConnected] = useState(false);
   const [presence, setPresence] = useState<PresenceSnapshot | null>(null);
   const [competition, setCompetition] =
@@ -4659,6 +4667,56 @@ export function App() {
     useState<RuntimeMode>("official");
   const [participantType, setParticipantType] = useState<ParticipantType>("college");
   const [gameplayRules, setGameplayRules] = useState<CompetitionGameplayRules | null>(null);
+
+  useEffect(() => {
+    if (!operatorSurface) return;
+    let cancelled = false;
+    void fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
+      .then((response) => response.ok
+        ? response.json() as Promise<{ authenticated: boolean }>
+        : Promise.reject(new Error("Auth unavailable")))
+      .then((result) => {
+        if (!cancelled) setOperatorAccess(result.authenticated ? "authorized" : "required");
+      })
+      .catch(() => { if (!cancelled) setOperatorAccess("required"); });
+    return () => { cancelled = true; };
+  }, [operatorSurface]);
+
+  const loginOperator = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoginError(null);
+    setLoginBusy(true);
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: operatorPassword }),
+      });
+      if (!response.ok) {
+        const body = await response.json() as { error?: string };
+        throw new Error(body.error === "TOO_MANY_LOGIN_ATTEMPTS"
+          ? "محاولات الدخول كثيرة. حاول لاحقاً."
+          : "كلمة مرور المشغّل غير صحيحة أو الخدمة غير جاهزة.");
+      }
+      setOperatorPassword("");
+      setOperatorAccess("authorized");
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "تعذر تسجيل الدخول");
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  const logoutOperator = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+    } finally {
+      setConnected(false);
+      setOperatorPassword("");
+      setOperatorAccess("required");
+    }
+  };
 
   useEffect(() => {
     void fetch("/api/competitions")
@@ -4718,6 +4776,7 @@ export function App() {
   }, [role]);
 
   useEffect(() => {
+    if (operatorSurface && operatorAccess !== "authorized") return;
     const socket = io({
       auth: {
         role,
@@ -4816,7 +4875,7 @@ export function App() {
       setLiveSocket(null);
       socket.disconnect();
     };
-  }, [role, stationToken]);
+  }, [role, stationToken, operatorSurface, operatorAccess]);
 
   const showPresence = surface === "operator";
 
@@ -4852,6 +4911,32 @@ export function App() {
       );
     });
   };
+
+  if (operatorSurface && operatorAccess !== "authorized") {
+    return (
+      <main className="shell">
+        <section className="panel operator-login" dir="rtl">
+          <h1>دخول مشغّل UniQuiz</h1>
+          {operatorAccess === "checking" ? (
+            <p>جاري فحص صلاحية الجلسة...</p>
+          ) : (
+            <form onSubmit={(event) => void loginOperator(event)}>
+              <p>لا يمكن فتح إعدادات المسابقة أو التحكم بالنتائج بدون كلمة مرور المشغّل.</p>
+              <label htmlFor="uniquiz-operator-password">كلمة مرور المشغّل</label>
+              <input id="uniquiz-operator-password" type="password"
+                value={operatorPassword} autoComplete="current-password"
+                onChange={(event) => setOperatorPassword(event.target.value)}
+                required minLength={16} />
+              <button type="submit" className="primary" disabled={loginBusy}>
+                {loginBusy ? "جاري التحقق..." : "تسجيل الدخول"}
+              </button>
+              <StatusMessage error={loginError} message={null} />
+            </form>
+          )}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main
@@ -4894,6 +4979,11 @@ export function App() {
               : "جاري الاتصال بالسيرفر"}
           </div>
 
+          {operatorSurface ? (
+            <div className="actions">
+              <button onClick={() => void logoutOperator()}>تسجيل خروج المشغّل</button>
+            </div>
+          ) : null}
           {surface === "setup" ? (
             <div className="surface-switcher">
               <a className="button-link" href="/draw">
