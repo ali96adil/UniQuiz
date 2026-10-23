@@ -96,6 +96,25 @@ Open `http://127.0.0.1:5174/setup` only on the rehearsal Mac.
 This API points to the **copy**. Never place the rehearsal server or UI on
 `0.0.0.0` during an actual event.
 
+## Workspace-specific event-day verification
+
+Even when the same hardware is used for consecutive tournaments, a verified
+OSC reception from a **previous** tournament cannot certify the newly opened
+competition. M7 clears OSC sent/confirmed state atomically each time a
+different workspace is activated. The operator must send and confirm a new
+`/uniquiz/system/test` before OSC preflight becomes READY.
+
+Similarly, a backup made **before** opening or renaming a competition cannot
+count toward the new active competition's preflight. Make a new verified
+`/api/operations/backup` after activating the intended event. Existing older
+backup files are retained for recovery but are marked stale for readiness.
+
+The automated full-flow acceptance test also checks the entire two-round
+lifecycle: 2 and 3 independently configured questions, fixed scoring,
+nonrepeating allocations, final results requiring an explicit operator
+announcement, previous tournament restoration and new OSC/backup preflight
+conditions. This is **synthetic CI**, not the Mac rehearsal below.
+
 ## Full rehearsal scenarios
 
 1. **Legacy preservation:** verify the copied original event title, colleges,
