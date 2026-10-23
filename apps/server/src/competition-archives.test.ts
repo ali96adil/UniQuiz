@@ -35,6 +35,10 @@ test("M7 public category labels and immutable archive survive later edits", asyn
     assert.equal(summary.categories[0].name, "رياضة");
     assert.equal(summary.categories[0].internalName, "رياضة تخصصية");
 
+    // Preserve this logo in the archive; a later competition may replace it.
+    const historicalLogo = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    db.prepare("INSERT INTO audience_assets(slot,mime_type,bytes,updated_at) VALUES('university','image/png',?,CURRENT_TIMESTAMP)")
+      .run(historicalLogo);
     registerCompetitionArchiveRoutes(app, db);
     await app.ready();
 
@@ -51,6 +55,25 @@ test("M7 public category labels and immutable archive survive later edits", asyn
     db.prepare("UPDATE categories SET display_name = ? WHERE id = 1")
       .run("المعلومات الرياضية");
 
+    // The active DB has diverged: old PDF must still use archived logo and ranking.
+    db.prepare("UPDATE audience_assets SET bytes=? WHERE slot='university'")
+      .run(Buffer.from([99, 88, 77, 66]));
+    db.prepare("UPDATE audience_settings SET event_title='Different active event'").run();
+    const asset = await app.inject({
+      method: "GET",
+      url: "/api/archives/" + created.archive.id + "/assets/university",
+    });
+    assert.equal(asset.statusCode, 200);
+    assert.equal(asset.headers["content-type"], "image/png");
+    assert.deepEqual(asset.rawPayload, historicalLogo);
+    assert.equal((await app.inject({
+      method: "GET",
+      url: "/api/archives/" + created.archive.id + "/assets/unknown",
+    })).statusCode, 404);
+    assert.equal((await app.inject({
+      method: "GET",
+      url: "/api/archives/not-real/assets/university",
+    })).statusCode, 404);
     const detail = await app.inject({
       method: "GET",
       url: "/api/archives/" + created.archive.id,
@@ -60,6 +83,9 @@ test("M7 public category labels and immutable archive survive later edits", asyn
       snapshot: { questionBank: { categories: Array<{ name: string }> } };
     };
     assert.equal(archiveDetail.snapshot.questionBank.categories[0].name, "رياضة");
+    assert.equal((detail.json() as {participantType: string}).participantType, "college");
+    assert.notEqual((detail.json() as {snapshot:{audienceSettings:{eventTitle:string}}}).snapshot.audienceSettings.eventTitle,
+      "Different active event");
 
     const exportResponse = await app.inject({
       method: "GET",
