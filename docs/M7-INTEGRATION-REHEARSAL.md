@@ -9,6 +9,8 @@ This document applies to the stacked PR sequence:
 5. PR #29 — per-competition duration and scoring
 6. PR #30 — guided setup UX
 7. PR #31 — verified startup migration backup and integration hardening
+8. PR #32 — full-flow competition verification and event-scoped readiness
+9. PR #33 — accurate Excel results for configurable timing/scoring and variable rounds
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -142,6 +144,31 @@ conditions. This is **synthetic CI**, not the Mac rehearsal below.
    the guided progress tracker must not claim operational READY.
 9. **Recovery:** restart only the rehearsal server and repeat checks for
    the archived event and new workspaces.
+
+## Historical results export acceptance
+
+M7 changes the participant type, question duration, scoring mode and number
+of questions/categories per round. For **each** saved competition, verify
+the exported `/api/export/results.xlsx` contains the actual settings:
+
+- Summary: event title, participant type, real duration, correct-point value,
+  scoring mode and points deducted per whole second.
+- Ranking: official scores, response time, correct/wrong counts and entrant
+  naming appropriate to colleges, teams, departments or classes.
+- Rounds: the configured and allocated question count and selected category
+  quotas for **each round separately**. The original 10-question format is
+  only a historical default; 12 is only an example.
+- Submissions/Audit: question response details and whether a submission
+  counts in the official revealed result; question replacement must not
+  inflate score totals.
+- After closing and reopening the rehearsal server, switch to a historical
+  competition and export again. Old timing, scoring, result totals and labels
+  must remain unchanged.
+
+Automated tests in PR #33 validate 40s fixed/10-point rules, 45s custom
+time-decay, per-round 2/3-question plans, team labels and physical SQLite
+restart/restore of two competitions. These tests **do not** replace the
+manual check against the actual 2026 event copy.
 
 ## Acceptance and release gate
 
