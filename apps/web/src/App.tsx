@@ -4,6 +4,7 @@ import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
 import { GameplayRulesPanel } from "./GameplayRules.js";
+import { SetupJourney } from "./SetupJourney.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
 import type {
@@ -249,7 +250,7 @@ function BulkImportPanel({
     <section className="panel import-panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">الخطوة 1</p>
+          <p className="step-label">بنك الأسئلة</p>
           <h2>إدخال البيانات</h2>
         </div>
         <div className="actions compact-actions">
@@ -616,7 +617,7 @@ function AudienceSettingsPanel({
     <section className="panel audience-settings-panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">الخطوة 6</p>
+          <p className="step-label">الهوية والرعاية</p>
           <h2>هوية شاشة الجمهور</h2>
         </div>
       </div>
@@ -972,7 +973,7 @@ function QuestionAllocationPanel({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">الخطوة 5</p>
+          <p className="step-label">التوزيع النهائي</p>
           <h2>توزيع أسئلة الجولات</h2>
         </div>
         <span
@@ -1224,7 +1225,7 @@ function SetupSurface({
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="step-label">الخطوة 2</p>
+            <p className="step-label">إدارة المشاركين</p>
             <h2>قائمة {participantLabels.plural}</h2>
           </div>
           <span className="counter">
@@ -1269,7 +1270,7 @@ function SetupSurface({
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="step-label">الخطوة 3</p>
+            <p className="step-label">اعتماد المشاركين</p>
             <h2>تحديد {participantLabels.plural} المشاركة</h2>
           </div>
           <span className="counter">{selectedIds.size} مختارة</span>
@@ -1478,7 +1479,7 @@ function DrawSurface({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="step-label">الخطوة 4</p>
+          <p className="step-label">القرعة الرسمية</p>
           <h2>القرعة الرسمية</h2>
         </div>
         <span className="counter">
@@ -4931,24 +4932,48 @@ export function App() {
       ) : null}
 
       {surface === "setup" && competition ? (
-        <>
-          <CompetitionWorkspacesPanel onActiveChange={setParticipantType} />
-          <BulkImportPanel questionBank={questionBank} />
-          <CategoryLabelsPanel questionBank={questionBank} />
-          <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
-          <RoundOverridesPanel questionBank={questionBank} allocation={questionAllocation} />
-          <GameplayRulesPanel
-            locked={competition.rounds.some((round) => round.status !== "PENDING") || (liveSnapshot !== null && liveSnapshot.phase !== "IDLE")}
-            onSaved={setGameplayRules}
-          />
-          <SetupSurface snapshot={competition} participantType={participantType} />
-          <DrawSurface snapshot={competition} />
-          <QuestionAllocationPanel allocation={questionAllocation} />
-          <AudienceSettingsPanel settings={audienceSettings} />
-          {/* With independent workspaces, new competitions use Create / Switch above.
-              Keep the legacy reset API available for backup/restore tooling,
-              but do not place a destructive reset beside the workspace controls. */}
-        </>
+        <SetupJourney
+          competition={competition}
+          questionBank={questionBank}
+          allocation={questionAllocation}
+          eventTitle={audienceSettings?.eventTitle ?? null}
+          panels={{
+            identity: (
+              <>
+                <CompetitionWorkspacesPanel onActiveChange={setParticipantType} />
+                <AudienceSettingsPanel settings={audienceSettings} />
+              </>
+            ),
+            participants: (
+              <SetupSurface snapshot={competition} participantType={participantType} />
+            ),
+            questions: (
+              <>
+                <BulkImportPanel questionBank={questionBank} />
+                <CategoryLabelsPanel questionBank={questionBank} />
+                <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
+                <GameplayRulesPanel
+                  locked={competition.rounds.some((round) => round.status !== "PENDING") ||
+                    (liveSnapshot !== null && liveSnapshot.phase !== "IDLE")}
+                  onSaved={setGameplayRules}
+                />
+              </>
+            ),
+            draw: (
+              <>
+                <DrawSurface snapshot={competition} />
+                <RoundOverridesPanel questionBank={questionBank} allocation={questionAllocation} />
+              </>
+            ),
+            readiness: (
+              <>
+                <QuestionAllocationPanel allocation={questionAllocation} />
+                <OperationsPreflightPanel />
+                <StationAccessPanel />
+              </>
+            ),
+          }}
+        />
       ) : null}
 
       {surface === "archives" ? <ArchivesPanel /> : null}

@@ -72,7 +72,21 @@ Gameplay settings are stored independently from category/round distributions in 
 
 **Boundary:** Duration and scoring are configurable **per competition**. Round-specific question counts and categories are supported in PR #28. Round-specific time/scoring overrides are not part of this phase and should be added only with safe locking and historical transparency.
 
-### M7.6 themes and reusable layouts
+### M7.6 guided tournament setup — PR #30 (draft)
+
+The `/setup` screen now provides five clear stages for operators and organizers, with a responsive visual progress tracker, explicit Next/Back controls, a deep link for each stage (`?step=identity`, `participants`, `questions`, `draw`, `readiness`) and an optional **Show all settings** view for advanced users. Existing APIs, station behavior and official scoring logic are unchanged.
+
+1. **Competition and branding:** choose/create/clone a competition, set participant type, event title, patronage, logos and pre-show identity.
+2. **Participants:** enter and select participants (colleges, departments, classes or teams) and lock the selected lineup.
+3. **Questions and rules:** import/manage the shared question bank, public category labels, competition-wide question counts, time limit and scoring scheme.
+4. **Draw and round plans:** generate/present the official draw and optionally choose different question totals/category allocations per round.
+5. **Allocation and event-day preflight:** allocate and lock nonrepeating questions, generate verified backups, verify station links/presence, OSC and display readiness, and then proceed to the operator screen.
+
+The UI progress check is **advisory**, not an authorization to begin live rounds. A stage is marked provisionally complete based on locally available setup snapshots; actual safety/readiness is confirmed only through the existing **server-side** `/api/operations/preflight`. Existing operator/draw routes continue working, and no extra live-session mutations are introduced.
+
+The shared progress model has regression tests for fresh competitions, missing identity, participant lock, question inventory, draw and allocation, including verification that allocated questions do *not* automatically imply event-day READY.
+
+### M7.7 themes and reusable layouts
 
 Each competition gets editable title, logo, sponsor identity, colors, animation and pre-show pages, using presets. Reuse proven permissively licensed components rather than importing unrelated quiz frameworks wholesale:
 
