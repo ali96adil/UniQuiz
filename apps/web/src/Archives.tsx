@@ -159,8 +159,11 @@ export function ArchivesPanel() {
                 <button disabled={busy} onClick={() => void openArchive(archive.id)}>
                   عرض النتائج
                 </button>
+                <a className="button-link primary" href={"/archives/" + encodeURIComponent(archive.id) + "/report?print=1"} target="_blank" rel="noopener noreferrer">
+                  تصدير النتائج PDF
+                </a>
                 <a className="button-link" href={"/api/archives/" + archive.id + "/export"} download>
-                  تصدير نسخة JSON كاملة
+                  نسخة احتياطية JSON
                 </a>
                 <button disabled={busy} onClick={() => void renameArchive(archive)}>تعديل العنوان</button>
                 <button className="danger-outline" disabled={busy} onClick={() => void deleteArchive(archive)}>

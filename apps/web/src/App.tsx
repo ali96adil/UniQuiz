@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
+import { ArchivedResultsReport } from "./ArchivedResultsReport.js";
 import { QuestionEditorPanel } from "./QuestionEditor.js";
 import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
@@ -34,6 +35,7 @@ type Surface =
   | "setup"
   | "question-bank"
   | "archives"
+  | "archive-report"
   | "draw"
   | "operator"
   | "display"
@@ -47,6 +49,7 @@ const surfaceTitles: Record<Surface, string> = {
   setup: "إعداد المسابقة",
   "question-bank": "إدارة بنك الأسئلة والمحاور",
   archives: "أرشيف المسابقات",
+  "archive-report": "بيان النتائج المؤرشفة",
   draw: "القرعة",
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
@@ -68,6 +71,7 @@ const roleTitles: Record<ClientRole, string> = {
 function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/setup")) return "setup";
   if (pathname.startsWith("/question-bank")) return "question-bank";
+  if (/^\/archives\/[^/]+\/report\/?$/.test(pathname)) return "archive-report";
   if (pathname.startsWith("/archives")) return "archives";
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
@@ -84,6 +88,7 @@ function roleForSurface(surface: Surface): ClientRole {
     case "setup":
     case "question-bank":
     case "archives":
+    case "archive-report":
     case "draw":
     case "operator":
     case "report":
@@ -5113,7 +5118,7 @@ export function App() {
       className={
         surface === "display"
           ? "display-shell"
-          : surface === "report"
+          : (surface === "report" || surface === "archive-report")
             ? "report-shell"
             : surface === "team-a" || surface === "team-b"
               ? "team-shell"
@@ -5128,6 +5133,7 @@ export function App() {
 
       {surface !== "display" &&
       surface !== "report" &&
+      surface !== "archive-report" &&
       surface !== "team-a" &&
       surface !== "team-b" ? (
         <section className="hero">
@@ -5328,6 +5334,8 @@ export function App() {
         )
       ) : null}
 
+      {surface === "archive-report" ? <ArchivedResultsReport /> : null}
+
       {surface === "report" ? (
         <OfficialResultsReport
           ranking={ranking}
@@ -5376,6 +5384,7 @@ export function App() {
       {surface !== "setup" &&
       surface !== "question-bank" &&
       surface !== "archives" &&
+      surface !== "archive-report" &&
       surface !== "draw" &&
       surface !== "operator" &&
       surface !== "display" &&
