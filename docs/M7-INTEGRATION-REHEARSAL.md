@@ -16,6 +16,7 @@ This document applies to the stacked PR sequence:
 12. PR #40 — safe Windows answer-station enrollment and token rotation
 13. PR #41 — synchronized cross-browser active workspace rules and editors
 14. PR #42 — read-only historical-row fingerprint check of a copied DB
+15. PR #44 — bind preservation baseline to its exact rehearsal database and test startup migration
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -84,7 +85,7 @@ python3 scripts/m7_rehearsal_verify.py capture \
 
 Require `M7_BASELINE_CAPTURE_OK`. The private baseline file has permissions
 `0600`; it contains row digests, not the names, question texts or logos.
-The command will **refuse to overwrite** an existing manifest. Never upload
+The command will **refuse to overwrite** an existing manifest and binds it to the exact resolved rehearsal database path. Do not move or rename the rehearsal DB between capture and verification. Never upload
 the private manifest or competition database to a public issue.
 
 Start the M7 rehearsal server as instructed below, confirm that its
@@ -199,6 +200,23 @@ conditions. This is **synthetic CI**, not the Mac rehearsal below.
     restart. Confirm that unauthorized browsers cannot retrieve station tokens
     or mutate competition setup, while both team stations and audience
     display remain operational.
+
+## Automated upgrade smoke scope
+
+PR #44 adds a GitHub CI end-to-end migration test. It creates an entirely
+**synthetic** quiz database with historical scores, answer times, question
+records, a logo BLOB and custom event metadata, recreates the old
+10-question `live_submissions` SQLite position constraint and marks the
+schema version as 15. CI then creates a WAL-aware copy, captures the
+baseline, runs the **real M7 Node startup migration**, and checks every
+original row fingerprint, upgraded constraints, SQLite foreign keys and
+physical pre-migration backup. A subsequent deliberate score change must
+fail verification.
+
+This exercises migration code end to end but is **not a byte-for-byte M6
+fixture**. Other historical schema variants might behave differently. It
+does not certify the real University 2026 database until the separate Mac
+rehearsal procedure above is completed successfully.
 
 ## Migration acceptance gate
 

@@ -248,6 +248,11 @@ def main() -> int:
             check_database(db)
             if args.command == "capture":
                 baseline = capture(db)
+                # A manifest must only certify the exact rehearsal DB that
+                # was captured, not an unrelated file with similar tables.
+                # SQLite header salt/counter bytes can change during upgrade,
+                # so bind to the database's canonical pre-upgrade location.
+                baseline["rehearsalDatabasePath"] = str(database_path)
                 write_manifest_exclusive(manifest_path, baseline)
                 print("M7_BASELINE_CAPTURE_OK")
                 print("Protected tables:", len(baseline["protectedTables"]))
@@ -255,6 +260,8 @@ def main() -> int:
             else:
                 with manifest_path.open("r", encoding="utf-8") as file:
                     baseline = json.load(file)
+                if baseline.get("rehearsalDatabasePath") != str(database_path):
+                    raise ValueError("BASELINE_DATABASE_PATH_MISMATCH")
                 errors, notes = verify(db, baseline)
                 for note in notes:
                     print(note)
