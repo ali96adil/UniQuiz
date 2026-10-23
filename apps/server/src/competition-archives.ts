@@ -104,6 +104,13 @@ export function saveCompetitionArchive(db: AppDatabase, title: string) {
 
     const id = randomUUID();
     const archivedAt = new Date().toISOString();
+    // New archives carry the entrant label as it was when archived.
+    // Old archives without this metadata print a neutral "participant" label.
+    const currentType = db.prepare(`
+      SELECT participant_type AS participantType
+      FROM competition_workspaces
+      WHERE id = (SELECT value FROM app_meta WHERE key='active_workspace_id')
+    `).get() as { participantType: string } | undefined;
     const snapshot = {
       competition: getCompetitionSnapshot(db),
       ranking: getQualificationRanking(db),
@@ -121,6 +128,7 @@ export function saveCompetitionArchive(db: AppDatabase, title: string) {
       id,
       title: title,
       archivedAt,
+      participantType: currentType?.participantType ?? null,
       snapshot,
       tables,
     });
@@ -223,8 +231,50 @@ export function registerCompetitionArchiveRoutes(
       const { payloadJson, ...metadata } = row;
       const payload = JSON.parse(payloadJson) as {
         snapshot: unknown;
+        participantType?: unknown;
       };
-      return { archive: metadata, snapshot: payload.snapshot };
+      const participantType = ["college", "department", "class", "team"]
+        .includes(String(payload.participantType))
+        ? payload.participantType
+        : null;
+      return { archive: metadata, participantType, snapshot: payload.snapshot };
+    },
+  );
+
+  // Serve the logos stored INSIDE this archive, not the currently active
+  // event's mutable /api/audience/assets/* endpoints. The operator session
+  // protects both the archived JSON and its media.
+  app.get<{ Params: { id: string; slot: string } }>(
+    "/api/archives/:id/assets/:slot",
+    async (request, reply) => {
+      if (request.params.slot !== "university" && request.params.slot !== "department")
+        return reply.code(404).send({ error: "ARCHIVE_ASSET_NOT_FOUND" });
+      const row = findArchive(db, request.params.id);
+      if (!row) return reply.code(404).send({ error: "ARCHIVE_NOT_FOUND" });
+      const payload = JSON.parse(row.payloadJson) as {
+        tables?: {
+          audience_assets?: Array<{
+            slot?: string;
+            mime_type?: string;
+            bytes?: { kind?: string; data?: string };
+          }>;
+        };
+      };
+      const found = payload.tables?.audience_assets?.find(
+        asset => asset.slot === request.params.slot,
+      );
+      if (!found) return reply.code(404).send({ error: "ARCHIVE_ASSET_NOT_FOUND" });
+      if (!["image/png", "image/jpeg", "image/webp"].includes(found.mime_type ?? "") ||
+          found.bytes?.kind !== "base64-blob" ||
+          typeof found.bytes.data !== "string" ||
+          found.bytes.data.length > 12_000_000 ||
+          !/^[A-Za-z0-9+/]*={0,2}$/.test(found.bytes.data)) {
+        return reply.code(422).send({ error: "ARCHIVE_ASSET_INVALID" });
+      }
+      return reply
+        .header("cache-control", "private, no-store")
+        .type(found.mime_type!)
+        .send(Buffer.from(found.bytes.data, "base64"));
     },
   );
 
