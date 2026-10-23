@@ -22,7 +22,21 @@ M7.1 is an additive migration on the `feature/m7-archives-category-display` bran
 - Archived results should not be mistaken for an operational restore feature; users should retain regular SQLite backups.
 - Import with locked legacy question sets is guarded; begin a new competition safely via the archive-and-reset workflow before changing the library.
 
-### M7.2 data model
+## M7.2 workspace implementation — PR #27
+
+M7.2 now includes a working **single-active-competition workspace registry**, stacked on M7.3 (PR #26) and M7.1 (PR #25). Legacy 2026 data is automatically registered as the `legacy` workspace without moving or resetting it.
+
+- Administrators can create a blank competition; rename its administrative name; choose participant labels: colleges, departments, classes or teams; or duplicate another competition's **setup without old scores or draw**.
+- Inactive competitions are serialized snapshots of their event-scoped SQLite tables. The selected competition is materialized into the application's existing tables, so current live/OSC clients work without maintaining parallel active runs.
+- Switching is a single SQLite transaction. Source data is captured first, the target data is restored with foreign keys ON, and the active workspace pointer changes only if restoration succeeds. Database backup is required before switching from the HTTP API.
+- The globally shared `categories` and `questions` tables and station credentials remain independent of workspaces.
+- Audience sponsors, presentation copy, branding image blobs, rounds, answers, history and results are stored separately for each workspace.
+- Switching is refused when a round is ACTIVE or the runtime phase is not IDLE/ROUND_COMPLETE; restoring a target that has an unfinished live session is also refused.
+- The existing destructive Reset button has been removed from setup, favoring Create and Switch. Legacy backup/reset API remains available for compatibility.
+
+**Limitations:** Only one competition may be running live at a time; the original DB tables remain physically named `colleges` internally even when teams/departments/classes are shown. The current participant/draw limit of 20 remains. Common question-bank category metadata is shared, including the global default public label, although completed archives preserve the historical text. We still need tests on an offline copy of the actual theater Mac database and a controlled deployment before merging any of the stacked drafts.
+
+### M7.2 data model (normalized long-term option)
 
 Introduce `competitions(id, name, status, created_at, archived_at, settings_json)` and explicit `competition_id` on participants, rounds, rounds' questions, live results and sponsor/layout settings. Migrating a legacy active competition must create a dedicated competition record; all original row IDs, responses, timings, and scores remain unchanged. Prefer transactional, tested migration with rollback via backup. The central question bank exists independently.
 

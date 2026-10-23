@@ -346,7 +346,7 @@ export interface OperationsBackupRecord {
   sizeBytes: number;
   sha256: string;
   integrity: "ok";
-  purpose: "manual" | "pre-restore" | "pre-reset";
+  purpose: "manual" | "pre-restore" | "pre-reset" | "pre-switch";
 }
 
 export interface OperationsPreflightCheck {
