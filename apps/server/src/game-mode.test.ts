@@ -29,10 +29,14 @@ test("2026 legacy and newly created workspace inherit ranked duel with no schema
       INSERT INTO participants (college_id) VALUES (1);
       INSERT INTO qualification_rounds (round_order,college_a_id,status)
       VALUES (1,1,'COMPLETED');
+      INSERT INTO categories (category_key, name, sort_order)
+      VALUES ('sport', 'Sports', 1);
+      INSERT INTO questions (category_id, prompt, option_a, option_b, option_c, option_d, correct_option)
+      VALUES (1, 'Historic sports question', 'A', 'B', 'C', 'D', 'A');
       INSERT INTO live_submissions (
         round_id, question_position, station, question_id, selected_option,
         submitted_at_epoch_ms, response_time_ms, is_correct, score_micros
-      ) VALUES (1,1,'A',NULL,'A',1000,450,1,192000000);
+      ) VALUES (1,1,'A',1,'A',1000,450,1,192000000);
     `);
     const scoreBefore = db.prepare("SELECT score_micros AS score, response_time_ms AS ms FROM live_submissions")
       .all();
