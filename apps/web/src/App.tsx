@@ -8,6 +8,7 @@ import { GameplayRulesPanel } from "./GameplayRules.js";
 import { SetupJourney } from "./SetupJourney.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
+import { RANKED_DUEL_MODE } from "@uniquiz/shared";
 import { participantAwareAudienceText } from "@uniquiz/shared";
 import type {
   AudienceDisplaySettings,
@@ -5141,7 +5142,7 @@ export function App() {
           <h1>{surfaceTitles[surface]}</h1>
           <p className="subtitle">
             {["setup", "draw", "operator", "question-bank"].includes(surface)
-              ? "المواجهة بالنقاط · Ranked Duel · Mode 01"
+              ? `${RANKED_DUEL_MODE.labelAr} · ${RANKED_DUEL_MODE.labelEn} · Mode 01`
               : "UniQuiz · Realtime Competition Runtime"}
           </p>
           <div className="connection">

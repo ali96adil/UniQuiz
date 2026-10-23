@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RANKED_DUEL_MODE } from "@uniquiz/shared";
 import type {
   AudienceDisplaySettings,
   CompetitionSetupSnapshot,
@@ -155,6 +156,7 @@ export function ArchivesPanel() {
                 {archive.roundCount} جولة ·
                 {archive.questionCount} سؤال
               </p>
+              <p className="muted">النمط: {RANKED_DUEL_MODE.labelAr} — {RANKED_DUEL_MODE.labelEn}</p>
               <div className="actions">
                 <button disabled={busy} onClick={() => void openArchive(archive.id)}>
                   عرض النتائج

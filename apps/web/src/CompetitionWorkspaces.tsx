@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RANKED_DUEL_MODE } from "@uniquiz/shared";
 
 export type ParticipantType = "college" | "department" | "class" | "team";
 export const PARTICIPANT_LABELS: Record<ParticipantType, { singular: string; plural: string }> = {
@@ -154,6 +155,11 @@ export function CompetitionWorkspacesPanel({
             كل مسابقة تحتفظ بالمشاركين والقرعة والنتائج والهوية الخاصة بها.
             بنك الأسئلة مشترك بين جميع المسابقات.
           </p>
+          <p className="muted">
+            نمط اللعب المعتمد: <strong>{RANKED_DUEL_MODE.labelAr} — {RANKED_DUEL_MODE.labelEn} (Mode 01)</strong>.
+            المتسابقان يجيبان عن الأسئلة نفسها، وتُرتّب النتائج بالنقاط ثم الزمن دون إقصاء.
+            تغيير «نوع المتنافسين» لا يغيّر نمط اللعب.
+          </p>
         </div>
       </div>
       <div className="audience-settings-grid">
@@ -168,7 +174,7 @@ export function CompetitionWorkspacesPanel({
           />
         </label>
         <label>
-          <span>نوع المتنافسين</span>
+          <span>نوع المتنافسين (مو نمط اللعب)</span>
           <select
             value={newType}
             disabled={busy}
@@ -197,6 +203,7 @@ export function CompetitionWorkspacesPanel({
           <div className="round-allocation" key={workspace.id}>
             <strong>{workspace.name}</strong>
             <span>{PARTICIPANT_LABELS[workspace.participantType].plural}</span>
+            <small>النمط: {RANKED_DUEL_MODE.labelAr} · {RANKED_DUEL_MODE.labelEn}</small>
             <small>{workspace.active ? "المسابقة المفتوحة حالياً" : "محفوظة"}</small>
             <div className="actions">
               {workspace.active ? null : (

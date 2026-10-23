@@ -468,3 +468,23 @@ neutral label "المشارك" instead of guessing "كلية".
 data, reprocessing, and future recovery workflows. JSON is not a document
 for presenting rankings; PDF is the human-readable signed/printed artifact.
 Keep JSON if the goal includes preserving a complete copy for future reuse.
+
+## Mode 01 release identity — Ranked Duel / المواجهة بالنقاط
+
+M7 currently implements ONE game mode only: **المواجهة بالنقاط (Ranked Duel, Mode 01)**.
+Two competing answer stations receive the same questions, accumulate point
+scores and total response time across rounds, and are ranked without knockout
+elimination. Solo/byes remain supported within Ranked Duel.
+
+The setup header, workspace creation and existing-workspace cards, navigation,
+and historical archive list display a single `RANKED_DUEL_MODE` identity
+exported from `@uniquiz/shared`. **No mode dropdown is introduced.**
+The four participant types (college, department, class and team) and the
+time-decay/fixed scoring options are editable properties of this ONE mode,
+not distinct game modes. Existing 2026/legacy archives are labeled as this
+mode on the client **without adding or rewriting schema columns or prior
+records**; historical ranks/scores/answers/timings remain untouched.
+
+If additional game modes are introduced later, they require independent
+schema, rules, test and migration review under the separate future-mode
+issue; the current implicit legacy mapping must remain backward compatible.

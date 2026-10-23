@@ -432,6 +432,7 @@ export interface OperationsDiagnosticsSnapshot {
 }
 
 export { SETUP_STEP_IDS, getSetupJourney } from "./setup-journey.js";
+export { RANKED_DUEL_MODE } from "./game-mode.js";
 export type { SetupJourneyState, SetupStep, SetupStepId, SetupStepStatus } from "./setup-journey.js";
 
 /** The database retains historic college names even for newer participant types.
