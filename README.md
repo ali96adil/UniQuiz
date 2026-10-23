@@ -5,6 +5,40 @@ hosts the authoritative server and operator/audience screens; Windows browser
 stations submit answers for Team A and Team B. Internet is not required during
 a competition.
 
+## Game Mode 01 — المواجهة بالنقاط / Ranked Duel
+
+This is UniQuiz's single supported gameplay mode in the M7 stabilization
+release. Two stations (A and B, or a solo bye when the draw requires it)
+answer the same timed multiple-choice questions independently. Rounds
+accumulate score toward a competition-wide leaderboard, with the published
+cumulative response time tie-break; **no one is eliminated after a match**.
+
+Question categories, number of questions, difficulty progression, timer,
+score formula and participant labels are **configuration options**, not
+separate game modes. `Knockout` and `Buzzer Challenge` are **future M8
+designs only** and are not selectable or implemented in this release
+(see [#49](https://github.com/ali96adil/UniQuiz/issues/49)).
+The protected Mac/data rehearsal completion gate is tracked in
+[#50](https://github.com/ali96adil/UniQuiz/issues/50).
+
+## M7.7 question library (draft PR #51)
+
+A private operator-only page at `/question-bank` can create or edit
+questions and categories without a CSV or Excel file, with difficulty
+levels 1–5, search/filter, copy, soft deactivation and restoration.
+Protected historical question references are not editable. CSV/XLSX
+question sheets have an optional `difficulty` integer column (default
+3 for older unclassified rows); exports include it. Existing M6/M7
+competitions keep legacy random question ordering; new blank
+competitions can use ascending difficulty ordering and modify this
+under competition gameplay rules before locking rounds. The ordering
+is nondecreasing by level **among the selected questions**, not a
+promise that all five levels are available in inventory.
+
+**Still a draft:** The M7.7 code, tests and migration have not passed
+the real Mac/Windows stage acceptance yet; do not run it against
+the original 2026 production SQLite database.
+
 ## Official historical rules and M7 extension
 
 The **original University of Babylon competition** used up to 20 colleges,
@@ -182,3 +216,23 @@ rehearsal document for exact commands.
 
 > Real question banks, contestant answers, official results, station tokens
 > and database backups must not be committed to Git.
+
+### M7.7 difficulty allocation hardening (draft)
+
+The ascending allocator now **selects a spread across difficulty levels**
+before ordering the chosen questions from easiest to hardest. It continues
+to respect exact category quotas and prevents repeats across rounds. When
+a category lacks enough easy or hard questions for the planned rounds, the
+operator readiness panel displays explicit warnings and counts per level.
+Legacy events keep random allocation unchanged. Competition difficulty and
+scoring configuration locks immediately when a question set is allocated,
+not only when the first question has begun. Archived question references
+under `tables.*`, as well as inactive workspace references, block unsafe edits.
+
+### M7.7 import race/duplicate safeguards
+
+CSV/XLSX previews reject an already-active identical prompt or source reference
+from the shared bank. A Preview that was valid earlier may become stale after
+another operator changes the bank; Apply repeats the check within one SQLite
+transaction, responds with HTTP 409 and rolls back the complete import rather
+than partially adding questions.

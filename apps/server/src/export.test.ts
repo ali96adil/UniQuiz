@@ -86,7 +86,8 @@ test("Excel export contains current master data and blank source_ref", async () 
   assert.equal(questions.getRow(2).getCell(1).text, "sports");
   assert.equal(questions.getRow(2).getCell(2).text, "Export question");
   assert.equal(questions.getRow(2).getCell(7).text, "C");
-  assert.equal(questions.getRow(2).getCell(8).text, "");
+  assert.equal(questions.getRow(2).getCell(8).text, "3");
+  assert.equal(questions.getRow(2).getCell(9).text, "");
 
   io.close();
   await app.close();

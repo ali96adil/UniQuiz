@@ -67,7 +67,7 @@ test("M7 integration: pre-upgrade backup captures committed WAL rows, results an
 
       assert.equal(
         (reopened.prepare("SELECT value FROM app_meta WHERE key='schema_version'").get() as {value:string}).value,
-        "16",
+        "17",
       );
       assert.equal(
         (reopened.prepare("SELECT score_micros AS score FROM live_submissions").get() as {score:number}).score,
@@ -81,7 +81,7 @@ test("M7 integration: pre-upgrade backup captures committed WAL rows, results an
       assert.equal(readdirSync(join(root, "migration-backups")).length,1);
       assert.equal(
         (after.prepare("SELECT value FROM app_meta WHERE key='schema_version'").get() as {value:string}).value,
-        "16",
+        "17",
       );
     } finally { after.close(); }
   } finally {

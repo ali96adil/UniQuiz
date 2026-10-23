@@ -3983,3 +3983,15 @@ h2 {
 .operator-login button.primary {
   align-self: stretch;
 }
+
+/* M7.7 — editor surfaces: responsive, not tied to a fixed question count */
+.question-editor .editor-form { display: grid; gap: 16px; margin: 18px 0 26px; padding: 20px; background: rgba(15,23,42,.42); border: 1px solid rgba(148,163,184,.2); border-radius: 18px; }
+.question-editor .editor-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 13px; }
+.question-editor .editor-fields label, .question-editor .editor-wide { display: grid; gap: 7px; color: #dbeafe; }
+.question-editor input, .question-editor select, .question-editor textarea { width: 100%; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(148,163,184,.35); background: #0f172a; color: #f8fafc; font: inherit; }
+.question-editor .editor-results { display: grid; gap: 12px; margin: 18px 0; }
+.question-editor .editor-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 16px; border: 1px solid rgba(148,163,184,.2); border-radius: 14px; background: rgba(30,41,59,.55); }
+.question-editor .editor-item-body { flex: 1 1 350px; overflow-wrap: anywhere; }
+.question-editor .editor-item small { display: block; margin-top: 8px; color: #cbd5e1; }
+.question-editor .editor-item .actions { margin: 0; }
+@media (max-width: 600px) { .question-editor .editor-item .actions { flex-wrap: wrap; } }

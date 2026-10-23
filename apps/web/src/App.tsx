@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
-import { CategoryLabelsPanel } from "./CategoryLabels.js";
+import { ArchivedResultsReport } from "./ArchivedResultsReport.js";
+import { QuestionEditorPanel } from "./QuestionEditor.js";
 import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
 import { GameplayRulesPanel } from "./GameplayRules.js";
 import { SetupJourney } from "./SetupJourney.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
+import { RANKED_DUEL_MODE } from "@uniquiz/shared";
+import { participantAwareAudienceText } from "@uniquiz/shared";
 import type {
   AudienceDisplaySettings,
   AudiencePresentationSnapshot,
@@ -31,7 +34,9 @@ import type {
 type Surface =
   | "home"
   | "setup"
+  | "question-bank"
   | "archives"
+  | "archive-report"
   | "draw"
   | "operator"
   | "display"
@@ -43,7 +48,9 @@ type Surface =
 const surfaceTitles: Record<Surface, string> = {
   home: "مسابقة بنك المعلومات",
   setup: "إعداد المسابقة",
+  "question-bank": "إدارة بنك الأسئلة والمحاور",
   archives: "أرشيف المسابقات",
+  "archive-report": "بيان النتائج المؤرشفة",
   draw: "القرعة",
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
@@ -64,6 +71,8 @@ const roleTitles: Record<ClientRole, string> = {
 
 function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/setup")) return "setup";
+  if (pathname.startsWith("/question-bank")) return "question-bank";
+  if (/^\/archives\/[^/]+\/report\/?$/.test(pathname)) return "archive-report";
   if (pathname.startsWith("/archives")) return "archives";
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
@@ -78,7 +87,9 @@ function surfaceFromPath(pathname: string): Surface {
 function roleForSurface(surface: Surface): ClientRole {
   switch (surface) {
     case "setup":
+    case "question-bank":
     case "archives":
+    case "archive-report":
     case "draw":
     case "operator":
     case "report":
@@ -998,6 +1009,14 @@ function QuestionAllocationPanel({
         تكرار أي سؤال بين الجولات.
       </p>
 
+      {allocation.difficultyWarnings && allocation.difficultyWarnings.length > 0 ? (
+        <div className="status-message error">
+          <strong>ملاحظات حول التدرج بالصعوبة:</strong>
+          {allocation.difficultyWarnings.map((warning,index) =>
+            <p key={index}>{warning}</p>)}
+        </div>
+      ) : null}
+
       <div className="allocation-categories">
         {allocation.categories.filter((item) => item.requiredQuestions > 0).map((category) => {
           const enough =
@@ -1019,6 +1038,8 @@ function QuestionAllocationPanel({
                   ? "المطلوب يتحدد بعد القرعة"
                   : `المطلوب ${category.requiredQuestions}`}
               </span>
+              {category.difficultyCounts ? <small>الصعوبة 1–5: {[1,2,3,4,5].map((level) =>
+                `${level}: ${category.difficultyCounts?.[level] ?? 0}`).join(" · ")}</small> : null}
             </div>
           );
         })}
@@ -1652,10 +1673,12 @@ function AudienceDrawSurface({
   snapshot,
   presentation,
   settings,
+  participantType,
 }: {
   snapshot: CompetitionSetupSnapshot;
   presentation: DrawPresentationEvent | null;
   settings: AudienceDisplaySettings;
+  participantType: ParticipantType;
 }) {
   const participantNames = snapshot.colleges
     .filter((college) => snapshot.participantCollegeIds.includes(college.id))
@@ -1666,13 +1689,13 @@ function AudienceDrawSurface({
       <section className="audience-stage">
         <div className="audience-kicker">{settings.eventTitle}</div>
         <h2 className="audience-title">{settings.copy.welcomeTitle}</h2>
-        <p className="audience-copy">{settings.copy.waitingParticipantsText}</p>
+        <p className="audience-copy">{participantAwareAudienceText(settings.copy.waitingParticipantsText, participantType)}</p>
 
         {participantNames.length > 0 ? (
           <>
             <p className="audience-live-participant-count">
               {audienceText(
-                settings.copy.participatingCollegeCountText,
+                participantAwareAudienceText(settings.copy.participatingCollegeCountText, participantType),
                 { count: participantNames.length },
               )}
             </p>
@@ -1682,7 +1705,7 @@ function AudienceDrawSurface({
               ))}
             </div>
             <div className="draw-waiting">
-              بانتظار تثبيت قائمة الكليات المشاركة
+              بانتظار تثبيت قائمة {PARTICIPANT_LABELS[participantType].plural} المشاركة
             </div>
           </>
         ) : null}
@@ -1696,7 +1719,7 @@ function AudienceDrawSurface({
         <div className="audience-kicker">{settings.copy.drawPhaseLabel}</div>
         <h2 className="audience-title">{settings.copy.drawOfficialTitle}</h2>
         <p className="audience-copy">
-          {audienceText(settings.copy.participatingCollegeCountText, { count: participantNames.length })}
+          {audienceText(participantAwareAudienceText(settings.copy.participatingCollegeCountText, participantType), { count: participantNames.length })}
         </p>
         <div className="audience-participants">
           {participantNames.map((name) => (
@@ -2278,6 +2301,11 @@ function phaseLabel(phase: LiveSnapshot["phase"]): string {
 interface StationCredentialResponse {
   teamA: { station: "A"; token: string } | null;
   teamB: { station: "B"; token: string } | null;
+}
+interface StationPairingCode {
+  station: "A" | "B";
+  code: string;
+  expiresAt: number;
 }
 
 
@@ -3189,6 +3217,7 @@ function StationAccessPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<"A" | "B" | null>(null);
   const [showTokens, setShowTokens] = useState(false);
+  const [pairingCodes, setPairingCodes] = useState<Partial<Record<"A" | "B", StationPairingCode>>>({});
 
   useEffect(() => {
     void apiRequest<StationCredentialResponse>("/api/stations/credentials")
@@ -3220,6 +3249,21 @@ function StationAccessPanel() {
     }
   };
 
+  const issuePairingCode = async (station: "A" | "B") => {
+    setError(null); setNotice(null);
+    setBusy(station);
+    try {
+      const issued = await apiRequest<StationPairingCode>(
+        "/api/stations/" + station.toLowerCase() + "/pairing-code",
+        { method: "POST", body: "{}" },
+      );
+      setPairingCodes(previous => ({ ...previous, [station]: issued }));
+      setNotice("اكتب الأرقام الستة بمحطة " + station + " خلال 5 دقائق. الرمز لمرة واحدة.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر إنشاء رمز الربط");
+    } finally { setBusy(null); }
+  };
+
   const shareToken = async (token: string) => {
     setError(null);
     try {
@@ -3240,8 +3284,8 @@ function StationAccessPanel() {
         </div>
       </div>
       <p className="muted">
-        افتح صفحة الفريق بدون رمز داخل الرابط، ثم أدخل الرمز على جهاز Windows.
-        لا تشارك الرمز في رابط أو رسالة عامة.
+        الطريقة الأسهل: ولّد رمز ربط من 6 أرقام للمحطة، ثم أدخله على جهازها خلال 5 دقائق.
+        الرمز يستخدم مرة واحدة فقط. يبقى الرمز الطويل للاتصال محفوظاً داخلياً.
       </p>
       <button type="button" onClick={() => setShowTokens(!showTokens)}>
         {showTokens ? "إخفاء الرموز" : "إظهار الرموز للمشغّل"}
@@ -3255,11 +3299,18 @@ function StationAccessPanel() {
               <div key={station}>
                 <strong>Station {station}</strong>
                 <code>{`${window.location.origin}/team/${station.toLowerCase()}`}</code>
+                {pairingCodes[station] && pairingCodes[station]!.expiresAt > Date.now() ? (
+                  <p className="status-message">رمز الربط المؤقت {station}: <strong dir="ltr">{pairingCodes[station]!.code}</strong> (5 دقائق / مرة واحدة)</p>
+                ) : null}
                 {showTokens ? (
                   <input aria-label={`رمز المحطة ${station}`} readOnly value={credential.token}
                     onFocus={(event) => event.target.select()} dir="ltr" />
                 ) : null}
                 <div className="actions">
+                  <button type="button" className="primary" disabled={busy !== null}
+                    onClick={() => void issuePairingCode(station)}>
+                    إنشاء رمز ربط 6 أرقام {station}
+                  </button>
                   <button type="button" onClick={() => void shareToken(credential.token)}>
                     نسخ رمز {station}
                   </button>
@@ -3602,8 +3653,10 @@ function OperatorHotkeys({
 
 function OperatorLivePanel({
   snapshot,
+  allocation,
 }: {
   snapshot: LiveSnapshot | null;
+  allocation: QuestionAllocationSummary | null;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3764,6 +3817,13 @@ function OperatorLivePanel({
         </div>
         <span className="live-phase">{phaseLabel(snapshot.phase)}</span>
       </div>
+      {snapshot.hasPendingRound && allocation && !allocation.ready ? (
+        <p className="status-message">
+          أسئلة الجولات لم توزّع وتُقفل بالكامل بعد. 
+          <a href="/setup?step=readiness">انتقل إلى إعداد الأسئلة والجاهزية</a>
+          ، ثم ارجع لتجهيز الجولة.
+        </p>
+      ) : null}
 
       {snapshot.round ? (
         <div className="live-round-map">
@@ -4794,6 +4854,8 @@ export function App() {
     return window.localStorage.getItem(key);
   });
   const [stationTokenDraft, setStationTokenDraft] = useState("");
+  const [stationEnrollError, setStationEnrollError] = useState<string | null>(null);
+  const [stationEnrollBusy, setStationEnrollBusy] = useState(false);
   useEffect(() => {
     if (role !== "team-a" && role !== "team-b") return;
     const url = new URL(window.location.href);
@@ -4803,14 +4865,36 @@ export function App() {
     }
   }, [role]);
 
-  const enrollStation = (event: FormEvent<HTMLFormElement>) => {
+  const enrollStation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (role !== "team-a" && role !== "team-b") return;
-    const token = stationTokenDraft.trim();
-    if (!/^[A-Za-z0-9_-]{32}$/.test(token)) return;
-    window.localStorage.setItem(`uniquiz:${role}:token`, token);
-    setStationTokenDraft("");
-    setStationToken(token);
+    const entered = stationTokenDraft.trim();
+    setStationEnrollError(null);
+    setStationEnrollBusy(true);
+    try {
+      let token = entered;
+      if (/^\d{6}$/.test(entered)) {
+        const response = await fetch("/api/stations/enroll", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ station: role === "team-a" ? "A" : "B", code: entered }),
+        });
+        if (!response.ok) {
+          throw new Error(response.status === 429
+            ? "محاولات كثيرة. انتظر دقيقة واطلب رمزاً جديداً من المشغّل."
+            : "رمز الربط غير صحيح، منتهي الصلاحية أو مستخدم مسبقاً.");
+        }
+        const paired = await response.json() as { token: string };
+        token = paired.token;
+      } else if (!/^[A-Za-z0-9_-]{32}$/.test(entered)) {
+        throw new Error("أدخل رمز الربط المكوّن من 6 أرقام.");
+      }
+      window.localStorage.setItem(`uniquiz:${role}:token`, token);
+      setStationTokenDraft("");
+      setStationToken(token);
+    } catch (error) {
+      setStationEnrollError(error instanceof Error ? error.message : "تعذّر الربط");
+    } finally { setStationEnrollBusy(false); }
   };
 
   const clearStationToken = () => {
@@ -4977,19 +5061,22 @@ export function App() {
       <main className="shell">
         <section className="panel station-enrollment" dir="rtl">
           <h1>تهيئة محطة الفريق {role === "team-a" ? "A" : "B"}</h1>
-          <p>أدخل الرمز الذي يظهر في لوحة المشغّل. لا تضع الرمز داخل عنوان الصفحة.</p>
+          <p>أدخل رمز الربط المؤقت المكوّن من 6 أرقام من لوحة المشغّل. لا تضعه بالرابط.</p>
           {stationToken && effectiveRole !== role ? (
             <p className="status-message error">
               الرمز السابق غير صالح أو تم إلغاؤه. أدخل الرمز الجديد من المشغّل.
             </p>
           ) : null}
-          <form onSubmit={enrollStation}>
-            <label htmlFor="station-access-token">رمز المحطة</label>
-            <input id="station-access-token" type="password" autoComplete="off"
-              value={stationTokenDraft} minLength={32} maxLength={32}
+          <form onSubmit={(event) => void enrollStation(event)}>
+            <label htmlFor="station-access-token">رمز الربط (6 أرقام)</label>
+            <input id="station-access-token" type="text" autoComplete="off"
+              inputMode="numeric" value={stationTokenDraft} maxLength={32}
               onChange={(event) => setStationTokenDraft(event.target.value)}
-              placeholder="ألصق الرمز هنا" required dir="ltr" />
-            <button className="primary" type="submit">ربط محطة الفريق</button>
+              placeholder="مثال: 123456" required dir="ltr" />
+            <button className="primary" type="submit" disabled={stationEnrollBusy}>
+              {stationEnrollBusy ? "جاري الربط..." : "ربط محطة الفريق"}
+            </button>
+            {stationEnrollError ? <p className="status-message error">{stationEnrollError}</p> : null}
           </form>
           {stationToken ? (
             <button type="button" onClick={clearStationToken}>
@@ -5032,7 +5119,7 @@ export function App() {
       className={
         surface === "display"
           ? "display-shell"
-          : surface === "report"
+          : (surface === "report" || surface === "archive-report")
             ? "report-shell"
             : surface === "team-a" || surface === "team-b"
               ? "team-shell"
@@ -5047,15 +5134,16 @@ export function App() {
 
       {surface !== "display" &&
       surface !== "report" &&
+      surface !== "archive-report" &&
       surface !== "team-a" &&
       surface !== "team-b" ? (
         <section className="hero">
           <p className="eyebrow">University Knowledge Competition</p>
           <h1>{surfaceTitles[surface]}</h1>
           <p className="subtitle">
-            {surface === "setup" || surface === "draw"
-              ? "M2 — Participants & Draw"
-              : "Realtime Competition Runtime"}
+            {["setup", "draw", "operator", "question-bank"].includes(surface)
+              ? `${RANKED_DUEL_MODE.labelAr} · ${RANKED_DUEL_MODE.labelEn} · Mode 01`
+              : "UniQuiz · Realtime Competition Runtime"}
           </p>
           <div className="connection">
             <span
@@ -5084,6 +5172,9 @@ export function App() {
               <a className="button-link" href="/archives">
                 أرشيف المسابقات
               </a>
+              <a className="button-link" href="/question-bank">
+                تحرير بنك الأسئلة
+              </a>
             </div>
           ) : surface === "draw" ? (
             <div className="surface-switcher">
@@ -5105,6 +5196,14 @@ export function App() {
               <a className="button-link" href="/archives">
                 أرشيف المسابقات
               </a>
+              <a className="button-link" href="/question-bank">
+                بنك الأسئلة
+              </a>
+            </div>
+          ) : surface === "question-bank" ? (
+            <div className="surface-switcher">
+              <a className="button-link" href="/setup?step=questions">إعدادات الأسئلة والجولات</a>
+              <a className="button-link" href="/operator">لوحة التشغيل</a>
             </div>
           ) : null}
         </section>
@@ -5130,7 +5229,7 @@ export function App() {
             questions: (
               <>
                 <BulkImportPanel questionBank={questionBank} />
-                <CategoryLabelsPanel questionBank={questionBank} />
+                <a className="button-link" href="/question-bank">فتح محرر الأسئلة والمحاور (إضافة / تعديل / تعطيل)</a>
                 <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
                 <GameplayRulesPanel
                   locked={competition.rounds.some((round) => round.status !== "PENDING") ||
@@ -5155,6 +5254,8 @@ export function App() {
           }}
         />
       ) : null}
+
+      {surface === "question-bank" ? <QuestionEditorPanel questionBank={questionBank} /> : null}
 
       {surface === "archives" ? <ArchivesPanel /> : null}
 
@@ -5226,12 +5327,15 @@ export function App() {
                 snapshot={competition}
                 presentation={drawPresentation}
                 settings={audienceSettings}
+                participantType={participantType}
               />
             </AudienceSceneTransition>
           )}
         </AudienceBroadcastFrame>
         )
       ) : null}
+
+      {surface === "archive-report" ? <ArchivedResultsReport /> : null}
 
       {surface === "report" ? (
         <OfficialResultsReport
@@ -5246,7 +5350,7 @@ export function App() {
         <>
           <PresentationControlPanel settings={audienceSettings} />
           <OperationsPreflightPanel />
-          <OperatorLivePanel snapshot={liveSnapshot} />
+          <OperatorLivePanel snapshot={liveSnapshot} allocation={questionAllocation} />
           <StationAccessPanel />
         </>
       ) : null}
@@ -5279,7 +5383,9 @@ export function App() {
       ) : null}
 
       {surface !== "setup" &&
+      surface !== "question-bank" &&
       surface !== "archives" &&
+      surface !== "archive-report" &&
       surface !== "draw" &&
       surface !== "operator" &&
       surface !== "display" &&

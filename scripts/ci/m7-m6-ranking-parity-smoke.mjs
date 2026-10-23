@@ -104,7 +104,7 @@ try {
     );
     assert.equal(db.prepare(
       "SELECT value FROM app_meta WHERE key='schema_version'",
-    ).get().value,"16");
+    ).get().value,"17");
     assert.deepEqual(db.pragma("foreign_key_check"),[]);
   } finally {
     db.close();

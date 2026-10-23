@@ -6,10 +6,15 @@ import { getCompetitionSnapshot } from "./competition.js";
 import { getQualificationRanking } from "./ranking.js";
 import { getAudienceDisplaySettings } from "./audience-settings.js";
 import { getQuestionBankSummary } from "./importer.js";
+import { createDatabaseBackup } from "./operations.js";
 
 const createSchema = z.object({
   title: z.string().trim().min(1).max(180),
 });
+const archiveDeleteSchema = z.object({
+  confirm: z.literal("DELETE_ARCHIVE"),
+  title: z.string(),
+}).strict();
 
 // Explicit allowlist: station access tokens and process settings are NOT archived.
 // Historical images (BLOBs) are encoded losslessly for JSON export.
@@ -99,6 +104,13 @@ export function saveCompetitionArchive(db: AppDatabase, title: string) {
 
     const id = randomUUID();
     const archivedAt = new Date().toISOString();
+    // New archives carry the entrant label as it was when archived.
+    // Old archives without this metadata print a neutral "participant" label.
+    const currentType = db.prepare(`
+      SELECT participant_type AS participantType
+      FROM competition_workspaces
+      WHERE id = (SELECT value FROM app_meta WHERE key='active_workspace_id')
+    `).get() as { participantType: string } | undefined;
     const snapshot = {
       competition: getCompetitionSnapshot(db),
       ranking: getQualificationRanking(db),
@@ -116,6 +128,7 @@ export function saveCompetitionArchive(db: AppDatabase, title: string) {
       id,
       title: title,
       archivedAt,
+      participantType: currentType?.participantType ?? null,
       snapshot,
       tables,
     });
@@ -145,6 +158,7 @@ export function saveCompetitionArchive(db: AppDatabase, title: string) {
 export function registerCompetitionArchiveRoutes(
   app: FastifyInstance,
   db: AppDatabase,
+  databasePath?: string,
 ) {
   app.get("/api/archives", async () => ({ archives: listArchives(db) }));
 
@@ -169,6 +183,46 @@ export function registerCompetitionArchiveRoutes(
     return reply.code(201).send({ archive });
   });
 
+  // Editing an archive changes ONLY its human-readable title.
+  // Score snapshots, logos, question history and recorded times stay immutable.
+  app.patch<{ Params: { id: string } }>("/api/archives/:id", async (request, reply) => {
+    const body = createSchema.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "INVALID_ARCHIVE_TITLE" });
+    const row = findArchive(db, request.params.id);
+    if (!row) return reply.code(404).send({ error: "ARCHIVE_NOT_FOUND" });
+    try {
+      db.transaction(() => {
+        const data = JSON.parse(row.payloadJson) as Record<string, unknown>;
+        data.title = body.data.title;
+        db.prepare("UPDATE competition_archives SET title=?, payload_json=? WHERE id=?")
+          .run(body.data.title, JSON.stringify(data), row.id);
+      })();
+    } catch {
+      return reply.code(409).send({ error: "ARCHIVE_PAYLOAD_INVALID" });
+    }
+    return { archive: listArchives(db).find(entry=>entry.id===row.id) };
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/archives/:id", async (request, reply) => {
+    const body = archiveDeleteSchema.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "ARCHIVE_DELETE_CONFIRMATION_REQUIRED" });
+    const row = findArchive(db, request.params.id);
+    if (!row) return reply.code(404).send({ error: "ARCHIVE_NOT_FOUND" });
+    if (body.data.title !== row.title)
+      return reply.code(409).send({ error: "ARCHIVE_DELETE_TITLE_MISMATCH" });
+    if (!databasePath) return reply.code(503).send({ error: "ARCHIVE_BACKUP_UNAVAILABLE" });
+    try {
+      createDatabaseBackup(db, databasePath, "pre-reset");
+    } catch (error) {
+      return reply.code(500).send({
+        error: "PRE_DELETE_BACKUP_FAILED",
+        message: error instanceof Error ? error.message : "Backup failed",
+      });
+    }
+    db.prepare("DELETE FROM competition_archives WHERE id=?").run(row.id);
+    return { deleted: true, id: row.id };
+  });
+
   app.get<{ Params: { id: string } }>(
     "/api/archives/:id",
     async (request, reply) => {
@@ -177,8 +231,50 @@ export function registerCompetitionArchiveRoutes(
       const { payloadJson, ...metadata } = row;
       const payload = JSON.parse(payloadJson) as {
         snapshot: unknown;
+        participantType?: unknown;
       };
-      return { archive: metadata, snapshot: payload.snapshot };
+      const participantType = ["college", "department", "class", "team"]
+        .includes(String(payload.participantType))
+        ? payload.participantType
+        : null;
+      return { archive: metadata, participantType, snapshot: payload.snapshot };
+    },
+  );
+
+  // Serve the logos stored INSIDE this archive, not the currently active
+  // event's mutable /api/audience/assets/* endpoints. The operator session
+  // protects both the archived JSON and its media.
+  app.get<{ Params: { id: string; slot: string } }>(
+    "/api/archives/:id/assets/:slot",
+    async (request, reply) => {
+      if (request.params.slot !== "university" && request.params.slot !== "department")
+        return reply.code(404).send({ error: "ARCHIVE_ASSET_NOT_FOUND" });
+      const row = findArchive(db, request.params.id);
+      if (!row) return reply.code(404).send({ error: "ARCHIVE_NOT_FOUND" });
+      const payload = JSON.parse(row.payloadJson) as {
+        tables?: {
+          audience_assets?: Array<{
+            slot?: string;
+            mime_type?: string;
+            bytes?: { kind?: string; data?: string };
+          }>;
+        };
+      };
+      const found = payload.tables?.audience_assets?.find(
+        asset => asset.slot === request.params.slot,
+      );
+      if (!found) return reply.code(404).send({ error: "ARCHIVE_ASSET_NOT_FOUND" });
+      if (!["image/png", "image/jpeg", "image/webp"].includes(found.mime_type ?? "") ||
+          found.bytes?.kind !== "base64-blob" ||
+          typeof found.bytes.data !== "string" ||
+          found.bytes.data.length > 12_000_000 ||
+          !/^[A-Za-z0-9+/]*={0,2}$/.test(found.bytes.data)) {
+        return reply.code(422).send({ error: "ARCHIVE_ASSET_INVALID" });
+      }
+      return reply
+        .header("cache-control", "private, no-store")
+        .type(found.mime_type!)
+        .send(Buffer.from(found.bytes.data, "base64"));
     },
   );
 

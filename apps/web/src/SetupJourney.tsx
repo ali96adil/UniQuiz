@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   SETUP_STEP_IDS,
+  RANKED_DUEL_MODE,
   getSetupJourney,
   type CompetitionSetupSnapshot,
   type QuestionAllocationSummary,
@@ -56,11 +57,12 @@ export function SetupJourney({
       <section className="setup-journey-head" aria-label="مراحل إعداد المسابقة">
         <div className="setup-journey-headline">
           <div>
-            <p className="eyebrow">UniQuiz · Competition Setup</p>
-            <h2>إعداد البطولة خطوة بخطوة</h2>
+            <p className="eyebrow">UniQuiz · Mode 01 · {RANKED_DUEL_MODE.labelEn}</p>
+            <h2>إعداد مسابقة «{RANKED_DUEL_MODE.labelAr}»</h2>
             <p className="muted">
               كل مرحلة تحفظ إعداداتها داخل المسابقة الحالية. تگدر تنتقل بين المراحل
               بأي وقت، ومراجعة الجاهزية النهائية قبل بدء التشغيل.
+              النمط الحالي ثابت؛ نوع المتنافسين وطريقة احتساب النقاط إعدادات داخل هذا النمط، مو أنماط لعب أخرى.
             </p>
           </div>
           <div className="setup-journey-head-actions">
@@ -110,7 +112,7 @@ export function SetupJourney({
           ))}
         </div>
         <p className="setup-journey-progress">
-          {progress.completedCount} من 4 مراحل إعداد مكتملة. فحص الجاهزية التشغيلية مستقل
+          {progress.completedCount} من {SETUP_STEP_IDS.length - 1} مراحل إعداد مكتملة. فحص الجاهزية التشغيلية مستقل
           ولا يُعتبر ناجحاً إلا بعد ظهور READY في الفحص الفعلي.
         </p>
       </section>

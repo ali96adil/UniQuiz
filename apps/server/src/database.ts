@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 import Database from "better-sqlite3";
 
-const CURRENT_SCHEMA_VERSION = 16;
+const CURRENT_SCHEMA_VERSION = 17;
 
 /**
  * M7 migrations affect table checks and add competition/workspace metadata.
@@ -170,7 +170,9 @@ export function openDatabase(databasePath: string) {
       correct_points INTEGER NOT NULL DEFAULT 25
         CHECK (correct_points BETWEEN 1 AND 1000),
       points_lost_per_second INTEGER NOT NULL DEFAULT 1
-        CHECK (points_lost_per_second BETWEEN 0 AND 100)
+        CHECK (points_lost_per_second BETWEEN 0 AND 100),
+      difficulty_mode TEXT NOT NULL DEFAULT 'random'
+        CHECK (difficulty_mode IN ('random', 'ascending'))
     );
     INSERT INTO competition_gameplay_rules (
       id, duration_seconds, scoring_mode, correct_points, points_lost_per_second
@@ -186,6 +188,8 @@ export function openDatabase(databasePath: string) {
       option_d TEXT NOT NULL,
       correct_option TEXT NOT NULL
         CHECK (correct_option IN ('A', 'B', 'C', 'D')),
+      difficulty INTEGER NOT NULL DEFAULT 3
+        CHECK (difficulty BETWEEN 1 AND 5),
       source_ref TEXT UNIQUE,
       active INTEGER NOT NULL DEFAULT 1
         CHECK (active IN (0, 1)),
@@ -478,6 +482,18 @@ export function openDatabase(databasePath: string) {
     db.exec("ALTER TABLE categories ADD COLUMN display_name TEXT");
   }
 
+  // Additive M7.7 metadata: historical M6 questions remain untouched and
+  // unclassified questions read as level 3. Older workspaces retain random
+  // question ordering; only newly created workspaces default to ascending.
+  const questionColumns = db.pragma("table_info(questions)") as Array<{ name: string }>;
+  if (!questionColumns.some((column) => column.name === "difficulty")) {
+    db.exec("ALTER TABLE questions ADD COLUMN difficulty INTEGER NOT NULL DEFAULT 3 CHECK (difficulty BETWEEN 1 AND 5)");
+  }
+  const gameplayColumns = db.pragma("table_info(competition_gameplay_rules)") as Array<{ name: string }>;
+  if (!gameplayColumns.some((column) => column.name === "difficulty_mode")) {
+    db.exec("ALTER TABLE competition_gameplay_rules ADD COLUMN difficulty_mode TEXT NOT NULL DEFAULT 'random' CHECK (difficulty_mode IN ('random', 'ascending'))");
+  }
+
   // Migrate old 1..10 constraints transactionally. The original constraints,
   // primary keys, foreign keys, data and indexes are preserved.
   const widenedTables = [
@@ -520,7 +536,7 @@ export function openDatabase(databasePath: string) {
     })();
   }
 
-  db.prepare("UPDATE app_meta SET value = '16' WHERE key = 'schema_version'").run();
+  db.prepare("UPDATE app_meta SET value = '17' WHERE key = 'schema_version'").run();
     })();
   } catch (error) {
     // DDL, data changes and schema_version all roll back as one operation.

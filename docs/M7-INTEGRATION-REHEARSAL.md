@@ -25,6 +25,9 @@ This document applies to the stacked PR sequence:
 until an operator has rehearsed the upgrade on an isolated copy of the actual
 official competition database and recorded the results.
 
+For release review and the required ancestor-preserving merge sequence,
+see [M7 ordered merge runbook](M7-MERGE-RUNBOOK.md).
+
 ## Preservation guarantees
 
 - The existing official database is never the input to a new M7 server while
@@ -113,10 +116,10 @@ with manual rehearsal operations. Do **not** rerun this baseline comparison
 after intentionally editing the rehearsal database; it is designed to detect
 such edits.
 
-Install and validate the reviewed branch before starting its test runtime:
+Install and validate the reviewed branch before starting its test runtime. The current public repository does **not** contain `pnpm-lock.yaml`, so `--frozen-lockfile` would fail; match the GitHub CI install command instead:
 
 ```bash
-pnpm install --frozen-lockfile
+pnpm install --no-frozen-lockfile
 pnpm typecheck
 pnpm test
 pnpm build
@@ -150,8 +153,13 @@ pnpm --filter @uniquiz/web dev -- --host 127.0.0.1 --port 5174
 ```
 
 Open `http://127.0.0.1:5174/setup` only on the rehearsal Mac.
-This API points to the **copy**. Never place the rehearsal server or UI on
-`0.0.0.0` during an actual event.
+The same `UNIQUIZ_API_PROXY_TARGET` is now applied to `/api`, `/health`
+and `/socket.io` (including WebSockets). The CI rehearsal-proxy
+regression checks this route isolation because a mistaken hardcoded default
+could otherwise send operator writes to a concurrently running official
+server. Verify `curl http://127.0.0.1:5174/health` reports
+`"mode":"rehearsal"` before opening an operator window.
+Never place the rehearsal server or UI on `0.0.0.0` during an actual event.
 
 ## Workspace-specific event-day verification
 
@@ -382,3 +390,104 @@ schema backup fails, or switching causes partial data restoration. When all
 checks pass, merge the **stacked PRs in dependency order** into `main` only
 after explicit release approval. Deployment to the actual tournament Mac is
 a separate, explicitly authorized action.
+
+## One-command Mac offline migration audit (M7.7 / schema v17)
+
+After running `pnpm install --no-frozen-lockfile` and `pnpm build`, the operator
+can audit the real 2026 source database without starting any UniQuiz server:
+
+```bash
+export UNIQUIZ_OFFICIAL_SOURCE="/ACTUAL/ABSOLUTE/PATH/TO/uniquiz.db"
+node scripts/m7-mac-offline-audit.mjs --source "$UNIQUIZ_OFFICIAL_SOURCE"
+```
+
+The tool creates a new private folder in `$HOME/UniQuiz-M7-Rehearsal`.
+It refuses a folder containing the source. The original is opened *only* by
+the read-only WAL-aware SQLite copier. Before migration it captures a
+read-only fingerprint manifest and the actual M6 ranking using pinned SQL.
+It runs the normal database schema v17 migration on the COPY and checks
+original rows, scores, tie-break time, correct/wrong counts, source rank order,
+SQLite integrity, foreign keys, and a physical pre-migration backup.
+It writes `report-private.json` without participant names or question text.
+
+Expected result is `M7_MAC_OFFLINE_AUDIT_OK` with the private folder path.
+Anything else is a release blocker. The command explicitly requires the
+original M6 schema version **12**; any other schema version is rejected
+instead of guessing historical ranking rules.
+
+**Do not upload** the copied SQLite DB, private manifest or report.
+This is only an offline migration/ranking acceptance check. It does not
+certify real Windows station timing, operator controls, visual screens, OSC
+hardware or recovery; complete the manual Mac rehearsal separately.
+
+CI runs the identical entrypoint on a synthetic M6/v12 fixture with
+`node scripts/ci/m7-mac-audit-smoke.mjs` (no user data).
+
+## M7 tournament and historical archive management
+
+"إدارة المسابقات" workspaces are editable via **تعديل الاسم والنوع**. To
+delete an OLD workspace, first activate a different workspace. The active
+workspace and the original protected `legacy` (2026) workspace cannot be
+deleted. A delete requires the exact competition name and a second confirmation,
+followed by a physically verified `pre-reset` SQLite backup **before** the
+transaction deletes the inactive workspace. The central bank, other workspaces,
+and independent historical archives are never deleted.
+
+"أرشيف المسابقات" is an independent, immutable historical snapshot.
+`تعديل العنوان` changes only archive metadata and top-level export title,
+not the event title, score totals, ranking or stored questions/media.
+`حذف الأرشيف` is explicitly destructive: export the JSON first, enter its
+exact title, confirm again and require a verified pre-delete SQLite backup.
+The procedure is intentionally separate from workspace deletion.
+
+**Warning:** backups live next to the isolated database, not in a public
+repository. Deleting an inactive workspace that has results without an
+independent archive removes the easy UI access to those results. Export or
+archive the results FIRST; restoration requires a separate verified backup
+restore procedure. These features are **draft** and must be rehearsed on the
+private copy before applying to the official event.
+
+## PDF results for a completed historical competition
+
+On `/archives`, each saved archive now has **تصدير النتائج PDF**.
+This opens `/archives/<archive-id>/report?print=1` in a separate operator
+tab and uses the **same A4 print stylesheet** as the official `/report`
+screen: archived event title, the saved logo assets, patronage lines,
+podium, every saved rank and entrant, score, total time in seconds
+(three decimal places), correct and incorrect answer counts, footer,
+archive timestamp and statement issue timestamp. The user chooses
+**Save as PDF** from the browser's print destination (Safari or Chrome).
+The operation does not create a new archive, change official results or
+ask the server to regenerate ranking.
+
+The report is based on the archived `snapshot.ranking` and
+`snapshot.audienceSettings`, **never** on live `/api/ranking`.
+Archive logo endpoints read the stored BLOBs instead of
+`/api/audience/assets/*` from the currently active tournament. Archive
+payloads saved before the participant-type metadata was added use the
+neutral label "المشارك" instead of guessing "كلية".
+
+**نسخة احتياطية JSON** remains available separately for lossless event
+data, reprocessing, and future recovery workflows. JSON is not a document
+for presenting rankings; PDF is the human-readable signed/printed artifact.
+Keep JSON if the goal includes preserving a complete copy for future reuse.
+
+## Mode 01 release identity — Ranked Duel / المواجهة بالنقاط
+
+M7 currently implements ONE game mode only: **المواجهة بالنقاط (Ranked Duel, Mode 01)**.
+Two competing answer stations receive the same questions, accumulate point
+scores and total response time across rounds, and are ranked without knockout
+elimination. Solo/byes remain supported within Ranked Duel.
+
+The setup header, workspace creation and existing-workspace cards, navigation,
+and historical archive list display a single `RANKED_DUEL_MODE` identity
+exported from `@uniquiz/shared`. **No mode dropdown is introduced.**
+The four participant types (college, department, class and team) and the
+time-decay/fixed scoring options are editable properties of this ONE mode,
+not distinct game modes. Existing 2026/legacy archives are labeled as this
+mode on the client **without adding or rewriting schema columns or prior
+records**; historical ranks/scores/answers/timings remain untouched.
+
+If additional game modes are introduced later, they require independent
+schema, rules, test and migration review under the separate future-mode
+issue; the current implicit legacy mapping must remain backward compatible.

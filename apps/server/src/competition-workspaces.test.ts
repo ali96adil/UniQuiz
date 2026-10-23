@@ -81,7 +81,7 @@ test("M7.2 keeps results and sponsorship isolated while retaining the shared que
     assert.equal((db.prepare("SELECT event_title AS title FROM audience_settings").get() as {title:string}).title,"جامعة بابل 2026");
     assert.equal(getCompetitionRules(db).questionsPerRound,12);
     assert.equal(getRoundRules(db,1).questionsPerRound,5);
-    assert.deepEqual(getCompetitionGameplayRules(db), { durationSeconds:40,scoringMode:"fixed",correctPoints:10,pointsLostPerSecond:0 });
+    assert.deepEqual(getCompetitionGameplayRules(db), { durationSeconds:40,scoringMode:"fixed",correctPoints:10,pointsLostPerSecond:0,difficultyMode:"random" });
     assert.deepEqual((db.prepare("SELECT bytes FROM audience_assets").get() as {bytes:Buffer}).bytes,logo);
     assert.deepEqual(db.pragma("foreign_key_check"),[]);
 
@@ -186,4 +186,56 @@ test("M7.4 safely loads M7.2 workspaces without the new round-rule table", () =>
     assert.equal(activeWorkspaceId(db),oldWorkspace.id);
     assert.deepEqual(db.prepare("SELECT * FROM qualification_round_rules").all(),[]);
   } finally { db.close(); }
+});
+
+test("M7 workspace deletion blocks active/legacy, requires exact name, backs up before deleting and keeps archive + bank", async () => {
+  const root = mkdtempSync(join(tmpdir(),"uniquiz-m7-delete-workspace-"));
+  const path = join(root,"workspace.db");
+  const db = openDatabase(path);
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  const live = new LiveSessionManager(db,io);
+  try {
+    db.exec(`
+      INSERT INTO categories(category_key,name,sort_order)
+      VALUES('geography','Geography',1);
+      INSERT INTO questions(category_id,prompt,option_a,option_b,option_c,option_d,correct_option)
+      VALUES(1,'Historic geography?','A','B','C','D','A');
+      INSERT INTO competition_archives(id,title,archived_at,participant_count,round_count,question_count,payload_json)
+      VALUES('arch-2026','Official 2026',CURRENT_TIMESTAMP,19,10,100,'{"rank":"saved"}');
+    `);
+    const old = createCompetitionWorkspace(db,"Old Tournament","team");
+    const active = createCompetitionWorkspace(db,"Current Tournament","department");
+    activateCompetitionWorkspace(db, active.id);
+    registerCompetitionWorkspaceRoutes(app,db,io,live,path);
+    await app.ready();
+    async function remove(id: string,name: string,confirm = "DELETE_COMPETITION") {
+      return app.inject({method:"DELETE",url:"/api/competitions/"+id,
+        payload:{confirm,name}});
+    }
+    const cannotActive=await remove(active.id,"Current Tournament");
+    assert.equal(cannotActive.statusCode,409);
+    assert.equal(cannotActive.json().error,"ACTIVE_WORKSPACE_CANNOT_BE_DELETED");
+    const cannotLegacy=await remove("legacy","Old official");
+    assert.equal(cannotLegacy.statusCode,409);
+    assert.equal(cannotLegacy.json().error,"LEGACY_WORKSPACE_PROTECTED");
+    assert.equal((await remove(old.id,"Wrong Name")).statusCode,409);
+    assert.equal((await remove(old.id,"Old Tournament","NO")).statusCode,400);
+    assert.equal(existsSync(join(root,"backups")),false,
+      "Invalid confirmations must not create any backup directory");
+    const ok=await remove(old.id,"Old Tournament");
+    assert.equal(ok.statusCode,200,ok.body);
+    assert.equal(ok.json().deleted,true);
+    assert.equal(activeWorkspaceId(db),active.id);
+    assert.equal(listCompetitionWorkspaces(db).length,2,"Only inactive old workspace was deleted");
+    assert.equal((db.prepare("SELECT COUNT(*) AS n FROM competition_archives").get() as {n:number}).n,1);
+    assert.equal((db.prepare("SELECT COUNT(*) AS n FROM questions").get() as {n:number}).n,1);
+    const files = readdirSync(join(root,"backups"));
+    assert.equal(files.filter(x=>x.includes("pre-reset") && x.endsWith(".db")).length,1);
+    assert.equal(files.filter(x=>x.includes("pre-reset") && x.endsWith(".db.json")).length,1);
+    assert.equal((await remove(old.id,"Old Tournament")).statusCode,404);
+  } finally {
+    live.dispose();io.close();await app.close();db.close();
+    rmSync(root,{recursive:true,force:true});
+  }
 });

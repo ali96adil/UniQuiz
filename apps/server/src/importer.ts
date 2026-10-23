@@ -39,6 +39,7 @@ interface ImportedQuestion {
   optionC: string;
   optionD: string;
   correctOption: "A" | "B" | "C" | "D";
+  difficulty: number;
   sourceRef: string | null;
 }
 
@@ -212,16 +213,6 @@ function validateQuestions(
   const prompts = new Set<string>();
   const sourceRefs = new Set<string>();
 
-  if (records.some((record) => Object.hasOwn(record, "difficulty"))) {
-    issue(
-      issues,
-      "error",
-      sheet,
-      null,
-      "difficulty is not supported. All official questions have one level.",
-    );
-  }
-
   records.forEach((record, index) => {
     const row = index + 2;
     const categoryReference = text(record.category_key);
@@ -238,6 +229,12 @@ function validateQuestions(
     const optionD = text(record.option_d);
     const correctOption = text(record.correct_option).toUpperCase();
     const sourceRef = text(record.source_ref) || null;
+    const difficultyText = text(record.difficulty);
+    const difficulty = difficultyText === "" ? 3 : Number(difficultyText);
+    if (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 5) {
+      issue(issues, "error", sheet, row, "difficulty must be an integer between 1 and 5.");
+      return;
+    }
 
     if (
       !categoryReference ||
@@ -317,6 +314,7 @@ function validateQuestions(
       optionC,
       optionD,
       correctOption: correctOption as "A" | "B" | "C" | "D",
+      difficulty,
       sourceRef,
     });
   });
@@ -474,6 +472,35 @@ function existingQuestionCounts(
   );
 }
 
+interface QuestionImportConflict { row: number; message: string }
+
+function findExistingQuestionConflicts(
+  db: AppDatabase,
+  incoming: readonly ImportedQuestion[],
+): QuestionImportConflict[] {
+  // Import preview fixtures may not have initialized the questions table yet.
+  if (!tableExists(db, "questions")) return [];
+  const existing = db.prepare(
+    "SELECT prompt, source_ref AS sourceRef, active FROM questions",
+  ).all() as Array<{ prompt: string; sourceRef: string | null; active: number }>;
+  const activePrompts = new Set(existing.filter((q) => q.active === 1)
+    .map((q) => normalizeKey(q.prompt)));
+  // The database guarantees global uniqueness of source_ref, including
+  // archived/deactivated rows, so the preview must do the same.
+  const sourceRefs = new Set(existing.filter((q) => q.sourceRef)
+    .map((q) => normalizeKey(q.sourceRef!)));
+  const conflicts: QuestionImportConflict[] = [];
+  for (const [index, question] of incoming.entries()) {
+    if (activePrompts.has(normalizeKey(question.question))) {
+      conflicts.push({ row: index + 2, message: "Question already exists in the active bank; import only new questions." });
+    }
+    if (question.sourceRef && sourceRefs.has(normalizeKey(question.sourceRef))) {
+      conflicts.push({ row: index + 2, message: "source_ref is already used by an existing question." });
+    }
+  }
+  return conflicts;
+}
+
 function qualificationRequiredPerCategory(
   db: AppDatabase,
 ): Map<string, number> {
@@ -606,6 +633,9 @@ export async function parseImportBuffer(
     : null;
 
   if (questions) {
+    for (const conflict of findExistingQuestionConflicts(db, questions)) {
+      issue(issues, "error", "Questions", conflict.row, conflict.message);
+    }
     const importedCounts = new Map<string, number>();
     for (const question of questions) {
       const key = normalizeKey(question.categoryKey);
@@ -737,6 +767,7 @@ async function sendTemplate(reply: FastifyReply) {
     "option_c",
     "option_d",
     "correct_option",
+    "difficulty",
     "source_ref",
   ]);
 
@@ -795,6 +826,7 @@ async function sendSampleWorkbook(reply: FastifyReply) {
     "option_c",
     "option_d",
     "correct_option",
+    "difficulty",
     "source_ref",
   ]);
 
@@ -810,6 +842,7 @@ async function sendSampleWorkbook(reply: FastifyReply) {
         `الخيار C-${index}`,
         `الخيار D-${index}`,
         correctOptions[(index - 1) % correctOptions.length],
+        ((index - 1) % 5) + 1,
         "",
       ]);
     }
@@ -890,6 +923,7 @@ async function sendExport(
     "option_c",
     "option_d",
     "correct_option",
+    "difficulty",
     "source_ref",
   ]);
 
@@ -902,6 +936,7 @@ async function sendExport(
       q.option_c AS optionC,
       q.option_d AS optionD,
       q.correct_option AS correctOption,
+      q.difficulty AS difficulty,
       q.source_ref AS sourceRef
     FROM questions q
     JOIN categories c ON c.id = q.category_id
@@ -915,6 +950,7 @@ async function sendExport(
     optionC: string;
     optionD: string;
     correctOption: string;
+    difficulty: number;
     sourceRef: string | null;
   }>;
 
@@ -927,6 +963,7 @@ async function sendExport(
       question.optionC,
       question.optionD,
       question.correctOption,
+      question.difficulty,
       question.sourceRef ?? "",
     ]);
   }
@@ -1049,6 +1086,13 @@ export function registerImportRoutes(
     void parsedBody.data.questionMode;
 
     const apply = db.transaction(() => {
+      // Stage previews expire after 30 minutes; the bank could have changed
+      // between Preview and Apply. Re-check *inside* the write transaction,
+      // so no partial categories/questions/participants can be committed.
+      if (staged.parsed.questions &&
+          findExistingQuestionConflicts(db, staged.parsed.questions).length > 0) {
+        throw new Error("QUESTION_IMPORT_CONFLICT");
+      }
       if (staged.parsed.colleges) {
         db.prepare("DELETE FROM participants").run();
         db.prepare("DELETE FROM colleges").run();
@@ -1108,9 +1152,10 @@ export function registerImportRoutes(
             option_c,
             option_d,
             correct_option,
+            difficulty,
             source_ref
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         for (const question of staged.parsed.questions) {
@@ -1132,13 +1177,22 @@ export function registerImportRoutes(
             question.optionC,
             question.optionD,
             question.correctOption,
+            question.difficulty,
             question.sourceRef,
           );
         }
       }
     });
 
-    apply();
+    try {
+      apply();
+    } catch (error) {
+      return reply.code(409).send({
+        error: error instanceof Error && error.message === "QUESTION_IMPORT_CONFLICT"
+          ? "QUESTION_IMPORT_CONFLICT" : "IMPORT_APPLY_FAILED",
+        message: "تعذّر تطبيق الاستيراد. لم يُحفَظ أي جزء منه؛ راجع الأسئلة والمحاور ثم أعد المعاينة.",
+      });
+    }
     previews.delete(parsedBody.data.previewId);
 
     if (staged.parsed.colleges) {

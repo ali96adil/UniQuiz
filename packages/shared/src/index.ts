@@ -122,6 +122,7 @@ export interface QuestionAllocationCategorySummary {
   availableQuestions: number;
   requiredQuestions: number;
   quotaPerRound: number;
+  difficultyCounts?: Record<number, number>;
 }
 
 export interface RoundQuestionSetSummary {
@@ -139,6 +140,7 @@ export interface QuestionAllocationSummary {
   roundCount: number;
   questionsPerRound: number;
   requiredPerCategory: number;
+  difficultyWarnings?: string[];
   ready: boolean;
   categories: QuestionAllocationCategorySummary[];
   rounds: RoundQuestionSetSummary[];
@@ -149,6 +151,7 @@ export interface CompetitionGameplayRules {
   scoringMode: "time_decay" | "fixed";
   correctPoints: number;
   pointsLostPerSecond: number;
+  difficultyMode?: "random" | "ascending";
 }
 
 export type LivePhase =
@@ -429,4 +432,20 @@ export interface OperationsDiagnosticsSnapshot {
 }
 
 export { SETUP_STEP_IDS, getSetupJourney } from "./setup-journey.js";
+export { RANKED_DUEL_MODE } from "./game-mode.js";
 export type { SetupJourneyState, SetupStep, SetupStepId, SetupStepStatus } from "./setup-journey.js";
+
+/** The database retains historic college names even for newer participant types.
+ * Only unmodified built-in text adapts; operator-customized copy is preserved. */
+export type AudienceParticipantKind = "college" | "department" | "class" | "team";
+export function participantAwareAudienceText(text: string, type: AudienceParticipantKind): string {
+  if (type === "college") return text;
+  const words = {
+    department: { waiting: "بانتظار تثبيت الأقسام المشاركة", count: "{count} قسم مشارك" },
+    class: { waiting: "بانتظار تثبيت الشعب المشاركة", count: "{count} شعبة مشاركة" },
+    team: { waiting: "بانتظار تثبيت الفرق المشاركة", count: "{count} فريق مشارك" },
+  }[type];
+  if (text === "بانتظار تثبيت الكليات المشاركة") return words.waiting;
+  if (text === "{count} كلية مشاركة") return words.count;
+  return text;
+}

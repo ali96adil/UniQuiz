@@ -15,7 +15,7 @@ test("M7.5 preserves original 25-second countdown scoring exactly", () => {
   try {
     assert.deepEqual(getCompetitionGameplayRules(db), {
       durationSeconds: 25, scoringMode: "time_decay",
-      correctPoints: 25, pointsLostPerSecond: 1,
+      correctPoints: 25, pointsLostPerSecond: 1, difficultyMode: "random",
     });
     assert.equal(scoreMicrosToPoints(calculateScoreMicros(true, 0)), 25);
     assert.equal(scoreMicrosToPoints(calculateScoreMicros(true, 999)), 25);
@@ -69,10 +69,10 @@ test("M7.5 validates gameplay API and locks scoring rules once competition start
     };
     const save = await app.inject({method:"PUT",url:"/api/competition/gameplay",payload:rules});
     assert.equal(save.statusCode,200,save.body);
-    assert.deepEqual(getCompetitionGameplayRules(db),rules);
+    assert.deepEqual(getCompetitionGameplayRules(db),{...rules,difficultyMode:"random"});
     const read = await app.inject({method:"GET",url:"/api/competition/gameplay"});
     assert.equal(read.statusCode,200);
-    assert.deepEqual(read.json(),rules);
+    assert.deepEqual(read.json(),{...rules,difficultyMode:"random"});
     for (const payload of [
       {...rules,durationSeconds:4},
       {...rules,durationSeconds:301},
@@ -92,7 +92,7 @@ test("M7.5 validates gameplay API and locks scoring rules once competition start
       payload:{...rules,scoringMode:"fixed"},
     });
     assert.equal(blocked.statusCode,409);
-    assert.deepEqual(getCompetitionGameplayRules(db),rules);
+    assert.deepEqual(getCompetitionGameplayRules(db),{...rules,difficultyMode:"random"});
   } finally {
     io.close();
     await app.close();
@@ -156,5 +156,29 @@ test("M7.5 live session and ranking use configured 40-second timeout", async () 
     io.close();
     await app.close();
     db.close();
+  }
+});
+
+test("M7.7 difficulty/score settings freeze as soon as a round's questions are allocated", async () => {
+  const db = openDatabase(":memory:");
+  const app = Fastify();
+  const io = new SocketIOServer(app.server);
+  try {
+    registerQuestionBankRoutes(app, db, io);
+    await app.ready();
+    db.exec(`
+      INSERT INTO colleges(name,sort_order) VALUES ('A',1);
+      INSERT INTO qualification_rounds(round_order,college_a_id,status) VALUES(1,1,'PENDING');
+      INSERT INTO qualification_round_question_sets(round_id,locked_at) VALUES(1,CURRENT_TIMESTAMP);
+    `);
+    const before = getCompetitionGameplayRules(db);
+    const response = await app.inject({ method:"PUT", url:"/api/competition/gameplay", payload:{
+      durationSeconds: 40, scoringMode:"fixed", correctPoints: 10,
+      pointsLostPerSecond: 0, difficultyMode:"ascending",
+    }});
+    assert.equal(response.statusCode, 409, response.body);
+    assert.deepEqual(getCompetitionGameplayRules(db), before);
+  } finally {
+    io.close(); await app.close(); db.close();
   }
 });

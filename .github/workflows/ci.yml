@@ -38,6 +38,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Ensure rehearsal UI HTTP and WebSocket use only isolated API
+        run: node scripts/ci/m7-rehearsal-proxy-smoke.mjs
+
       - name: Test
         run: pnpm test
 
@@ -61,6 +64,9 @@ jobs:
 
       - name: Compare pre-upgrade M6 and post-upgrade M7 ranking exactly
         run: node scripts/ci/m7-m6-ranking-parity-smoke.mjs
+
+      - name: Verify Mac offline audit entrypoint on pinned M6 schema
+        run: node scripts/ci/m7-mac-audit-smoke.mjs
 
       - name: Server, realtime and M2 persistence smoke test
         shell: bash

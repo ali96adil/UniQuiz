@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
 import { openDatabase } from "./database.js";
-import { ensureStationCredentials, registerStationAuthRoutes } from "./station-auth.js";
+import { ensureStationCredentials, registerStationAuthRoutes, validateStationToken } from "./station-auth.js";
 import { createOperatorAuth } from "./operator-auth.js";
 
 const PASSWORD = "ci-offline-test-password-very-long";
@@ -119,4 +119,48 @@ test("M7 operator auth rate-limits brute force and never accepts station tokens 
   } finally {
     await app.close();db.close();
   }
+});
+
+
+test("6-digit station pairing is operator-issued, one-use, scoped, and rate-limited", async () => {
+  const db=openDatabase(":memory:");
+  ensureStationCredentials(db);
+  const app=Fastify();
+  createOperatorAuth(PASSWORD).register(app);
+  registerStationAuthRoutes(app,db);
+  try {
+    const unauthorized=await app.inject({method:"POST",url:"/api/stations/a/pairing-code",payload:{}});
+    assert.equal(unauthorized.statusCode,401);
+    const login=await app.inject({method:"POST",url:"/api/auth/login",payload:{password:PASSWORD}});
+    const cookie=(login.headers["set-cookie"] as string).split(";")[0]!;
+    const issue=await app.inject({
+      method:"POST",url:"/api/stations/a/pairing-code",headers:{cookie},payload:{},
+    });
+    assert.equal(issue.statusCode,200,issue.body);
+    const code=issue.json().code as string;
+    assert.match(code,/^\d{6}$/);
+    const mismatch=await app.inject({
+      method:"POST",url:"/api/stations/enroll",payload:{station:"B",code},
+    });
+    assert.equal(mismatch.statusCode,401);
+    const valid=await app.inject({
+      method:"POST",url:"/api/stations/enroll",payload:{station:"A",code},
+    });
+    assert.equal(valid.statusCode,200,valid.body);
+    assert.equal(validateStationToken(db,"A",valid.json().token),true);
+    assert.equal(validateStationToken(db,"B",valid.json().token),false);
+    const replay=await app.inject({
+      method:"POST",url:"/api/stations/enroll",payload:{station:"A",code},
+    });
+    assert.equal(replay.statusCode,401);
+    for(let i=0;i<4;i++) {
+      const wrong=await app.inject({method:"POST",url:"/api/stations/enroll",
+        payload:{station:"A",code:"999999"===code?"888888":"999999"}});
+      assert.equal(wrong.statusCode,401);
+    }
+    assert.equal((await app.inject({method:"POST",url:"/api/stations/enroll",
+      payload:{station:"A",code}})).statusCode,429);
+    // A new code cannot be brute-forced by repeatedly reissuing codes.
+    assert.equal((await app.inject({method:"GET",url:"/api/stations/credentials"})).statusCode,401);
+  } finally { await app.close();db.close(); }
 });

@@ -28,6 +28,10 @@ const inputSchema = z.object({
   participantType: z.enum(["college", "department", "class", "team"]).default("college"),
 });
 const patchSchema = inputSchema.partial().refine((value) => Object.keys(value).length > 0);
+const deleteWorkspaceSchema = z.object({
+  confirm: z.literal("DELETE_COMPETITION"),
+  name: z.string(),
+}).strict();
 
 // These are the only event-scoped data tables. All questions and categories
 // remain in the central library, shared across workspaces.
@@ -96,7 +100,7 @@ function emptySnapshot(
     id: 1, participants_locked: 0, draw_created_at: null, selected_round_id: null,
   }];
   saved.competition_rules = [{ id: 1, distribution_json: null }];
-  saved.competition_gameplay_rules = [{ id: 1, duration_seconds: 25, scoring_mode: "time_decay", correct_points: 25, points_lost_per_second: 1 }];
+  saved.competition_gameplay_rules = [{ id: 1, duration_seconds: 25, scoring_mode: "time_decay", correct_points: 25, points_lost_per_second: 1, difficulty_mode: "ascending" }];
   saved.live_state = [{
     id: 1, phase: "IDLE", round_id: null, question_position: null,
     stations_confirmed: 0, countdown_started_at_epoch_ms: null,
@@ -311,6 +315,24 @@ export function renameCompetitionWorkspace(
   return listCompetitionWorkspaces(db).find((item) => item.id === id)!;
 }
 
+/**
+ * Only non-active, non-legacy workspaces can be removed.
+ * Archived history and the shared bank are in different tables and untouched.
+ * Caller must perform a VERIFIED physical SQLite backup first.
+ */
+export function deleteCompetitionWorkspace(db: AppDatabase, id: string, exactName: string): void {
+  db.transaction(() => {
+    if (id === "legacy") throw new Error("LEGACY_WORKSPACE_PROTECTED");
+    if (id === activeWorkspaceId(db)) throw new Error("ACTIVE_WORKSPACE_CANNOT_BE_DELETED");
+    const current = db.prepare("SELECT name FROM competition_workspaces WHERE id=?")
+      .get(id) as { name: string } | undefined;
+    if (!current) throw new Error("WORKSPACE_NOT_FOUND");
+    if (current.name !== exactName) throw new Error("WORKSPACE_DELETE_NAME_MISMATCH");
+    const deleted = db.prepare("DELETE FROM competition_workspaces WHERE id=?").run(id);
+    if (deleted.changes !== 1) throw new Error("WORKSPACE_DELETE_FAILED");
+  })();
+}
+
 export function registerCompetitionWorkspaceRoutes(
   app: FastifyInstance,
   db: AppDatabase,
@@ -362,6 +384,37 @@ export function registerCompetitionWorkspaceRoutes(
       return { competition };
     } catch (error) {
       return reply.code(404).send({ error: error instanceof Error ? error.message : "WORKSPACE_ERROR" });
+    }
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/competitions/:id", async (request, reply) => {
+    const body = deleteWorkspaceSchema.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "WORKSPACE_DELETE_CONFIRMATION_REQUIRED" });
+    const { id } = request.params;
+    const current = listCompetitionWorkspaces(db).find(item => item.id === id);
+    if (!current) return reply.code(404).send({ error: "WORKSPACE_NOT_FOUND" });
+    if (id === "legacy") return reply.code(409).send({ error: "LEGACY_WORKSPACE_PROTECTED" });
+    if (current.active) return reply.code(409).send({ error: "ACTIVE_WORKSPACE_CANNOT_BE_DELETED" });
+    if (body.data.name !== current.name)
+      return reply.code(409).send({ error: "WORKSPACE_DELETE_NAME_MISMATCH" });
+    // Fail closed: a disposable competition may contain results, pictures
+    // and timings. Never delete without a physically verified backup.
+    try {
+      createDatabaseBackup(db, databasePath, "pre-reset");
+    } catch (error) {
+      return reply.code(500).send({
+        error: "PRE_DELETE_BACKUP_FAILED",
+        message: error instanceof Error ? error.message : "Backup failed",
+      });
+    }
+    try {
+      deleteCompetitionWorkspace(db, id, body.data.name);
+      publish();
+      return { deleted: true, id };
+    } catch (error) {
+      return reply.code(409).send({
+        error: error instanceof Error ? error.message : "WORKSPACE_DELETE_FAILED",
+      });
     }
   });
 
