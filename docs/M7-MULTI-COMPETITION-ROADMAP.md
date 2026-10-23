@@ -26,9 +26,9 @@ M7.1 is an additive migration on the `feature/m7-archives-category-display` bran
 
 Introduce `competitions(id, name, status, created_at, archived_at, settings_json)` and explicit `competition_id` on participants, rounds, rounds' questions, live results and sponsor/layout settings. Migrating a legacy active competition must create a dedicated competition record; all original row IDs, responses, timings, and scores remain unchanged. Prefer transactional, tested migration with rollback via backup. The central question bank exists independently.
 
-### M7.3 scoring + allocation
+### M7.3 scoring + allocation (implemented in stacked PR #26; draft)
 
-Persist `questions_per_round`, `round_time_seconds`, scoring strategy, and a per-competition `category_distribution` array (e.g. `[{category_key:'sports_specialist',count:12}]`). Remove all 10-question bounds, 5-category assumptions, and hardcoded 25-second scoring with tests across allocation, scheduler, operator, station, presentation and report. The sports-only/12-question competition must be an acceptance test.
+The active competition now stores selected category quotas in `competition_rules.distribution_json`, e.g. `[{categoryKey:'sports_specialist',questions:12}]`, with the previous 5×2 distribution as the default. The allocator, live transitions, operator hotkeys, station view and public pre-show read the dynamic count. Legacy SQLite `position BETWEEN 1 AND 10` constraints upgrade transactionally while preserving answers and scores. Integration tests cover sports-only 12 questions, no repeats and schema upgrade. **Still pending:** per-round overrides, adjustable question duration and scoring strategy, multiple fully independent active competitions, and reusable participant types.
 
 ### M7.4 themes and reusable layouts
 

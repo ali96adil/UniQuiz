@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArchivesPanel } from "./Archives.js";
 import { CategoryLabelsPanel } from "./CategoryLabels.js";
+import { RoundRulesPanel } from "./RoundRules.js";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -897,8 +898,9 @@ function QuestionAllocationPanel({
 
   const inventoryReady =
     allocation.roundCount > 0 &&
-    allocation.categories.length === 5 &&
-    allocation.categories.every(
+    allocation.questionsPerRound > 0 &&
+    allocation.categories.filter((category) => category.quotaPerRound > 0).length > 0 &&
+    allocation.categories.filter((category) => category.quotaPerRound > 0).every(
       (category) =>
         category.availableQuestions >= category.requiredQuestions,
     );
@@ -932,7 +934,7 @@ function QuestionAllocationPanel({
   const allocate = () => {
     if (
       !window.confirm(
-        "توزيع وقفل 10 أسئلة لكل جولة الآن؟ سيتم استخدام سؤالين من كل محور ولن يتكرر أي سؤال بين الجولات.",
+        `توزيع وقفل ${allocation.questionsPerRound} سؤالاً لكل جولة حسب المحاور المحددة؟ لن يتكرر سؤال بين الجولات.`,
       )
     ) {
       return;
@@ -984,12 +986,12 @@ function QuestionAllocationPanel({
       </div>
 
       <p className="muted">
-        لكل جولة 10 أسئلة: سؤالان من كل واحد من المحاور الخمسة، ومن دون
+        لكل جولة {allocation.questionsPerRound} سؤالاً حسب التوزيع المحدد، ومن دون
         تكرار أي سؤال في جولة أخرى.
       </p>
 
       <div className="allocation-categories">
-        {allocation.categories.map((category) => {
+        {allocation.categories.filter((item) => item.quotaPerRound > 0).map((category) => {
           const enough =
             category.availableQuestions >= category.requiredQuestions;
 
@@ -1031,7 +1033,7 @@ function QuestionAllocationPanel({
             key={round.roundId}
           >
             <strong>جولة {round.roundOrder}</strong>
-            <span>{round.questionCount} / 10 سؤال</span>
+            <span>{round.questionCount} / {allocation.questionsPerRound} سؤال</span>
             <small>
               {round.locked ? "مقفلة" : "غير موزعة"}
             </small>
@@ -1066,7 +1068,7 @@ function QuestionAllocationPanel({
 
       {!inventoryReady && allocation.roundCount > 0 ? (
         <p className="status-message error">
-          بنك الأسئلة غير كافٍ لتوزيع سؤالين من كل محور على كل الجولات
+          بنك الأسئلة غير كافٍ لتوزيع الحصص المحددة للمحاور على كل الجولات
           بدون تكرار.
         </p>
       ) : null}
@@ -2000,7 +2002,7 @@ function AudienceLiveSurface({
           <div>
             <span>{settings.roundLabel} {round.order}</span>
             <strong>
-              {settings.copy.questionLabel} {question?.position ?? "—"} / 10
+              {settings.copy.questionLabel} {question?.position ?? "—"} / {snapshot.questionsPerRound}
             </strong>
           </div>
           <span>{question?.categoryName ?? ""}</span>
@@ -2331,12 +2333,18 @@ function PreShowTopBar({
 function AudiencePreShowSurface({
   settings,
   categories,
+  allocation,
   presentationKey,
 }: {
   settings: AudienceDisplaySettings;
   categories: QuestionBankSummary["categories"];
+  allocation: QuestionAllocationSummary | null;
   presentationKey: string;
 }) {
+  const activeCategories = categories.filter((category) =>
+    allocation?.categories.some((item) => item.key === category.key && item.quotaPerRound > 0),
+  );
+  const questionsPerRound = allocation?.questionsPerRound ?? 10;
   const enabledPages = (
     [
       settings.copy.preShow.identityEnabled ? "identity" : null,
@@ -2458,12 +2466,12 @@ function AudiencePreShowSurface({
               <section className="preshow-v3-categories-band">
                 <div className="preshow-v3-band-label">
                   <small>محاور المسابقة</small>
-                  <strong>خمسة محاور · سؤالان من كل محور</strong>
+                  <strong>{activeCategories.length} محاور · {questionsPerRound} سؤالاً للجولة</strong>
                 </div>
 
                 <div className="preshow-v3-category-row">
-                  {categories.length > 0 ? (
-                    categories.map((category, index) => (
+                  {activeCategories.length > 0 ? (
+                    activeCategories.map((category, index) => (
                       <div key={category.key}>
                         <span>
                           {String(index + 1).padStart(2, "0")}
@@ -2497,13 +2505,13 @@ function AudiencePreShowSurface({
 
               <div className="preshow-v3-flow" aria-label="تسلسل آلية المسابقة">
                 <div>
-                  <strong>10</strong>
+                  <strong>{questionsPerRound}</strong>
                   <span>أسئلة في الجولة</span>
                 </div>
                 <i aria-hidden="true">←</i>
                 <div>
-                  <strong>5</strong>
-                  <span>محاور · سؤالان لكل محور</span>
+                  <strong>{activeCategories.length}</strong>
+                  <span>محاور مختارة</span>
                 </div>
                 <i aria-hidden="true">←</i>
                 <div>
@@ -3387,7 +3395,7 @@ function OperatorHotkeys({
           snapshot.phase === "INTERMISSION" ||
           (
             snapshot.phase === "QUESTION_REVEAL" &&
-            (snapshot.question?.position ?? 0) < 10
+            (snapshot.question?.position ?? 0) < snapshot.questionsPerRound
           )
         ) {
           consume();
@@ -3478,7 +3486,7 @@ function OperatorHotkeys({
       if (
         key === "c" &&
         snapshot.phase === "QUESTION_REVEAL" &&
-        snapshot.question?.position === 10
+        snapshot.question?.position === snapshot.questionsPerRound
       ) {
         consume();
         setLastAction("Alt+C · إنهاء الجولة");
@@ -3737,7 +3745,7 @@ function OperatorLivePanel({
           </div>
           <div>
             <span>السؤال</span>
-            <strong>{questionPosition ?? "—"} / 10</strong>
+            <strong>{questionPosition ?? "—"} / {snapshot.questionsPerRound}</strong>
           </div>
           <div>
             <span>Station A</span>
@@ -3847,7 +3855,7 @@ function OperatorLivePanel({
         {snapshot.phase === "ROUND_ACTIVE" ||
         snapshot.phase === "INTERMISSION" ||
         (snapshot.phase === "QUESTION_REVEAL" &&
-          (snapshot.question?.position ?? 0) < 10) ? (
+          (snapshot.question?.position ?? 0) < snapshot.questionsPerRound) ? (
           <button
             className="primary live-start-button"
             disabled={busy}
@@ -3914,7 +3922,7 @@ function OperatorLivePanel({
         ) : null}
 
         {snapshot.phase === "QUESTION_REVEAL" &&
-        snapshot.question?.position === 10 ? (
+        snapshot.question?.position === snapshot.questionsPerRound ? (
           <button
             className="primary"
             disabled={busy}
@@ -4451,7 +4459,7 @@ function TeamLivePanel({
       snapshot.phase === "QUESTION_REVEAL" ? (
         <>
           <div className="team-question-meta">
-            <span>سؤال {snapshot.question?.position ?? "—"} / 10</span>
+            <span>سؤال {snapshot.question?.position ?? "—"} / {snapshot.questionsPerRound}</span>
             <span>{snapshot.question?.categoryName ?? ""}</span>
             {remainingSeconds !== null ? (
               <strong>{remainingSeconds} ثانية</strong>
@@ -4885,6 +4893,7 @@ export function App() {
         <>
           <BulkImportPanel questionBank={questionBank} />
           <CategoryLabelsPanel questionBank={questionBank} />
+          <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
           <SetupSurface snapshot={competition} />
           <DrawSurface snapshot={competition} />
           <QuestionAllocationPanel allocation={questionAllocation} />
@@ -4911,6 +4920,7 @@ export function App() {
             <AudiencePreShowSurface
               settings={audienceSettings}
               categories={questionBank?.categories ?? []}
+              allocation={questionAllocation}
               presentationKey={audiencePresentation.updatedAt}
             />
           </AudienceSceneTransition>

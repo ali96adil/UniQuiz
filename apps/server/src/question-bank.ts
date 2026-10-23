@@ -13,6 +13,7 @@ import {
 import { appendAuditEvent } from "./audit.js";
 import type { AppDatabase } from "./database.js";
 import { getQuestionBankSummary } from "./importer.js";
+import { getCompetitionRules } from "./competition-rules.js";
 
 const allocateSchema = z.object({
   confirm: z.literal("ALLOCATE_QUESTIONS"),
@@ -22,9 +23,16 @@ const resetSchema = z.object({
   confirm: z.literal("RESET_QUESTION_SETS"),
 });
 
+const rulesSchema = z.object({
+  categories: z.array(z.object({
+    categoryKey: z.string().trim().min(1).max(100),
+    questions: z.number().int().min(1).max(100),
+  })).min(1).max(20),
+});
+
 const voidReplaceSchema = z.object({
   roundId: z.number().int().positive(),
-  position: z.number().int().min(1).max(10),
+  position: z.number().int().min(1).max(100),
   reason: z.string().trim().min(3).max(500),
   confirm: z.literal("VOID_AND_REPLACE"),
 });
@@ -67,7 +75,7 @@ export function getQuestionAllocationSummary(
     SELECT
       c.id,
       c.category_key AS key,
-      c.name,
+      COALESCE(NULLIF(TRIM(c.display_name), ''), c.name) AS name,
       COUNT(q.id) AS availableQuestions
     FROM categories c
     LEFT JOIN questions q
@@ -77,7 +85,10 @@ export function getQuestionAllocationSummary(
     ORDER BY c.sort_order, c.id
   `).all() as CategoryRow[];
 
-  const requiredPerCategory = rounds.length * 2;
+  const rules = getCompetitionRules(db);
+  const quotas = new Map(rules.categories.map((item) => [item.categoryKey, item.questions]));
+  const selectedCategories = categories.filter((item) => quotas.has(item.key));
+  const requiredPerCategory = rounds.length * 2; // Kept for older clients.
 
   const roundSummaries: RoundQuestionSetSummary[] = rounds.map((round) => {
     const locked = db.prepare(`
@@ -115,24 +126,27 @@ export function getQuestionAllocationSummary(
 
   return {
     roundCount: rounds.length,
-    questionsPerRound: 10,
+    questionsPerRound: rules.questionsPerRound,
     requiredPerCategory,
     ready:
       rounds.length > 0 &&
-      categories.length === 5 &&
+      rules.categories.length > 0 &&
+      selectedCategories.length === rules.categories.length &&
+      rules.categories.reduce((sum, item) => sum + item.questions, 0) === rules.questionsPerRound &&
       roundSummaries.every(
         (round) =>
           round.locked &&
-          round.questionCount === 10 &&
-          categories.every(
-            (category) => round.categoryCounts[category.key] === 2,
+          round.questionCount === rules.questionsPerRound &&
+          selectedCategories.every(
+            (category) => round.categoryCounts[category.key] === quotas.get(category.key),
           ),
       ),
     categories: categories.map((category) => ({
       key: category.key,
       name: category.name,
       availableQuestions: category.availableQuestions,
-      requiredQuestions: requiredPerCategory,
+      requiredQuestions: rounds.length * (quotas.get(category.key) ?? 0),
+      quotaPerRound: quotas.get(category.key) ?? 0,
     })),
     rounds: roundSummaries,
   };
@@ -174,6 +188,44 @@ export function registerQuestionBankRoutes(
       return { ok: true, questionBank };
     },
   );
+
+  app.get("/api/competition/rules", async () => getCompetitionRules(db));
+
+  app.put("/api/competition/rules", async (request, reply) => {
+    const parsed = rulesSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "INVALID_RULES", issues: parsed.error.issues });
+    }
+    const categories = parsed.data.categories;
+    const total = categories.reduce((sum, item) => sum + item.questions, 0);
+    if (total > 100 || new Set(categories.map((item) => item.categoryKey)).size !== categories.length) {
+      return reply.code(400).send({ error: "INVALID_QUOTA_DISTRIBUTION" });
+    }
+
+    const existingKeys = new Set(
+      (db.prepare("SELECT category_key AS categoryKey FROM categories").all() as Array<{ categoryKey: string }>)
+        .map((item) => item.categoryKey),
+    );
+    if (categories.some((item) => !existingKeys.has(item.categoryKey))) {
+      return reply.code(400).send({ error: "UNKNOWN_CATEGORY" });
+    }
+    const locked = (db.prepare(
+      "SELECT COUNT(*) AS count FROM qualification_round_question_sets",
+    ).get() as { count: number }).count;
+    const started = (db.prepare(
+      "SELECT COUNT(*) AS count FROM qualification_rounds WHERE status <> 'PENDING'",
+    ).get() as { count: number }).count;
+    if (locked > 0 || started > 0) {
+      return conflict(reply, "RULES_LOCKED", "Rules cannot change after allocating or starting rounds.");
+    }
+
+    db.prepare("UPDATE competition_rules SET distribution_json = ? WHERE id = 1")
+      .run(JSON.stringify(categories));
+    const rules = getCompetitionRules(db);
+    io.emit("competition-rules:snapshot", rules);
+    publish();
+    return rules;
+  });
 
   app.get("/api/question-bank/allocation", async () =>
     getQuestionAllocationSummary(db),
@@ -233,23 +285,19 @@ export function registerQuestionBankRoutes(
       ORDER BY sort_order, id
     `).all() as CategoryRow[];
 
-    if (categories.length !== 5) {
-      return conflict(
-        reply,
-        "FIVE_CATEGORIES_REQUIRED",
-        "Exactly five categories are required before allocation.",
-      );
+    const rules = getCompetitionRules(db);
+    const categoryMap = new Map(categories.map((category) => [category.key, category]));
+    if (rules.categories.length === 0 ||
+      rules.categories.reduce((sum, category) => sum + category.questions, 0) !== rules.questionsPerRound ||
+      rules.categories.some((category) => !categoryMap.has(category.categoryKey))) {
+      return conflict(reply, "ROUND_RULES_INCOMPLETE", "Select valid category quotas before allocation.");
     }
-
-    const requiredPerCategory = rounds.length * 2;
-    const insufficient = categories
-      .filter((category) => category.availableQuestions < requiredPerCategory)
-      .map((category) => ({
-        key: category.key,
-        name: category.name,
-        available: category.availableQuestions,
-        required: requiredPerCategory,
-      }));
+    const insufficient = rules.categories
+      .map((quota) => {
+        const category = categoryMap.get(quota.categoryKey)!;
+        return { key: category.key, name: category.name, available: category.availableQuestions, required: rounds.length * quota.questions };
+      })
+      .filter((category) => category.available < category.required);
 
     if (insufficient.length > 0) {
       return conflict(
@@ -260,8 +308,9 @@ export function registerQuestionBankRoutes(
       );
     }
 
-    const pools: CategoryQuestionPool[] = categories.map((category) => ({
-      categoryId: category.id,
+    const pools: CategoryQuestionPool[] = rules.categories.map((quota) => ({
+      categoryId: categoryMap.get(quota.categoryKey)!.id,
+      questionsPerRound: quota.questions,
       questionIds: (
         db.prepare(`
           SELECT id
@@ -269,7 +318,7 @@ export function registerQuestionBankRoutes(
           WHERE category_id = ?
             AND active = 1
           ORDER BY id
-        `).all(category.id) as Array<{ id: number }>
+        `).all(categoryMap.get(quota.categoryKey)!.id) as Array<{ id: number }>
       ).map((row) => row.id),
     }));
 

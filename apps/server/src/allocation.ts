@@ -3,6 +3,7 @@ export type RandomIndex = (upperExclusive: number) => number;
 export interface CategoryQuestionPool {
   categoryId: number;
   questionIds: number[];
+  questionsPerRound?: number;
 }
 
 export interface AllocatedQuestion {
@@ -61,12 +62,19 @@ export function allocateQualificationQuestions(
     throw new Error("At least one qualification round is required.");
   }
 
-  if (categoryPools.length !== 5) {
+  if (categoryPools.length === 0) {
+    throw new Error("At least one category quota is required.");
+  }
+  if (categoryPools.every((pool) => pool.questionsPerRound === undefined) && categoryPools.length !== 5) {
     throw new Error("Exactly five categories are required.");
   }
 
-  const requiredPerCategory = roundIds.length * 2;
+  const plannedQuestions = categoryPools.reduce((sum, pool) => sum + (pool.questionsPerRound ?? 2), 0);
+  if (plannedQuestions < 1 || plannedQuestions > 100) throw new Error("Round question count must be 1..100.");
   const preparedPools = categoryPools.map((pool) => {
+    const quota = pool.questionsPerRound ?? 2;
+    if (!Number.isInteger(quota) || quota < 1) throw new Error("Invalid category quota.");
+    const requiredPerCategory = roundIds.length * quota;
     if (pool.questionIds.length < requiredPerCategory) {
       throw new Error(
         `Category ${pool.categoryId} needs ${requiredPerCategory} questions but has ${pool.questionIds.length}.`,
@@ -81,6 +89,7 @@ export function allocateQualificationQuestions(
 
     return {
       categoryId: pool.categoryId,
+      quota,
       questionIds: shuffled(pool.questionIds, randomIndex).slice(
         0,
         requiredPerCategory,
@@ -92,16 +101,16 @@ export function allocateQualificationQuestions(
 
   return roundIds.map((roundId, roundIndex) => {
     const roundQuestions = preparedPools.flatMap((pool) => {
-      const start = roundIndex * 2;
-      return pool.questionIds.slice(start, start + 2).map((questionId) => ({
+      const start = roundIndex * pool.quota;
+      return pool.questionIds.slice(start, start + pool.quota).map((questionId) => ({
         questionId,
         categoryId: pool.categoryId,
       }));
     });
 
-    if (roundQuestions.length !== 10) {
+    if (roundQuestions.length !== plannedQuestions) {
       throw new Error(
-        `Round ${roundId} did not receive exactly 10 questions.`,
+        `Round ${roundId} did not receive exactly ${plannedQuestions} questions.`,
       );
     }
 

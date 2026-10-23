@@ -68,6 +68,14 @@ export function openDatabase(databasePath: string) {
       sort_order INTEGER NOT NULL UNIQUE
     );
 
+    CREATE TABLE IF NOT EXISTS competition_rules (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      distribution_json TEXT
+    );
+    INSERT INTO competition_rules (id, distribution_json)
+    VALUES (1, NULL)
+    ON CONFLICT(id) DO NOTHING;
+
     CREATE TABLE IF NOT EXISTS questions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category_id INTEGER NOT NULL,
@@ -99,7 +107,7 @@ export function openDatabase(databasePath: string) {
     CREATE TABLE IF NOT EXISTS qualification_round_questions (
       round_id INTEGER NOT NULL,
       position INTEGER NOT NULL
-        CHECK (position BETWEEN 1 AND 10),
+        CHECK (position >= 1),
       question_id INTEGER NOT NULL UNIQUE,
       category_id INTEGER NOT NULL,
       PRIMARY KEY (round_id, position),
@@ -119,7 +127,7 @@ export function openDatabase(databasePath: string) {
       question_id INTEGER PRIMARY KEY,
       round_id INTEGER NOT NULL,
       position INTEGER NOT NULL
-        CHECK (position BETWEEN 1 AND 10),
+        CHECK (position >= 1),
       disposition TEXT NOT NULL
         CHECK (disposition IN ('ALLOCATED', 'VOIDED', 'REPLACEMENT')),
       reserved_at TEXT NOT NULL,
@@ -188,7 +196,7 @@ export function openDatabase(databasePath: string) {
     CREATE TABLE IF NOT EXISTS live_submissions (
       round_id INTEGER NOT NULL,
       question_position INTEGER NOT NULL
-        CHECK (question_position BETWEEN 1 AND 10),
+        CHECK (question_position >= 1),
       station TEXT NOT NULL
         CHECK (station IN ('A', 'B')),
       question_id INTEGER NOT NULL,
@@ -340,7 +348,49 @@ export function openDatabase(databasePath: string) {
     db.exec("ALTER TABLE categories ADD COLUMN display_name TEXT");
   }
 
-  db.prepare("UPDATE app_meta SET value = '13' WHERE key = 'schema_version'").run();
+  // Migrate old 1..10 constraints transactionally. The original constraints,
+  // primary keys, foreign keys, data and indexes are preserved.
+  const widenedTables = [
+    { name: "qualification_round_questions", index:
+      "CREATE INDEX idx_round_questions_category ON qualification_round_questions(round_id, category_id)" },
+    { name: "qualification_question_reservations", index: null },
+    { name: "live_submissions", index:
+      "CREATE INDEX idx_live_submissions_round_question ON live_submissions(round_id, question_position)" },
+  ];
+  const originals = widenedTables.map((table) => {
+    const row = db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+    ).get(table.name) as { sql: string };
+    return { ...table, sql: row.sql };
+  }).filter((table) => /CHECK\s*\(\s*(?:question_)?position\s+BETWEEN\s+1\s+AND\s+10\s*\)/i.test(table.sql));
+
+  if (originals.length > 0) {
+    db.transaction(() => {
+      for (const table of originals) {
+        const upgraded = table.sql
+          .replace(
+            /^(CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?)(?:"[^"]+"|\w+)/i,
+            (_, prefix: string) => prefix + table.name + "_m7",
+          )
+          .replace(
+            /CHECK\s*\(\s*(question_position|position)\s+BETWEEN\s+1\s+AND\s+10\s*\)/gi,
+            (_, column: string) => "CHECK (" + column + " >= 1)",
+          );
+        if (upgraded === table.sql || !upgraded.includes(table.name + "_m7")) {
+          throw new Error("M7_POSITION_MIGRATION_SCHEMA_UNEXPECTED: " + table.name);
+        }
+        db.exec(upgraded);
+        db.exec("INSERT INTO " + table.name + "_m7 SELECT * FROM " + table.name);
+        db.exec("DROP TABLE " + table.name);
+        db.exec("ALTER TABLE " + table.name + "_m7 RENAME TO " + table.name);
+        if (table.index) db.exec(table.index);
+      }
+      const invalid = db.pragma("foreign_key_check") as unknown[];
+      if (invalid.length > 0) throw new Error("M7_POSITION_MIGRATION_FK_ERROR");
+    })();
+  }
+
+  db.prepare("UPDATE app_meta SET value = '14' WHERE key = 'schema_version'").run();
   return db;
 }
 
