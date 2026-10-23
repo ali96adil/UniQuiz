@@ -15,6 +15,7 @@ This document applies to the stacked PR sequence:
 11. PR #39 — operator session login and privileged API/Socket.IO authentication
 12. PR #40 — safe Windows answer-station enrollment and token rotation
 13. PR #41 — synchronized cross-browser active workspace rules and editors
+14. PR #42 — read-only historical-row fingerprint check of a copied DB
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -68,6 +69,46 @@ python3 scripts/m7_rehearsal_copy.py \
 If the script prints anything other than `REHEARSAL_COPY_OK`, stop. **Never**
 point M7 to the official database until an approved deployment.
 
+### Mandatory pre-upgrade fingerprint on the COPIED database
+
+Before starting the new M7 server on the copy, capture an independent,
+read-only baseline of all original tables. Run this on the **copied**
+`$UNIQUIZ_REHEARSAL_DB` only:
+
+```bash
+export UNIQUIZ_BASELINE_MANIFEST="$HOME/UniQuiz-M7-Rehearsal/baseline-before-m7.json"
+python3 scripts/m7_rehearsal_verify.py capture \
+  --database "$UNIQUIZ_REHEARSAL_DB" \
+  --manifest "$UNIQUIZ_BASELINE_MANIFEST"
+```
+
+Require `M7_BASELINE_CAPTURE_OK`. The private baseline file has permissions
+`0600`; it contains row digests, not the names, question texts or logos.
+The command will **refuse to overwrite** an existing manifest. Never upload
+the private manifest or competition database to a public issue.
+
+Start the M7 rehearsal server as instructed below, confirm that its
+`/health` endpoint responds, then **stop it without clicking or changing any
+competition content yet**. Verify the migrated rehearsal database:
+
+```bash
+python3 scripts/m7_rehearsal_verify.py verify \
+  --database "$UNIQUIZ_REHEARSAL_DB" \
+  --manifest "$UNIQUIZ_BASELINE_MANIFEST"
+```
+
+Require `M7_REHEARSAL_VERIFY_OK`. The check compares original row contents,
+scoring, timestamps, categories, branding and even BLOB image contents by
+SHA-256, while allowing explicitly documented additive migration rows.
+It also requires SQLite integrity, valid foreign keys and initialized M7
+workspace metadata. A changed or missing original row is a **release blocker**.
+This guarantees raw historical preservation, **not** that the application
+renders all old ranks correctly; still follow the official-results manual
+comparison below. Only after a successful fingerprint verification proceed
+with manual rehearsal operations. Do **not** rerun this baseline comparison
+after intentionally editing the rehearsal database; it is designed to detect
+such edits.
+
 Install and validate the reviewed branch before starting its test runtime:
 
 ```bash
@@ -84,7 +125,8 @@ in M7; enter a unique secret interactively in the **same server terminal**
 rather than committing it to the repo:
 
 ```bash
-read -r -s -p 'Rehearsal operator password: ' UNIQUIZ_OPERATOR_PASSWORD
+# This is zsh syntax (the standard interactive shell on current macOS).
+read -rs "UNIQUIZ_OPERATOR_PASSWORD?Rehearsal operator password: "
 echo
 export UNIQUIZ_OPERATOR_PASSWORD
 UNIQUIZ_MODE=rehearsal \
@@ -157,6 +199,15 @@ conditions. This is **synthetic CI**, not the Mac rehearsal below.
     restart. Confirm that unauthorized browsers cannot retrieve station tokens
     or mutate competition setup, while both team stations and audience
     display remain operational.
+
+## Migration acceptance gate
+
+An upgrade is eligible for manual operational testing only when all of
+these conditions hold: `REHEARSAL_COPY_OK`, `M7_BASELINE_CAPTURE_OK`,
+`M7_REHEARSAL_VERIFY_OK`, and the GitHub CI run for the exact reviewed
+commit is green. The first three results refer only to a **separate copied
+SQLite database**. Do not interpret synthetic tests as proof that your real
+2026 tournament data has been checked until you run this procedure locally.
 
 ## Two-browser workspace-switch acceptance
 

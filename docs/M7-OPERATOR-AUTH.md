@@ -19,8 +19,9 @@ does not appear in shell history. The example assumes you already set up the
 separate rehearsal DB path and disabled OSC as in
 `docs/M7-INTEGRATION-REHEARSAL.md`:
 
-```bash
-read -r -s -p 'Unique UniQuiz operator password: ' UNIQUIZ_OPERATOR_PASSWORD
+```zsh
+# macOS interactive zsh; the secret does not enter shell history.
+read -rs "UNIQUIZ_OPERATOR_PASSWORD?Unique UniQuiz operator password: "
 echo
 export UNIQUIZ_OPERATOR_PASSWORD
 

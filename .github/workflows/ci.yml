@@ -44,6 +44,9 @@ jobs:
       - name: Validate safe M7 rehearsal copier
         run: python3 -m unittest discover -s scripts -p "test_m7_rehearsal_copy.py" -v
 
+      - name: Verify read-only historical migration fingerprints
+        run: python3 -m unittest discover -s scripts -p "test_m7_rehearsal_verify.py" -v
+
       - name: Build
         run: pnpm build
 
