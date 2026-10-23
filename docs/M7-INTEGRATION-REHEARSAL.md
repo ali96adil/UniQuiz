@@ -25,6 +25,9 @@ This document applies to the stacked PR sequence:
 until an operator has rehearsed the upgrade on an isolated copy of the actual
 official competition database and recorded the results.
 
+For release review and the required ancestor-preserving merge sequence,
+see [M7 ordered merge runbook](M7-MERGE-RUNBOOK.md).
+
 ## Preservation guarantees
 
 - The existing official database is never the input to a new M7 server while
