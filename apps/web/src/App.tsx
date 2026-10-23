@@ -3184,68 +3184,100 @@ function OperationsPreflightPanel() {
 }
 
 function StationAccessPanel() {
-  const [credentials, setCredentials] =
-    useState<StationCredentialResponse | null>(null);
+  const [credentials, setCredentials] = useState<StationCredentialResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"A" | "B" | null>(null);
+  const [showTokens, setShowTokens] = useState(false);
 
   useEffect(() => {
-    void apiRequest<StationCredentialResponse>(
-      "/api/stations/credentials",
-    )
+    void apiRequest<StationCredentialResponse>("/api/stations/credentials")
       .then(setCredentials)
-      .catch((caught) => {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "تعذر تحميل روابط المحطات",
-        );
-      });
+      .catch((caught) => setError(caught instanceof Error
+        ? caught.message : "تعذر تحميل بيانات المحطات"));
   }, []);
 
-  const urlFor = (station: "a" | "b", token: string) =>
-    `${window.location.origin}/team/${station}?token=${encodeURIComponent(token)}`;
+  const rotate = async (station: "A" | "B") => {
+    if (!window.confirm(`إلغاء رمز المحطة ${station} وإصدار بديل؟ سيتم قطع اتصال الجهاز القديم. لا تنفّذ هذا الإجراء أثناء عرض فعّال.`)) return;
+    setBusy(station);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await apiRequest<{credential:{station:"A"|"B";token:string}}>(
+        `/api/stations/${station.toLowerCase()}/rotate`,
+        { method:"POST", body:JSON.stringify({confirm:"ROTATE_STATION_TOKEN"}) },
+      );
+      setCredentials((old) => old ? {
+        ...old,
+        [station === "A" ? "teamA" : "teamB"]: response.credential,
+      } : old);
+      setShowTokens(true);
+      setNotice(`تم إصدار رمز جديد للمحطة ${station}. أدخله في جهاز الفريق.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر تدوير الرمز");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const shareToken = async (token: string) => {
+    setError(null);
+    try {
+      await navigator.clipboard.writeText(token);
+      setNotice("تم نسخ الرمز. الصقه في صفحة المحطة المناسبة فقط.");
+    } catch {
+      setError("النسخ التلقائي غير متاح على هذه الشبكة. أظهر الرمز وانسخه يدوياً.");
+      setShowTokens(true);
+    }
+  };
 
   return (
-    <section className="panel station-access-panel">
+    <section className="panel station-access-panel" dir="rtl">
       <div className="section-heading">
         <div>
           <p className="step-label">Station Access</p>
-          <h2>روابط محطات المتسابقين</h2>
+          <h2>رموز دخول المحطات</h2>
         </div>
       </div>
-
       <p className="muted">
-        افتح كل رابط على جهاز الفريق المقابل. التوكن يثبت هوية المحطة
-        ويُحفظ في المتصفح بعد أول فتح.
+        افتح صفحة الفريق بدون رمز داخل الرابط، ثم أدخل الرمز على جهاز Windows.
+        لا تشارك الرمز في رابط أو رسالة عامة.
       </p>
-
+      <button type="button" onClick={() => setShowTokens(!showTokens)}>
+        {showTokens ? "إخفاء الرموز" : "إظهار الرموز للمشغّل"}
+      </button>
       {credentials ? (
         <div className="station-links">
-          {credentials.teamA ? (
-            <div>
-              <strong>Team A</strong>
-              <code>
-                {urlFor("a", credentials.teamA.token)}
-              </code>
-            </div>
-          ) : null}
-          {credentials.teamB ? (
-            <div>
-              <strong>Team B</strong>
-              <code>
-                {urlFor("b", credentials.teamB.token)}
-              </code>
-            </div>
-          ) : null}
+          {(["A","B"] as const).map((station) => {
+            const credential = station === "A" ? credentials.teamA : credentials.teamB;
+            if (!credential) return null;
+            return (
+              <div key={station}>
+                <strong>Station {station}</strong>
+                <code>{`${window.location.origin}/team/${station.toLowerCase()}`}</code>
+                {showTokens ? (
+                  <input aria-label={`رمز المحطة ${station}`} readOnly value={credential.token}
+                    onFocus={(event) => event.target.select()} dir="ltr" />
+                ) : null}
+                <div className="actions">
+                  <button type="button" onClick={() => void shareToken(credential.token)}>
+                    نسخ رمز {station}
+                  </button>
+                  <button type="button" className="danger-outline" disabled={busy !== null}
+                    onClick={() => void rotate(station)}>
+                    {busy === station ? "جاري التغيير..." : `إلغاء الرمز وإصدار بديل ${station}`}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : null}
-
       <p className="muted station-link-note">
-        إذا لوحة التحكم مفتوحة على localhost، استبدل localhost بعنوان
-        IP الماك على شبكة المسابقة قبل فتح الرابط على أجهزة Windows.
+        إذا لوحة المشغّل على localhost، استخدم عنوان IP الماك بنفس شبكة المسابقة
+        للوصول إلى /team/a أو /team/b على أجهزة Windows.
       </p>
-
-      <StatusMessage error={error} message={null} />
+      <StatusMessage error={error} message={notice} />
     </section>
   );
 }
@@ -3269,11 +3301,7 @@ function StationPortal() {
       });
   }, []);
 
-  const stationUrl = (
-    station: "a" | "b",
-    token: string,
-  ) =>
-    `/team/${station}?token=${encodeURIComponent(token)}`;
+  const stationUrl = (station: "a" | "b") => `/team/${station}`;
 
   return (
     <section className="panel station-portal">
@@ -3290,22 +3318,22 @@ function StationPortal() {
           {credentials.teamA ? (
             <a
               className="station-portal-card"
-              href={stationUrl("a", credentials.teamA.token)}
+              href={stationUrl("a")}
             >
               <span>Station A</span>
               <strong>محطة الفريق A</strong>
-              <small>دخول مباشر وآمن بالتوكن</small>
+              <small>إدخال رمز المحطة على جهاز الفريق</small>
             </a>
           ) : null}
 
           {credentials.teamB ? (
             <a
               className="station-portal-card"
-              href={stationUrl("b", credentials.teamB.token)}
+              href={stationUrl("b")}
             >
               <span>Station B</span>
               <strong>محطة الفريق B</strong>
-              <small>دخول مباشر وآمن بالتوكن</small>
+              <small>إدخال رمز المحطة على جهاز الفريق</small>
             </a>
           ) : null}
 
@@ -4757,23 +4785,44 @@ export function App() {
     };
   }, [surface]);
 
-  const stationToken = useMemo(() => {
-    if (role !== "team-a" && role !== "team-b") {
-      return null;
-    }
-
+  const [stationToken, setStationToken] = useState<string | null>(() => {
+    if (role !== "team-a" && role !== "team-b") return null;
     const key = `uniquiz:${role}:token`;
-    const queryToken = new URLSearchParams(
-      window.location.search,
-    ).get("token");
-
-    if (queryToken) {
-      window.localStorage.setItem(key, queryToken);
-      return queryToken;
+    // Import a legacy bookmarked link at most once, then remove the secret
+    // from address-bar history. Newly issued links never include any token.
+    const legacyToken = new URLSearchParams(window.location.search).get("token");
+    if (legacyToken) {
+      window.localStorage.setItem(key, legacyToken);
+      return legacyToken;
     }
-
     return window.localStorage.getItem(key);
+  });
+  const [stationTokenDraft, setStationTokenDraft] = useState("");
+  useEffect(() => {
+    if (role !== "team-a" && role !== "team-b") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("token")) {
+      url.searchParams.delete("token");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
   }, [role]);
+
+  const enrollStation = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (role !== "team-a" && role !== "team-b") return;
+    const token = stationTokenDraft.trim();
+    if (!/^[A-Za-z0-9_-]{32}$/.test(token)) return;
+    window.localStorage.setItem(`uniquiz:${role}:token`, token);
+    setStationTokenDraft("");
+    setStationToken(token);
+  };
+
+  const clearStationToken = () => {
+    if (role !== "team-a" && role !== "team-b") return;
+    window.localStorage.removeItem(`uniquiz:${role}:token`);
+    setStationToken(null);
+    setStationTokenDraft("");
+  };
 
   useEffect(() => {
     if (operatorSurface && operatorAccess !== "authorized") return;
@@ -4786,9 +4835,16 @@ export function App() {
     setLiveSocket(socket);
 
     socket.on("connect", () => setConnected(true));
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       setConnected(false);
       setEffectiveRole("unknown");
+      // The server forcibly disconnects a station when the operator rotates
+      // its credential. Clear the stale local secret and show enrollment.
+      if (reason === "io server disconnect" &&
+          (role === "team-a" || role === "team-b")) {
+        window.localStorage.removeItem(`uniquiz:${role}:token`);
+        setStationToken(null);
+      }
     });
     socket.on(
       "server:hello",
@@ -4911,6 +4967,36 @@ export function App() {
       );
     });
   };
+
+  if ((role === "team-a" || role === "team-b") &&
+      (!stationToken || (connected && effectiveRole !== role))) {
+    return (
+      <main className="shell">
+        <section className="panel station-enrollment" dir="rtl">
+          <h1>تهيئة محطة الفريق {role === "team-a" ? "A" : "B"}</h1>
+          <p>أدخل الرمز الذي يظهر في لوحة المشغّل. لا تضع الرمز داخل عنوان الصفحة.</p>
+          {stationToken && effectiveRole !== role ? (
+            <p className="status-message error">
+              الرمز السابق غير صالح أو تم إلغاؤه. أدخل الرمز الجديد من المشغّل.
+            </p>
+          ) : null}
+          <form onSubmit={enrollStation}>
+            <label htmlFor="station-access-token">رمز المحطة</label>
+            <input id="station-access-token" type="password" autoComplete="off"
+              value={stationTokenDraft} minLength={32} maxLength={32}
+              onChange={(event) => setStationTokenDraft(event.target.value)}
+              placeholder="ألصق الرمز هنا" required dir="ltr" />
+            <button className="primary" type="submit">ربط محطة الفريق</button>
+          </form>
+          {stationToken ? (
+            <button type="button" onClick={clearStationToken}>
+              مسح الرمز المحفوظ
+            </button>
+          ) : null}
+        </section>
+      </main>
+    );
+  }
 
   if (operatorSurface && operatorAccess !== "authorized") {
     return (

@@ -3,6 +3,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { appendAuditEvent } from "./audit.js";
 import type { AppDatabase } from "./database.js";
 
 export type TeamStation = "A" | "B";
@@ -72,9 +74,43 @@ export function validateStationToken(
   );
 }
 
+const rotateStationSchema = z.object({
+  confirm: z.literal("ROTATE_STATION_TOKEN"),
+}).strict();
+
+/** Revoke a station credential atomically without changing any competition data. */
+export function rotateStationToken(db: AppDatabase, station: TeamStation): StationCredential {
+  if (station !== "A" && station !== "B") throw new Error("UNKNOWN_STATION");
+  return db.transaction(() => {
+    const row = db.prepare("SELECT station FROM station_credentials WHERE station=?")
+      .get(station);
+    if (!row) throw new Error("STATION_CREDENTIAL_NOT_FOUND");
+    const token = newToken();
+    const now = new Date().toISOString();
+    db.prepare("UPDATE station_credentials SET access_token=?, rotated_at=? WHERE station=?")
+      .run(token, now, station);
+    appendAuditEvent(db, {
+      eventType: "STATION_CREDENTIAL_ROTATED",
+      payload: { station },
+      occurredAt: now,
+    });
+    return { station, token };
+  })();
+}
+
+export function isStationRotationSafe(db: AppDatabase): boolean {
+  const state = db.prepare("SELECT phase FROM live_state WHERE id=1")
+    .get() as { phase: string } | undefined;
+  const active = db.prepare("SELECT COUNT(*) AS count FROM qualification_rounds WHERE status='ACTIVE'")
+    .get() as { count: number };
+  return (state?.phase === "IDLE" || state?.phase === "ROUND_COMPLETE") &&
+    active.count === 0;
+}
+
 export function registerStationAuthRoutes(
   app: FastifyInstance,
   db: AppDatabase,
+  disconnectStation?: (station: TeamStation) => void,
 ): void {
   app.get("/api/stations/credentials", async () => {
     const credentials = listStationCredentials(db);
@@ -86,4 +122,29 @@ export function registerStationAuthRoutes(
       teamB: teamB ?? null,
     };
   });
+  app.post<{ Params: { station: string } }>(
+    "/api/stations/:station/rotate",
+    async (request, reply) => {
+      const station = request.params.station.toUpperCase();
+      if (station !== "A" && station !== "B") {
+        return reply.code(404).send({ error: "UNKNOWN_STATION" });
+      }
+      const parsed = rotateStationSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "ROTATION_CONFIRMATION_REQUIRED" });
+      }
+      if (!isStationRotationSafe(db)) {
+        return reply.code(409).send({
+          error: "STATION_ROTATION_BLOCKED_BY_LIVE_SESSION",
+          message: "Finish the active round before rotating the station credential.",
+        });
+      }
+      const credential = rotateStationToken(db, station);
+      // The previous socket has already authenticated; disconnect it so it
+      // cannot submit answers after credential rotation.
+      disconnectStation?.(station);
+      return reply.header("cache-control", "no-store").send({ credential });
+    },
+  );
+
 }

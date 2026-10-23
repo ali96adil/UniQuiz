@@ -152,7 +152,12 @@ const oscOutput = new OscOutput(
 
 registerCompetitionRoutes(app, database, io, oscOutput);
 registerImportRoutes(app, database, io);
-registerStationAuthRoutes(app, database);
+registerStationAuthRoutes(app, database, (station) => {
+  const role = station === "A" ? "team-a" : "team-b";
+  for (const socket of io.sockets.sockets.values()) {
+    if (roles.get(socket.id) === role) socket.disconnect(true);
+  }
+});
 registerAudienceSettingsRoutes(app, database, io);
 registerAudiencePresentationRoutes(app, database, io);
 
@@ -296,6 +301,13 @@ io.on("connection", (socket) => {
           throw new Error("INVALID_ANSWER_OPTION");
         }
 
+        // Revalidate the credential on each answer, not only on handshake:
+        // revoked station tokens must never submit from an old socket.
+        if ((role === "team-a" || role === "team-b") &&
+            !validateStationToken(database, role === "team-a" ? "A" : "B", socket.handshake.auth?.token)) {
+          socket.disconnect(true);
+          throw new Error("STATION_CREDENTIAL_REVOKED");
+        }
         const receipt = liveSession.submitAnswer(role, option);
         acknowledge?.({ ok: true, receipt });
 
