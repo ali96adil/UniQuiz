@@ -49,13 +49,31 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#42](https://github.com/ali96adil/UniQuiz/pull/42) →
 [#44](https://github.com/ali96adil/UniQuiz/pull/44) →
 [#45](https://github.com/ali96adil/UniQuiz/pull/45) →
-[#46](https://github.com/ali96adil/UniQuiz/pull/46).
+[#46](https://github.com/ali96adil/UniQuiz/pull/46) →
+[#47](https://github.com/ali96adil/UniQuiz/pull/47).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
 steps in [docs/M7-INTEGRATION-REHEARSAL.md](docs/M7-INTEGRATION-REHEARSAL.md)
 before approval. Never point an unapproved development build at the original
 event database.
+
+## Live question-answer secrecy (draft M7)
+
+Public audience screens, unauthorized browsers and Windows answer stations
+receive the same redacted `/api/live` and `live:snapshot` data. The
+operator's explicit **Reveal** is the only phase in which the correct option
+and graded team results become public. Before the question begins, the prompt
+and options are hidden; after the question starts but before Reveal, the
+public sees the question/options but not the answer key or graded points.
+Private team submission data stays in the authenticated team's socket room.
+
+A public-field allowlist ensures future internal snapshot additions are not
+automatically transmitted to spectators. CI runs both adversarial snapshot
+regressions and a real local Fastify/Socket.IO server with unauthorized and
+credentialed station clients. See
+[the updated release security gates](docs/M7-SECURITY-RELEASE-GATES.md).
+This does **not** provide HTTPS/WSS or make an Internet-facing deployment safe.
 
 ## Operator authentication (draft M7)
 

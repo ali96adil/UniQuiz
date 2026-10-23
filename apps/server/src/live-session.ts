@@ -23,6 +23,7 @@ import {
 import { calculateScoreMicros } from "./scoring.js";
 import { getCompetitionGameplayRules } from "./competition-gameplay.js";
 import { getQualificationRanking } from "./ranking.js";
+import { publicLiveSnapshot } from "./public-live-snapshot.js";
 import {
   NOOP_SHOW_CONTROL,
   type OscArgument,
@@ -587,7 +588,7 @@ export class LiveSessionManager {
         `).get() as { announced: number }
       ).announced === 1;
 
-    return {
+    return publicLiveSnapshot({
       phase: state.phase,
       gameplay: getCompetitionGameplayRules(this.db),
       questionsPerRound: state.roundId === null
@@ -625,7 +626,7 @@ export class LiveSessionManager {
       },
       revealResults,
       roundTotals,
-    };
+    });
   }
 
   onQuestionReplaced(
