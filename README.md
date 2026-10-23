@@ -48,7 +48,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#41](https://github.com/ali96adil/UniQuiz/pull/41) →
 [#42](https://github.com/ali96adil/UniQuiz/pull/42) →
 [#44](https://github.com/ali96adil/UniQuiz/pull/44) →
-[#45](https://github.com/ali96adil/UniQuiz/pull/45).
+[#45](https://github.com/ali96adil/UniQuiz/pull/45) →
+[#46](https://github.com/ali96adil/UniQuiz/pull/46).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -71,6 +72,19 @@ For password setup, local restart/logout and safe rehearsal instructions, see
 **does not make the existing HTTP-only LAN deployment safe to expose** to an
 untrusted network or public tunnel; TLS and a deployment-specific security
 review remain required.
+
+## Historical ranking parity across M6 and M7
+
+A new CI regression runs the original main/M6 leaderboard SQL against
+disposable historical-schema records **before** upgrade. The same
+WAL-consistent copy is then migrated by M7, and every leaderboard
+entry is compared field-for-field, including points, accumulated answer
+time, correct/wrong counts, tie-break order and pending teams. It checks
+the default 25-second unanswered-question penalty and verifies that
+results remain identical after restarting the database process.
+See `scripts/ci/m7-m6-ranking-parity-smoke.mjs` and the pinned old SQL
+`scripts/fixtures/m6-main-ranking.sql`. No actual 2026 event data is
+used in CI; human verification on the Mac rehearsal copy remains required.
 
 ## Exact historical M6/v12 schema upgrade CI
 

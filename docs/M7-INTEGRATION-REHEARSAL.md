@@ -18,6 +18,7 @@ This document applies to the stacked PR sequence:
 14. PR #42 — read-only historical-row fingerprint check of a copied DB
 15. PR #44 — bind preservation baseline to its exact rehearsal database and test startup migration
 16. PR #45 — verify M7 against pinned exact M6/v12 schema and historical ranking
+17. PR #46 — compare the exact M6 leaderboard before migration with M7 after upgrade
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -241,6 +242,34 @@ to `main` do not quietly alter the regression fixture. A successful test
 proves this particular M6 schema upgrade but does not prove that the real
 2026 Mac database is identical or undamaged. Always run the private copied
 database rehearsal and manually compare original final results.
+
+## Golden historical ranking parity
+
+PR #46 adds an independent cross-version ranking check. The exact M6 SQL
+for the old official leaderboard is pinned at
+`scripts/fixtures/m6-main-ranking.sql`, copied from
+`main:apps/server/src/ranking.ts` (source blob
+`b2f84d215a5cb24d069c502f9e142fd2e0dca6e3`). The historical
+25,000 ms unanswered-question fallback is resolved as a literal; the
+query is otherwise unchanged.
+
+CI computes the leaderboard **before migration** on the pinned M6/v12
+schema, including a tied score decided by faster cumulative response time,
+correct and wrong answer counts, an unanswered revealed question, and
+entrants in a pending round. It then migrates a WAL-aware copy with the
+real M7 code and compares every public ranking entry (name, ID, status,
+rank, score, total time, revealed questions and answer counts) to the
+old M6 result, including after closing and reopening the migrated DB.
+The test also opens the resulting M7 **Excel workbook** and compares each
+exported ranking row with the original M6 reference, including name,
+order, score, response time, correct/wrong totals and pending rows.
+The old round totals must also match the new workbook's round export.
+
+This blocks unintended changes to historical result calculations that
+cannot be caught by raw SQLite data fingerprints alone. For an actual
+event, keep the official end-of-competition results export/screenshots
+and compare against the isolated M7 rehearsal results **before release**.
+Synthetic parity is not a substitute for that manual comparison.
 
 ## Migration acceptance gate
 
