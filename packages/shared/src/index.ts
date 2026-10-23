@@ -144,6 +144,13 @@ export interface QuestionAllocationSummary {
   rounds: RoundQuestionSetSummary[];
 }
 
+export interface CompetitionGameplayRules {
+  durationSeconds: number;
+  scoringMode: "time_decay" | "fixed";
+  correctPoints: number;
+  pointsLostPerSecond: number;
+}
+
 export type LivePhase =
   | "IDLE"
   | "ROUND_READY"
@@ -179,6 +186,7 @@ export interface LiveRoundView {
 
 export interface LiveSnapshot {
   phase: LivePhase;
+  gameplay: CompetitionGameplayRules;
   questionsPerRound: number;
   serverNowEpochMs: number;
   round: LiveRoundView | null;

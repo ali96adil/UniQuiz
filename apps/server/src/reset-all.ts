@@ -30,6 +30,10 @@ export function resetAllCompetitionData(
     db.prepare("DELETE FROM qualification_rounds").run();
     db.prepare("DELETE FROM participants").run();
     db.prepare("UPDATE competition_rules SET distribution_json = NULL WHERE id = 1").run();
+    db.prepare(`UPDATE competition_gameplay_rules
+      SET duration_seconds=25,scoring_mode='time_decay',
+          correct_points=25,points_lost_per_second=1
+      WHERE id=1`).run();
     // Reuse the permanent question/category library in the next competition.
     db.prepare("DELETE FROM colleges").run();
 

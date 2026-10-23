@@ -3,7 +3,7 @@ import type {
   QualificationRankingSnapshot,
 } from "@uniquiz/shared";
 import type { AppDatabase } from "./database.js";
-import { QUESTION_DURATION_MS } from "./question-clock.js";
+import { getCompetitionGameplayRules } from "./competition-gameplay.js";
 
 interface RankingRow {
   collegeId: number;
@@ -21,6 +21,7 @@ interface RankingRow {
 export function getQualificationRanking(
   db: AppDatabase,
 ): QualificationRankingSnapshot {
+  const unansweredDurationMs = getCompetitionGameplayRules(db).durationSeconds * 1000;
   const rows = db.prepare(`
     SELECT
       c.id AS collegeId,
@@ -76,7 +77,7 @@ export function getQualificationRanking(
                 )
               LIMIT 1
             ),
-            ${QUESTION_DURATION_MS}
+            ${unansweredDurationMs}
           )
         ), 0)
         FROM audit_events a

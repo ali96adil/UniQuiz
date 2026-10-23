@@ -9,6 +9,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { LiveSessionManager } from "./live-session.js";
 import { registerCompetitionWorkspaceRoutes } from "./competition-workspaces.js";
 import { getCompetitionRules, getRoundRules } from "./competition-rules.js";
+import { getCompetitionGameplayRules } from "./competition-gameplay.js";
 import {
   activateCompetitionWorkspace,
   activeWorkspaceId,
@@ -48,6 +49,7 @@ test("M7.2 keeps results and sponsorship isolated while retaining the shared que
       UPDATE live_state SET phase='ROUND_COMPLETE',round_id=1,question_position=1;
       UPDATE audience_settings SET event_title='جامعة بابل 2026';
       UPDATE competition_rules SET distribution_json='[{"categoryKey":"sports_specialist","questions":12}]';
+      UPDATE competition_gameplay_rules SET duration_seconds=40,scoring_mode='fixed',correct_points=10,points_lost_per_second=0;
       INSERT INTO qualification_round_rules(round_id,distribution_json,updated_at)
       VALUES (1,'[{"categoryKey":"sports_specialist","questions":5}]',CURRENT_TIMESTAMP);
     `);
@@ -59,6 +61,7 @@ test("M7.2 keeps results and sponsorship isolated while retaining the shared que
     activateCompetitionWorkspace(db, second.id);
     assert.equal(activeWorkspaceId(db), second.id);
     assert.equal(getCompetitionRules(db).questionsPerRound, 10);
+    assert.equal(getCompetitionGameplayRules(db).durationSeconds,25);
     assert.deepEqual(db.prepare("SELECT * FROM colleges").all(), []);
     assert.deepEqual(db.prepare("SELECT * FROM live_submissions").all(), []);
     assert.deepEqual(db.prepare("SELECT * FROM audience_assets").all(), []);
@@ -78,6 +81,7 @@ test("M7.2 keeps results and sponsorship isolated while retaining the shared que
     assert.equal((db.prepare("SELECT event_title AS title FROM audience_settings").get() as {title:string}).title,"جامعة بابل 2026");
     assert.equal(getCompetitionRules(db).questionsPerRound,12);
     assert.equal(getRoundRules(db,1).questionsPerRound,5);
+    assert.deepEqual(getCompetitionGameplayRules(db), { durationSeconds:40,scoringMode:"fixed",correctPoints:10,pointsLostPerSecond:0 });
     assert.deepEqual((db.prepare("SELECT bytes FROM audience_assets").get() as {bytes:Buffer}).bytes,logo);
     assert.deepEqual(db.pragma("foreign_key_check"),[]);
 
@@ -110,6 +114,7 @@ test("M7.2 duplicate copies setup, sponsor branding and question quotas but not 
       INSERT INTO qualification_rounds(round_order,college_a_id,status) VALUES(1,1,'COMPLETED');
       UPDATE audience_settings SET event_title='المسابقة الأم';
       UPDATE competition_rules SET distribution_json='[{"categoryKey":"sport","questions":12}]';
+      UPDATE competition_gameplay_rules SET duration_seconds=60,scoring_mode='fixed',correct_points=12,points_lost_per_second=0;
     `);
     const copied = createCompetitionWorkspace(db,"نسخة باسم مختلف","team","legacy");
     activateCompetitionWorkspace(db,copied.id);
@@ -118,6 +123,8 @@ test("M7.2 duplicate copies setup, sponsor branding and question quotas but not 
     assert.equal((db.prepare("SELECT COUNT(*) AS count FROM qualification_rounds").get() as {count:number}).count,0);
     assert.equal((db.prepare("SELECT event_title AS title FROM audience_settings").get() as {title:string}).title,"نسخة باسم مختلف");
     assert.equal(getCompetitionRules(db).questionsPerRound,12);
+    assert.equal(getCompetitionGameplayRules(db).durationSeconds,60);
+    assert.equal(getCompetitionGameplayRules(db).correctPoints,12);
     assert.equal((db.prepare("SELECT phase FROM live_state").get() as {phase:string}).phase,"IDLE");
   } finally { db.close(); }
 });

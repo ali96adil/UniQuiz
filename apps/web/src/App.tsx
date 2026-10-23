@@ -3,6 +3,7 @@ import { ArchivesPanel } from "./Archives.js";
 import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { RoundRulesPanel } from "./RoundRules.js";
 import { RoundOverridesPanel } from "./RoundOverrides.js";
+import { GameplayRulesPanel } from "./GameplayRules.js";
 import { CompetitionWorkspacesPanel, PARTICIPANT_LABELS, type ParticipantType } from "./CompetitionWorkspaces.js";
 import { io } from "socket.io-client";
 import type {
@@ -11,6 +12,7 @@ import type {
   BulkImportPreview,
   ClientRole,
   CompetitionSetupSnapshot,
+  CompetitionGameplayRules,
   DrawPresentationEvent,
   LiveSnapshot,
   LiveTeamSubmissionState,
@@ -2342,12 +2344,14 @@ function AudiencePreShowSurface({
   allocation,
   presentationKey,
   participantType,
+  gameplay,
 }: {
   settings: AudienceDisplaySettings;
   categories: QuestionBankSummary["categories"];
   allocation: QuestionAllocationSummary | null;
   presentationKey: string;
   participantType: ParticipantType;
+  gameplay: CompetitionGameplayRules | null;
 }) {
   const activeCategories = categories.filter((category) =>
     allocation?.categories.some((item) => item.key === category.key && item.requiredQuestions > 0),
@@ -2511,7 +2515,7 @@ function AudiencePreShowSurface({
                   <span>02</span>
                   <b>آلية المسابقة</b>
                 </div>
-                <h2>واضحة، سريعة، وكل ثانية تصنع فرقاً</h2>
+                <h2>{gameplay?.scoringMode === "fixed" ? "قواعد واضحة، وكل إجابة صحيحة تصنع فرقاً" : "واضحة، سريعة، وكل ثانية تصنع فرقاً"}</h2>
               </div>
 
               <div className="preshow-v3-flow" aria-label="تسلسل آلية المسابقة">
@@ -2526,13 +2530,15 @@ function AudiencePreShowSurface({
                 </div>
                 <i aria-hidden="true">←</i>
                 <div>
-                  <strong>25</strong>
+                  <strong>{gameplay?.durationSeconds ?? 25}</strong>
                   <span>ثانية لكل سؤال</span>
                 </div>
                 <i aria-hidden="true">←</i>
                 <div>
-                  <strong>25 → 1</strong>
-                  <span>نقطة حسب سرعة الإجابة</span>
+                  <strong>{gameplay?.scoringMode === "fixed"
+                    ? String(gameplay.correctPoints)
+                    : `${gameplay?.correctPoints ?? 25} − ${gameplay?.pointsLostPerSecond ?? 1}/ث`}</strong>
+                  <span>{gameplay?.scoringMode === "fixed" ? "نقطة للصحيحة" : "نقاط حسب سرعة الإجابة"}</span>
                 </div>
               </div>
 
@@ -2542,7 +2548,9 @@ function AudiencePreShowSurface({
                   الإجابة فور إرسالها.
                 </p>
                 <p>
-                  <b>الاحتساب:</b> الصحيحة تنخفض نقطة كل ثانية،
+                  <b>الاحتساب:</b> {gameplay?.scoringMode === "fixed"
+                    ? `الصحيحة = ${gameplay.correctPoints} نقطة ثابتة`
+                    : `الصحيحة تبدأ من ${gameplay?.correctPoints ?? 25} نقطة، وتقل ${gameplay?.pointsLostPerSecond ?? 1} نقطة كل ثانية كاملة`}،
                   والخاطئة أو عدم الإجابة = 0.
                 </p>
                 <p>
@@ -4028,7 +4036,7 @@ function OperatorLivePanel({
 
       {snapshot.phase === "QUESTION_ACTIVE" ? (
         <p className="locked-note">
-          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء 25 ثانية.
+          السؤال فعال. ينغلق عند اكتمال الإجابات المطلوبة أو انتهاء {snapshot.gameplay.durationSeconds} ثانية.
         </p>
       ) : null}
 
@@ -4649,6 +4657,7 @@ export function App() {
   const [runtimeMode, setRuntimeMode] =
     useState<RuntimeMode>("official");
   const [participantType, setParticipantType] = useState<ParticipantType>("college");
+  const [gameplayRules, setGameplayRules] = useState<CompetitionGameplayRules | null>(null);
 
   useEffect(() => {
     void fetch("/api/competitions")
@@ -4760,8 +4769,10 @@ export function App() {
       "live:snapshot",
       (snapshot: LiveSnapshot) => {
         setLiveSnapshot(snapshot);
+        setGameplayRules(snapshot.gameplay);
       },
     );
+    socket.on("competition:gameplay", (rules: CompetitionGameplayRules) => setGameplayRules(rules));
     socket.on(
       "ranking:snapshot",
       (snapshot: QualificationRankingSnapshot) => {
@@ -4926,6 +4937,10 @@ export function App() {
           <CategoryLabelsPanel questionBank={questionBank} />
           <RoundRulesPanel questionBank={questionBank} allocation={questionAllocation} />
           <RoundOverridesPanel questionBank={questionBank} allocation={questionAllocation} />
+          <GameplayRulesPanel
+            locked={competition.rounds.some((round) => round.status !== "PENDING") || (liveSnapshot !== null && liveSnapshot.phase !== "IDLE")}
+            onSaved={setGameplayRules}
+          />
           <SetupSurface snapshot={competition} participantType={participantType} />
           <DrawSurface snapshot={competition} />
           <QuestionAllocationPanel allocation={questionAllocation} />
@@ -4956,6 +4971,7 @@ export function App() {
               categories={questionBank?.categories ?? []}
               allocation={questionAllocation}
               participantType={participantType}
+              gameplay={gameplayRules}
               presentationKey={audiencePresentation.updatedAt}
             />
           </AudienceSceneTransition>

@@ -41,6 +41,7 @@ const eventTables = [
   "live_submissions",
   "competition_state",
   "competition_rules",
+  "competition_gameplay_rules",
   "live_state",
   "audience_settings",
   "audience_copy",
@@ -93,6 +94,7 @@ function emptySnapshot(
     id: 1, participants_locked: 0, draw_created_at: null, selected_round_id: null,
   }];
   saved.competition_rules = [{ id: 1, distribution_json: null }];
+  saved.competition_gameplay_rules = [{ id: 1, duration_seconds: 25, scoring_mode: "time_decay", correct_points: 25, points_lost_per_second: 1 }];
   saved.live_state = [{
     id: 1, phase: "IDLE", round_id: null, question_position: null,
     stations_confirmed: 0, countdown_started_at_epoch_ms: null,
@@ -126,6 +128,7 @@ function duplicateSetup(
   target.colleges = source.colleges;
   target.participants = source.participants;
   target.competition_rules = source.competition_rules;
+  target.competition_gameplay_rules = source.competition_gameplay_rules;
   target.audience_settings = source.audience_settings.map((row) => ({
     ...row, event_title: title, updated_at: new Date().toISOString(),
   }));
@@ -143,6 +146,9 @@ function parseSnapshot(value: string): StoredSnapshot {
   // additive M7.4 migration treats it as a legacy/default-only competition.
   if (parsed.qualification_round_rules === undefined) {
     parsed.qualification_round_rules = [];
+  }
+  if (parsed.competition_gameplay_rules === undefined) {
+    parsed.competition_gameplay_rules = [{ id: 1, duration_seconds: 25, scoring_mode: "time_decay", correct_points: 25, points_lost_per_second: 1 }];
   }
   if (eventTables.some((table) => !Array.isArray(parsed[table]))) {
     throw new Error("WORKSPACE_SNAPSHOT_INVALID");
@@ -169,7 +175,7 @@ function restore(db: AppDatabase, saved: StoredSnapshot): void {
     "qualification_round_questions", "qualification_round_question_sets",
     "qualification_round_rules", "qualification_rounds", "participants", "colleges",
     "audience_assets", "audience_copy", "audience_presentation",
-    "audience_settings", "competition_rules", "competition_state", "live_state",
+    "audience_settings", "competition_gameplay_rules", "competition_rules", "competition_state", "live_state",
   ];
   for (const table of deleteOrder) {
     db.prepare("DELETE FROM " + table).run();
@@ -179,7 +185,7 @@ function restore(db: AppDatabase, saved: StoredSnapshot): void {
     "colleges", "participants", "qualification_rounds",
     "qualification_round_rules", "qualification_round_question_sets", "qualification_round_questions",
     "qualification_question_reservations", "audit_events", "live_submissions",
-    "competition_state", "competition_rules", "live_state", "audience_settings",
+    "competition_state", "competition_rules", "competition_gameplay_rules", "live_state", "audience_settings",
     "audience_copy", "audience_assets", "audience_presentation",
   ];
   for (const table of insertOrder) insertRows(db, table, saved[table]);

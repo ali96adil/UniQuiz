@@ -1,3 +1,5 @@
+import type { CompetitionGameplayRules } from "./competition-gameplay.js";
+import { DEFAULT_GAMEPLAY_RULES } from "./competition-gameplay.js";
 export const SCORE_MICROS_PER_POINT = 1_000_000;
 export const MAX_SCORE_POINTS = 25;
 export const MAX_SCORE_MICROS =
@@ -10,6 +12,7 @@ export const QUESTION_DEADLINE_MS = 25_000;
 export function calculateScoreMicros(
   correct: boolean,
   responseTimeMs: number | null,
+  rules: CompetitionGameplayRules = DEFAULT_GAMEPLAY_RULES,
 ): number {
   if (!correct || responseTimeMs === null) {
     return 0;
@@ -22,20 +25,20 @@ export function calculateScoreMicros(
     throw new Error("responseTimeMs must be a non-negative integer.");
   }
 
-  if (responseTimeMs >= QUESTION_DEADLINE_MS) {
+  if (responseTimeMs >= rules.durationSeconds * 1000) {
     return 0;
   }
 
-  const remainingMs =
-    QUESTION_DEADLINE_MS - responseTimeMs;
-  const displayedRemainingSeconds = Math.ceil(
-    remainingMs / 1000,
-  );
-  const scorePoints = Math.min(
-    MAX_SCORE_POINTS,
-    displayedRemainingSeconds,
-  );
+  if (rules.scoringMode === "fixed") {
+    return rules.correctPoints * SCORE_MICROS_PER_POINT;
+  }
 
+  // The first 999 ms receive full credit, as in the original competition.
+  const elapsedWholeSeconds = Math.floor(responseTimeMs / 1000);
+  const scorePoints = Math.max(
+    1,
+    rules.correctPoints - elapsedWholeSeconds * rules.pointsLostPerSecond,
+  );
   return scorePoints * SCORE_MICROS_PER_POINT;
 }
 
