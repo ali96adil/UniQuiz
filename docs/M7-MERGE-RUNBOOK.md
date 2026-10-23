@@ -88,11 +88,11 @@ They are not stages in the ancestor-chain above.
    (merge commits retain ancestry):
    ```bash
    git fetch origin
-   git merge-base --is-ancestor 3fcfbf5596d4ef3c88d448aebf5c0fdb332da501 origin/main
-   echo "M7_SHA_IN_MAIN"
+   git merge-base --is-ancestor 3fcfbf5596d4ef3c88d448aebf5c0fdb332da501 origin/main \
+     && echo "M7_SHA_IN_MAIN" \
+     || echo "M7_SHA_NOT_IN_MAIN"
    ```
-   Do not assume the check passed because an echo command ran: execute
-   with `&& echo M7_SHA_IN_MAIN || echo M7_SHA_NOT_IN_MAIN`.
+   The release is not complete if it prints `M7_SHA_NOT_IN_MAIN`.
    Verify full CI on the resulting main commit as well.
 6. **Release and deployment are separate tasks.** A Git merge cannot
    overwrite the Mac's official SQLite database, but starting a newer
