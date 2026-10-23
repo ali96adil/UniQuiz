@@ -42,9 +42,23 @@ Introduce `competitions(id, name, status, created_at, archived_at, settings_json
 
 ### M7.3 scoring + allocation (implemented in stacked PR #26; draft)
 
-The active competition now stores selected category quotas in `competition_rules.distribution_json`, e.g. `[{categoryKey:'sports_specialist',questions:12}]`, with the previous 5×2 distribution as the default. The allocator, live transitions, operator hotkeys, station view and public pre-show read the dynamic count. Legacy SQLite `position BETWEEN 1 AND 10` constraints upgrade transactionally while preserving answers and scores. Integration tests cover sports-only 12 questions, no repeats and schema upgrade. **Still pending:** per-round overrides, adjustable question duration and scoring strategy, multiple fully independent active competitions, and reusable participant types.
+The active competition now stores selected category quotas in `competition_rules.distribution_json`, e.g. `[{categoryKey:'sports_specialist',questions:12}]`, with the previous 5×2 distribution as the default. The allocator, live transitions, operator hotkeys, station view and public pre-show read the dynamic count. Legacy SQLite `position BETWEEN 1 AND 10` constraints upgrade transactionally while preserving answers and scores. Integration tests cover sports-only 12 questions, no repeats and schema upgrade. **Still pending after M7.4:** adjustable question duration and scoring strategy, multiple simultaneously live competitions, and removing the current 20-participant draw limit.
 
-### M7.4 themes and reusable layouts
+### M7.4 independent per-round plans — PR #28 (draft)
+
+**The number 12 is only an example, never a fixed or mandatory count.** The competition default can specify 1–100 questions from one or multiple categories, and **each drawn round may independently override** the categories and counts (e.g. round 1: 5 sports; round 2: 12 sports + 3 geography; round 3: 20 sports).
+
+- Optional `qualification_round_rules(round_id, distribution_json)` stores per-round quotas. Existing rounds without overrides inherit `competition_rules`.
+- Operator screen shows a per-round plan editor with a revert-to-default action; edits are blocked once a round has a locked question set or has started.
+- Allocation pools all categories used across rounds, sums required inventory, randomly distributes only unused questions, and rejects insufficient inventory before inserting any sets.
+- `LiveSessionManager` reads the prepared round's own question count for 3-2-1 sequencing, question bounds, question counters and final reveal/round completion.
+- Audience pre-show displays varying question counts correctly. Excel inventory warnings use the sum of the actual planned quotas rather than a hard-coded 2×roundCount.
+- Round rules are included in historical archives, retained by workspace switching, and have a backward-compatibility fallback for M7.2 saved workspaces.
+- Integration tests cover a single competition's 5/15/20-question rounds, multiple categories, no repeats, count validation and locking.
+
+The validated user-configurable limit is currently 1–100 questions per round for operator safety and practical performance. This is an implementation range, **not a requirement to choose 12**. Changing the time limit or scoring independently is a separate upcoming feature.
+
+### M7.5 themes and reusable layouts
 
 Each competition gets editable title, logo, sponsor identity, colors, animation and pre-show pages, using presets. Reuse proven permissively licensed components rather than importing unrelated quiz frameworks wholesale:
 

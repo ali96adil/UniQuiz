@@ -60,6 +60,15 @@ export function openDatabase(databasePath: string) {
       FOREIGN KEY (college_b_id) REFERENCES colleges(id)
     );
 
+    -- An optional distribution for a particular draw round. If absent,
+    -- that round inherits the current competition-wide category quotas.
+    CREATE TABLE IF NOT EXISTS qualification_round_rules (
+      round_id INTEGER PRIMARY KEY,
+      distribution_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (round_id) REFERENCES qualification_rounds(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category_key TEXT NOT NULL UNIQUE,
@@ -420,7 +429,7 @@ export function openDatabase(databasePath: string) {
     })();
   }
 
-  db.prepare("UPDATE app_meta SET value = '14' WHERE key = 'schema_version'").run();
+  db.prepare("UPDATE app_meta SET value = '15' WHERE key = 'schema_version'").run();
   return db;
 }
 

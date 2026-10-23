@@ -32,3 +32,31 @@ export function getCompetitionRules(db: AppDatabase): CompetitionRules {
     categories: oldCategories.map(({ categoryKey }) => ({ categoryKey, questions: 2 })),
   };
 }
+
+export interface RoundRules extends CompetitionRules {
+  roundId: number;
+  customized: boolean;
+}
+
+export function getRoundRules(db: AppDatabase, roundId: number): RoundRules {
+  const override = db.prepare(
+    "SELECT distribution_json AS distributionJson FROM qualification_round_rules WHERE round_id = ?",
+  ).get(roundId) as { distributionJson: string } | undefined;
+  const defaultRules = getCompetitionRules(db);
+  const categories = override
+    ? JSON.parse(override.distributionJson) as CategoryQuota[]
+    : defaultRules.categories;
+  return {
+    roundId,
+    customized: Boolean(override),
+    categories,
+    questionsPerRound: categories.reduce((sum, item) => sum + item.questions, 0),
+  };
+}
+
+export function getAllRoundRules(db: AppDatabase): RoundRules[] {
+  const rounds = db.prepare(
+    "SELECT id FROM qualification_rounds ORDER BY round_order",
+  ).all() as Array<{ id: number }>;
+  return rounds.map((round) => getRoundRules(db, round.id));
+}

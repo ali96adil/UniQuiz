@@ -7,13 +7,13 @@ import type {
   RoundQuestionSetSummary,
 } from "@uniquiz/shared";
 import {
-  allocateQualificationQuestions,
+  allocateRoundsByPlan,
   type CategoryQuestionPool,
 } from "./allocation.js";
 import { appendAuditEvent } from "./audit.js";
 import type { AppDatabase } from "./database.js";
 import { getQuestionBankSummary } from "./importer.js";
-import { getCompetitionRules } from "./competition-rules.js";
+import { getCompetitionRules, getRoundRules, getAllRoundRules } from "./competition-rules.js";
 
 const allocateSchema = z.object({
   confirm: z.literal("ALLOCATE_QUESTIONS"),
@@ -87,10 +87,17 @@ export function getQuestionAllocationSummary(
 
   const rules = getCompetitionRules(db);
   const quotas = new Map(rules.categories.map((item) => [item.categoryKey, item.questions]));
-  const selectedCategories = categories.filter((item) => quotas.has(item.key));
+  const roundPlans = getAllRoundRules(db);
+  const requiredByCategory = new Map<string, number>();
+  for (const plan of roundPlans) {
+    for (const quota of plan.categories) {
+      requiredByCategory.set(quota.categoryKey, (requiredByCategory.get(quota.categoryKey) ?? 0) + quota.questions);
+    }
+  }
   const requiredPerCategory = rounds.length * 2; // Kept for older clients.
 
   const roundSummaries: RoundQuestionSetSummary[] = rounds.map((round) => {
+    const plan = getRoundRules(db, round.id);
     const locked = db.prepare(`
       SELECT 1 AS locked
       FROM qualification_round_question_sets
@@ -121,6 +128,9 @@ export function getQuestionAllocationSummary(
       locked: Boolean(locked),
       questionCount: rows.reduce((sum, row) => sum + row.count, 0),
       categoryCounts,
+      plannedQuestionCount: plan.questionsPerRound,
+      plannedCategoryCounts: Object.fromEntries(plan.categories.map((item) => [item.categoryKey, item.questions])),
+      customized: plan.customized,
     };
   });
 
@@ -130,22 +140,22 @@ export function getQuestionAllocationSummary(
     requiredPerCategory,
     ready:
       rounds.length > 0 &&
-      rules.categories.length > 0 &&
-      selectedCategories.length === rules.categories.length &&
-      rules.categories.reduce((sum, item) => sum + item.questions, 0) === rules.questionsPerRound &&
-      roundSummaries.every(
-        (round) =>
-          round.locked &&
-          round.questionCount === rules.questionsPerRound &&
-          selectedCategories.every(
-            (category) => round.categoryCounts[category.key] === quotas.get(category.key),
-          ),
+      roundPlans.every((plan) => plan.categories.length > 0 &&
+        plan.questionsPerRound >= 1 && plan.questionsPerRound <= 100 &&
+        plan.categories.every((quota) => categories.some((category) => category.key === quota.categoryKey))) &&
+      roundSummaries.every((round) =>
+        round.locked &&
+        round.questionCount === round.plannedQuestionCount &&
+        Object.keys(round.categoryCounts).length === Object.keys(round.plannedCategoryCounts).length &&
+        Object.entries(round.plannedCategoryCounts).every(
+          ([key, count]) => round.categoryCounts[key] === count,
+        ),
       ),
     categories: categories.map((category) => ({
       key: category.key,
       name: category.name,
       availableQuestions: category.availableQuestions,
-      requiredQuestions: rounds.length * (quotas.get(category.key) ?? 0),
+      requiredQuestions: requiredByCategory.get(category.key) ?? 0,
       quotaPerRound: quotas.get(category.key) ?? 0,
     })),
     rounds: roundSummaries,
@@ -227,6 +237,69 @@ export function registerQuestionBankRoutes(
     return rules;
   });
 
+  // Per-round quotas override the competition default without altering other rounds.
+  app.put<{ Params: { roundId: string } }>(
+    "/api/competition/rounds/:roundId/rules",
+    async (request, reply) => {
+      const roundId = Number(request.params.roundId);
+      const parsed = rulesSchema.safeParse(request.body);
+      if (!Number.isSafeInteger(roundId) || roundId < 1 || !parsed.success) {
+        return reply.code(400).send({ error: "INVALID_ROUND_RULES" });
+      }
+      const round = db.prepare(
+        "SELECT status FROM qualification_rounds WHERE id=?",
+      ).get(roundId) as { status: string } | undefined;
+      if (!round) return reply.code(404).send({ error: "ROUND_NOT_FOUND" });
+      const locked = db.prepare(
+        "SELECT 1 FROM qualification_round_question_sets WHERE round_id=?",
+      ).get(roundId);
+      if (locked || round.status !== "PENDING") {
+        return conflict(reply, "ROUND_RULES_LOCKED", "Round has already been allocated or started.");
+      }
+      const categories = parsed.data.categories;
+      const total = categories.reduce((sum, item) => sum + item.questions, 0);
+      const keys = new Set(categories.map((item) => item.categoryKey));
+      if (total > 100 || keys.size !== categories.length) {
+        return reply.code(400).send({ error: "INVALID_QUOTA_DISTRIBUTION" });
+      }
+      const existingRows = db.prepare(
+        "SELECT category_key AS categoryKey FROM categories",
+      ).all() as Array<{ categoryKey: string }>;
+      const existing = new Set(existingRows.map((item) => item.categoryKey));
+      if (categories.some((item) => !existing.has(item.categoryKey))) {
+        return reply.code(400).send({ error: "UNKNOWN_CATEGORY" });
+      }
+      db.prepare(`
+        INSERT INTO qualification_round_rules (round_id, distribution_json, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(round_id) DO UPDATE SET
+          distribution_json=excluded.distribution_json, updated_at=excluded.updated_at
+      `).run(roundId, JSON.stringify(categories), new Date().toISOString());
+      return { rules: getRoundRules(db, roundId), allocation: publish() };
+    },
+  );
+
+  app.delete<{ Params: { roundId: string } }>(
+    "/api/competition/rounds/:roundId/rules",
+    async (request, reply) => {
+      const roundId = Number(request.params.roundId);
+      if (!Number.isSafeInteger(roundId) || roundId < 1) {
+        return reply.code(400).send({ error: "INVALID_ROUND_ID" });
+      }
+      const round = db.prepare("SELECT status FROM qualification_rounds WHERE id=?")
+        .get(roundId) as { status: string } | undefined;
+      if (!round) return reply.code(404).send({ error: "ROUND_NOT_FOUND" });
+      const locked = db.prepare(
+        "SELECT 1 FROM qualification_round_question_sets WHERE round_id=?",
+      ).get(roundId);
+      if (locked || round.status !== "PENDING") {
+        return conflict(reply, "ROUND_RULES_LOCKED", "Round has already been allocated or started.");
+      }
+      db.prepare("DELETE FROM qualification_round_rules WHERE round_id=?").run(roundId);
+      return { rules: getRoundRules(db, roundId), allocation: publish() };
+    },
+  );
+
   app.get("/api/question-bank/allocation", async () =>
     getQuestionAllocationSummary(db),
   );
@@ -285,17 +358,24 @@ export function registerQuestionBankRoutes(
       ORDER BY sort_order, id
     `).all() as CategoryRow[];
 
-    const rules = getCompetitionRules(db);
     const categoryMap = new Map(categories.map((category) => [category.key, category]));
-    if (rules.categories.length === 0 ||
-      rules.categories.reduce((sum, category) => sum + category.questions, 0) !== rules.questionsPerRound ||
-      rules.categories.some((category) => !categoryMap.has(category.categoryKey))) {
+    const plans = rounds.map((round) => getRoundRules(db, round.id));
+    if (plans.some((plan) =>
+      plan.questionsPerRound < 1 || plan.questionsPerRound > 100 ||
+      plan.categories.length === 0 ||
+      plan.categories.some((quota) => !categoryMap.has(quota.categoryKey)))) {
       return conflict(reply, "ROUND_RULES_INCOMPLETE", "Select valid category quotas before allocation.");
     }
-    const insufficient = rules.categories
-      .map((quota) => {
-        const category = categoryMap.get(quota.categoryKey)!;
-        return { key: category.key, name: category.name, available: category.availableQuestions, required: rounds.length * quota.questions };
+    const required = new Map<string, number>();
+    for (const plan of plans) {
+      for (const quota of plan.categories) {
+        required.set(quota.categoryKey, (required.get(quota.categoryKey) ?? 0) + quota.questions);
+      }
+    }
+    const insufficient = [...required.entries()]
+      .map(([key, count]) => {
+        const category = categoryMap.get(key)!;
+        return { key, name: category.name, available: category.availableQuestions, required: count };
       })
       .filter((category) => category.available < category.required);
 
@@ -308,9 +388,8 @@ export function registerQuestionBankRoutes(
       );
     }
 
-    const pools: CategoryQuestionPool[] = rules.categories.map((quota) => ({
-      categoryId: categoryMap.get(quota.categoryKey)!.id,
-      questionsPerRound: quota.questions,
+    const pools: CategoryQuestionPool[] = [...required.keys()].map((key) => ({
+      categoryId: categoryMap.get(key)!.id,
       questionIds: (
         db.prepare(`
           SELECT id
@@ -318,12 +397,18 @@ export function registerQuestionBankRoutes(
           WHERE category_id = ?
             AND active = 1
           ORDER BY id
-        `).all(categoryMap.get(quota.categoryKey)!.id) as Array<{ id: number }>
+        `).all(categoryMap.get(key)!.id) as Array<{ id: number }>
       ).map((row) => row.id),
     }));
 
-    const allocation = allocateQualificationQuestions(
-      rounds.map((round) => round.id),
+    const allocation = allocateRoundsByPlan(
+      plans.map((plan) => ({
+        roundId: plan.roundId,
+        categories: plan.categories.map((quota) => ({
+          categoryId: categoryMap.get(quota.categoryKey)!.id,
+          questions: quota.questions,
+        })),
+      })),
       pools,
       (upperExclusive) => randomInt(upperExclusive),
     );

@@ -18,6 +18,7 @@ const historicalTables = [
   "competition_state",
   "participants",
   "qualification_rounds",
+  "qualification_round_rules",
   "qualification_round_question_sets",
   "qualification_round_questions",
   "qualification_question_reservations",

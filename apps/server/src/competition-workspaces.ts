@@ -33,6 +33,7 @@ const eventTables = [
   "colleges",
   "participants",
   "qualification_rounds",
+  "qualification_round_rules",
   "qualification_round_question_sets",
   "qualification_round_questions",
   "qualification_question_reservations",
@@ -135,8 +136,15 @@ function duplicateSetup(
 
 function parseSnapshot(value: string): StoredSnapshot {
   const parsed = JSON.parse(value) as Partial<StoredSnapshot>;
-  if (!parsed || typeof parsed !== "object" ||
-      eventTables.some((table) => !Array.isArray(parsed[table]))) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("WORKSPACE_SNAPSHOT_INVALID");
+  }
+  // A workspace created with M7.2 has no per-round rules table yet. The
+  // additive M7.4 migration treats it as a legacy/default-only competition.
+  if (parsed.qualification_round_rules === undefined) {
+    parsed.qualification_round_rules = [];
+  }
+  if (eventTables.some((table) => !Array.isArray(parsed[table]))) {
     throw new Error("WORKSPACE_SNAPSHOT_INVALID");
   }
   return parsed as StoredSnapshot;
@@ -159,7 +167,7 @@ function restore(db: AppDatabase, saved: StoredSnapshot): void {
   const deleteOrder: EventTable[] = [
     "live_submissions", "audit_events", "qualification_question_reservations",
     "qualification_round_questions", "qualification_round_question_sets",
-    "qualification_rounds", "participants", "colleges",
+    "qualification_round_rules", "qualification_rounds", "participants", "colleges",
     "audience_assets", "audience_copy", "audience_presentation",
     "audience_settings", "competition_rules", "competition_state", "live_state",
   ];
@@ -169,7 +177,7 @@ function restore(db: AppDatabase, saved: StoredSnapshot): void {
   // Parent/child order is intentional so foreign_keys stays ON.
   const insertOrder: EventTable[] = [
     "colleges", "participants", "qualification_rounds",
-    "qualification_round_question_sets", "qualification_round_questions",
+    "qualification_round_rules", "qualification_round_question_sets", "qualification_round_questions",
     "qualification_question_reservations", "audit_events", "live_submissions",
     "competition_state", "competition_rules", "live_state", "audience_settings",
     "audience_copy", "audience_assets", "audience_presentation",

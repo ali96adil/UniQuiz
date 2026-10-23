@@ -8,7 +8,7 @@ import Fastify from "fastify";
 import { Server as SocketIOServer } from "socket.io";
 import { LiveSessionManager } from "./live-session.js";
 import { registerCompetitionWorkspaceRoutes } from "./competition-workspaces.js";
-import { getCompetitionRules } from "./competition-rules.js";
+import { getCompetitionRules, getRoundRules } from "./competition-rules.js";
 import {
   activateCompetitionWorkspace,
   activeWorkspaceId,
@@ -48,6 +48,8 @@ test("M7.2 keeps results and sponsorship isolated while retaining the shared que
       UPDATE live_state SET phase='ROUND_COMPLETE',round_id=1,question_position=1;
       UPDATE audience_settings SET event_title='جامعة بابل 2026';
       UPDATE competition_rules SET distribution_json='[{"categoryKey":"sports_specialist","questions":12}]';
+      INSERT INTO qualification_round_rules(round_id,distribution_json,updated_at)
+      VALUES (1,'[{"categoryKey":"sports_specialist","questions":5}]',CURRENT_TIMESTAMP);
     `);
     const logo = Buffer.from([0,1,2,3,255]);
     db.prepare("INSERT INTO audience_assets(slot,mime_type,bytes,updated_at) VALUES('university','image/png',?,CURRENT_TIMESTAMP)").run(logo);
@@ -75,6 +77,7 @@ test("M7.2 keeps results and sponsorship isolated while retaining the shared que
     assert.equal((db.prepare("SELECT score_micros AS score FROM live_submissions").get() as {score:number}).score,24000000);
     assert.equal((db.prepare("SELECT event_title AS title FROM audience_settings").get() as {title:string}).title,"جامعة بابل 2026");
     assert.equal(getCompetitionRules(db).questionsPerRound,12);
+    assert.equal(getRoundRules(db,1).questionsPerRound,5);
     assert.deepEqual((db.prepare("SELECT bytes FROM audience_assets").get() as {bytes:Buffer}).bytes,logo);
     assert.deepEqual(db.pragma("foreign_key_check"),[]);
 
@@ -159,4 +162,21 @@ test("M7.2 HTTP activation creates a verified physical backup before switching",
     db.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("M7.4 safely loads M7.2 workspaces without the new round-rule table", () => {
+  const db = openDatabase(":memory:");
+  try {
+    const oldWorkspace = createCompetitionWorkspace(db,"Old M7.2","team");
+    const saved = db.prepare(
+      "SELECT payload_json AS payload FROM competition_workspaces WHERE id=?",
+    ).get(oldWorkspace.id) as {payload: string};
+    const json = JSON.parse(saved.payload) as Record<string, unknown>;
+    delete json.qualification_round_rules;
+    db.prepare("UPDATE competition_workspaces SET payload_json=? WHERE id=?")
+      .run(JSON.stringify(json),oldWorkspace.id);
+    activateCompetitionWorkspace(db,oldWorkspace.id);
+    assert.equal(activeWorkspaceId(db),oldWorkspace.id);
+    assert.deepEqual(db.prepare("SELECT * FROM qualification_round_rules").all(),[]);
+  } finally { db.close(); }
 });

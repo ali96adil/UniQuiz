@@ -13,6 +13,7 @@ import type {
 } from "@uniquiz/shared";
 import { getCompetitionSnapshot } from "./competition.js";
 import type { AppDatabase } from "./database.js";
+import { getAllRoundRules } from "./competition-rules.js";
 
 interface RawRecord {
   [key: string]: string;
@@ -475,19 +476,17 @@ function existingQuestionCounts(
 
 function qualificationRequiredPerCategory(
   db: AppDatabase,
-): number {
-  if (!tableExists(db, "qualification_rounds")) {
-    return 2;
+): Map<string, number> {
+  const requirements = new Map<string, number>();
+  // Import previews also run against partial schemas and fresh staging DBs.
+  if (!tableExists(db, "qualification_rounds")) return requirements;
+  for (const round of getAllRoundRules(db)) {
+    for (const quota of round.categories) {
+      const key = normalizeKey(quota.categoryKey);
+      requirements.set(key, (requirements.get(key) ?? 0) + quota.questions);
+    }
   }
-
-  const roundCount = (
-    db.prepare(`
-      SELECT COUNT(*) AS count
-      FROM qualification_rounds
-    `).get() as { count: number }
-  ).count;
-
-  return Math.max(2, roundCount * 2);
+  return requirements;
 }
 
 export async function parseImportBuffer(
@@ -624,14 +623,15 @@ export async function parseImportBuffer(
       const combinedCount =
         (baseCounts.get(categoryKey) ?? 0) +
         (importedCounts.get(categoryKey) ?? 0);
+      const required = requiredPerCategory.get(categoryKey) ?? 0;
 
-      if (combinedCount < requiredPerCategory) {
+      if (combinedCount < required) {
         issue(
           issues,
           "warning",
           "Questions",
           null,
-          `Category ${categoryKey} will have ${combinedCount} questions after append; ${requiredPerCategory} are required for the current qualification draw.`,
+          `Category ${categoryKey} will have ${combinedCount} questions after append; ${required} are required for the current qualification draw.`,
         );
       }
     }
