@@ -11,6 +11,7 @@ This document applies to the stacked PR sequence:
 7. PR #31 — verified startup migration backup and integration hardening
 8. PR #32 — full-flow competition verification and event-scoped readiness
 9. PR #33 — accurate Excel results for configurable timing/scoring and variable rounds
+10. PR #34 — verify on-disk SQLite backup hash and integrity before preflight READY
 
 **Status: DRAFT.** Do not merge or install on the official tournament Mac
 until an operator has rehearsed the upgrade on an isolated copy of the actual
@@ -144,6 +145,18 @@ conditions. This is **synthetic CI**, not the Mac rehearsal below.
    the guided progress tracker must not claim operational READY.
 9. **Recovery:** restart only the rehearsal server and repeat checks for
    the archived event and new workspaces.
+
+## Backup checksum acceptance
+
+The event-day Backup check validates both SQLite page integrity and the
+SHA-256 of the backup file, rather than relying solely on the stored
+metadata and file size. An altered or unreadable backup must show NOT READY,
+even if its JSON sidecar has not changed. Create a fresh backup from the
+current competition and recheck before the show.
+
+See [M7 security release gates](M7-SECURITY-RELEASE-GATES.md) for remaining
+operator/privileged API authorization risks: **do not expose this draft on
+an untrusted LAN or public tunnel**.
 
 ## Historical results export acceptance
 
