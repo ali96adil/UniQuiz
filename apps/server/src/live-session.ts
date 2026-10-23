@@ -373,7 +373,7 @@ export class LiveSessionManager {
         rqq.question_id AS questionId,
         rqq.position,
         c.category_key AS categoryKey,
-        c.name AS categoryName,
+        COALESCE(NULLIF(TRIM(c.display_name), ''), c.name) AS categoryName,
         q.prompt,
         q.option_a AS optionA,
         q.option_b AS optionB,

@@ -12,6 +12,7 @@ import {
 } from "./allocation.js";
 import { appendAuditEvent } from "./audit.js";
 import type { AppDatabase } from "./database.js";
+import { getQuestionBankSummary } from "./importer.js";
 
 const allocateSchema = z.object({
   confirm: z.literal("ALLOCATE_QUESTIONS"),
@@ -151,6 +152,28 @@ export function registerQuestionBankRoutes(
     io.emit("question-allocation:snapshot", summary);
     return summary;
   };
+
+  // Editorial and audience labels are independent; updating one never rewrites old archives.
+  app.put<{ Params: { key: string } }>(
+    "/api/question-bank/categories/:key/display-name",
+    async (request, reply) => {
+      const body = z.object({
+        displayName: z.string().trim().min(1).max(120),
+      }).safeParse(request.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: "INVALID_DISPLAY_NAME", issues: body.error.issues });
+      }
+      const result = db.prepare(
+        "UPDATE categories SET display_name = ? WHERE category_key = ?",
+      ).run(body.data.displayName, request.params.key);
+      if (result.changes === 0) {
+        return reply.code(404).send({ error: "CATEGORY_NOT_FOUND" });
+      }
+      const questionBank = getQuestionBankSummary(db);
+      io.emit("question-bank:snapshot", questionBank);
+      return { ok: true, questionBank };
+    },
+  );
 
   app.get("/api/question-bank/allocation", async () =>
     getQuestionAllocationSummary(db),

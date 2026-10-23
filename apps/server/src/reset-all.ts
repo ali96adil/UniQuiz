@@ -11,6 +11,8 @@ import type { LiveSessionManager } from "./live-session.js";
 import { getQuestionAllocationSummary } from "./question-bank.js";
 import { getQualificationRanking } from "./ranking.js";
 import { createDatabaseBackup } from "./operations.js";
+import { saveCompetitionArchive } from "./competition-archives.js";
+import { getAudienceDisplaySettings } from "./audience-settings.js";
 
 const resetAllSchema = z.object({
   confirm: z.literal("RESET_ALL_COMPETITION_DATA"),
@@ -27,8 +29,7 @@ export function resetAllCompetitionData(
     db.prepare("DELETE FROM qualification_round_question_sets").run();
     db.prepare("DELETE FROM qualification_rounds").run();
     db.prepare("DELETE FROM participants").run();
-    db.prepare("DELETE FROM questions").run();
-    db.prepare("DELETE FROM categories").run();
+    // Reuse the permanent question/category library in the next competition.
     db.prepare("DELETE FROM colleges").run();
 
     db.prepare(`
@@ -72,14 +73,12 @@ export function resetAllCompetitionData(
       WHERE id = 1
     `).run(new Date().toISOString());
 
-    // Reset user-data row ids for a genuinely clean rehearsal/setup state.
+    // Only clear sequences for competition-scoped tables, not the shared library.
     db.prepare(`
       DELETE FROM sqlite_sequence
       WHERE name IN (
         'colleges',
         'qualification_rounds',
-        'categories',
-        'questions',
         'audit_events'
       )
     `).run();
@@ -124,6 +123,22 @@ export function registerResetAllRoute(
       });
     }
 
+    // Archive the outgoing competition automatically before clearing it.
+    // A failure must block reset, not destroy historical results.
+    let archive;
+    try {
+      const eventTitle = getAudienceDisplaySettings(db).eventTitle;
+      archive = saveCompetitionArchive(
+        db,
+        `${eventTitle} — ${new Date().toISOString().slice(0, 10)}`,
+      );
+    } catch (error) {
+      return reply.code(500).send({
+        error: "PRE_RESET_ARCHIVE_FAILED",
+        message: error instanceof Error ? error.message : "Unable to archive competition.",
+      });
+    }
+
     resetAllCompetitionData(db);
     const live = liveSession.resetForNewCompetition();
     const competition = getCompetitionSnapshot(db);
@@ -140,6 +155,7 @@ export function registerResetAllRoute(
       ok: true,
       resetAt: new Date().toISOString(),
       preResetBackup,
+      archive,
       competition,
       questionBank,
       allocation,

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArchivesPanel } from "./Archives.js";
+import { CategoryLabelsPanel } from "./CategoryLabels.js";
 import { io } from "socket.io-client";
 import type {
   AudienceDisplaySettings,
@@ -23,6 +25,7 @@ import type {
 type Surface =
   | "home"
   | "setup"
+  | "archives"
   | "draw"
   | "operator"
   | "display"
@@ -34,6 +37,7 @@ type Surface =
 const surfaceTitles: Record<Surface, string> = {
   home: "مسابقة بنك المعلومات",
   setup: "إعداد المسابقة",
+  archives: "أرشيف المسابقات",
   draw: "القرعة",
   operator: "لوحة التحكم",
   display: "شاشة الجمهور",
@@ -43,10 +47,6 @@ const surfaceTitles: Record<Surface, string> = {
   "team-b": "محطة المتسابق B",
 };
 
-const PATRONAGE_LINE =
-  "برعاية السيد رئيس جامعة بابل الأستاذ الدكتور أمين عجيل ياسر الياسري المحترم";
-const SUPERVISION_LINE =
-  "وإشراف الأستاذ الدكتور ميثاق طالب عبد الجبوري مساعد رئيس الجامعة للشؤون الإدارية المحترم";
 
 const roleTitles: Record<ClientRole, string> = {
   operator: "Operator",
@@ -58,6 +58,7 @@ const roleTitles: Record<ClientRole, string> = {
 
 function surfaceFromPath(pathname: string): Surface {
   if (pathname.startsWith("/setup")) return "setup";
+  if (pathname.startsWith("/archives")) return "archives";
   if (pathname.startsWith("/draw")) return "draw";
   if (pathname.startsWith("/operator")) return "operator";
   if (pathname.startsWith("/report")) return "report";
@@ -71,6 +72,7 @@ function surfaceFromPath(pathname: string): Surface {
 function roleForSurface(surface: Surface): ClientRole {
   switch (surface) {
     case "setup":
+    case "archives":
     case "draw":
     case "operator":
     case "report":
@@ -163,8 +165,6 @@ function BulkImportPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [questionMode, setQuestionMode] =
-    useState<"append" | "replace">("append");
 
   const previewFile = async () => {
     if (!file) return;
@@ -210,25 +210,6 @@ function BulkImportPanel({
   const applyImport = async () => {
     if (!preview?.valid) return;
 
-    const importsQuestions =
-      preview.kinds.includes("questions");
-    const importsCategories =
-      preview.kinds.includes("categories");
-    const effectiveQuestionMode =
-      importsQuestions && importsCategories
-        ? "replace"
-        : questionMode;
-
-    if (
-      importsQuestions &&
-      effectiveQuestionMode === "replace" &&
-      !window.confirm(
-        "استبدال بنك الأسئلة الحالي بالكامل؟ سيتم حذف الأسئلة الحالية قبل إدخال أسئلة الملف.",
-      )
-    ) {
-      return;
-    }
-
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -238,11 +219,7 @@ function BulkImportPanel({
         method: "POST",
         body: JSON.stringify({
           previewId: preview.previewId,
-          questionMode:
-            preview.kinds.includes("questions") &&
-            preview.kinds.includes("categories")
-              ? "replace"
-              : questionMode,
+          questionMode: "append",
         }),
       });
 
@@ -314,7 +291,11 @@ function BulkImportPanel({
         </div>
         <div>
           <strong>Categories</strong>
-          <code>key · name</code>
+          <code>key · name · display_name</code>
+          <small className="muted">
+            name هو الاسم الداخلي وdisplay_name هو الاسم الظاهر للجمهور،
+            مثل رياضة تخصصية ← رياضة.
+          </small>
         </div>
         <div>
           <strong>Colleges</strong>
@@ -332,7 +313,6 @@ function BulkImportPanel({
             setPreview(null);
             setError(null);
             setMessage(null);
-            setQuestionMode("append");
           }}
         />
         <button
@@ -404,34 +384,10 @@ function BulkImportPanel({
           ) : null}
 
           {preview.kinds.includes("questions") ? (
-            preview.kinds.includes("categories") ? (
-              <div className="import-mode-note">
-                هذا الملف يحتوي Categories وQuestions؛ سيتم استبدال
-                المحاور وبنك الأسئلة معًا عند الاعتماد.
-              </div>
-            ) : (
-              <div className="import-mode">
-                <strong>طريقة إدخال الأسئلة</strong>
-                <label>
-                  <input
-                    type="radio"
-                    name="question-import-mode"
-                    checked={questionMode === "append"}
-                    onChange={() => setQuestionMode("append")}
-                  />
-                  إضافة إلى بنك الأسئلة الحالي
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="question-import-mode"
-                    checked={questionMode === "replace"}
-                    onChange={() => setQuestionMode("replace")}
-                  />
-                  استبدال بنك الأسئلة بالكامل
-                </label>
-              </div>
-            )
+            <div className="import-mode-note">
+              سيتم إضافة الأسئلة الجديدة دون حذف الأسئلة القديمة،
+              مع تحديث تسمية العرض للمحاور المستوردة.
+            </div>
           ) : null}
 
           <div className="import-samples">
@@ -471,8 +427,8 @@ function BulkImportPanel({
           <div>
             {questionBank.categories.map((category) => (
               <span key={category.key}>
-                {category.name}: {category.questionCount}
-                <small> · key: {category.key}</small>
+                {category.internalName}: {category.questionCount}
+                <small> · للجمهور: {category.name} · key: {category.key}</small>
               </span>
             ))}
           </div>
@@ -726,6 +682,8 @@ function AudienceSettingsPanel({
         </p>
         <div className="audience-settings-grid">
           {([
+            ["patronageLine", "نص الرعاية"],
+            ["supervisionLine", "نص الإشراف"],
             ["welcomeTitle", "عنوان الترحيب"],
             ["waitingParticipantsText", "انتظار المشاركين"],
             ["drawPhaseLabel", "تسمية مرحلة القرعة"],
@@ -855,7 +813,7 @@ function ResetAllCompetitionPanel() {
   const resetAll = async () => {
     if (
       !window.confirm(
-        "سيتم حذف جميع بيانات المسابقة الحالية: الكليات، المشاركون، القرعة، المحاور، الأسئلة، التوزيع، النتائج والترتيب. هل تريد المتابعة؟",
+        "سيتم حفظ المسابقة تلقائياً في الأرشيف، ثم تصفير الجولات والمشاركين والنتائج. بنك الأسئلة والمحاور لن يُحذف. هل تريد المتابعة؟",
       )
     ) {
       return;
@@ -885,7 +843,7 @@ function ResetAllCompetitionPanel() {
       });
 
       setMessage(
-        "تم مسح جميع بيانات المسابقة. النظام جاهز لإعداد مسابقة جديدة.",
+        "تم أرشفة المسابقة السابقة وتصفير بيانات المنافسة، مع الاحتفاظ ببنك الأسئلة والمحاور.",
       );
     } catch (caught) {
       setError(
@@ -908,9 +866,9 @@ function ResetAllCompetitionPanel() {
       </div>
 
       <p className="muted">
-        يمسح الكليات والمشاركين والقرعة والمحاور والأسئلة وتوزيع الجولات
-        والإجابات والنتائج والترتيب. لا يمس توكنات Station A/B ولا إعدادات
-        تشغيل UniQuiz.
+        يحفظ نسخة تاريخية من المسابقة الحالية تلقائياً، ثم يصفر الكليات والمشاركين والقرعة
+        والجولات والإجابات والنتائج. يحتفظ ببنك الأسئلة والمحاور والأرشيف
+        وتوكنات المحطات وإعدادات التشغيل.
       </p>
 
       <button
@@ -918,7 +876,7 @@ function ResetAllCompetitionPanel() {
         disabled={busy}
         onClick={() => void resetAll()}
       >
-        مسح كل بيانات المسابقة
+        أرشفة المسابقة وبدء مسابقة جديدة
       </button>
 
       <StatusMessage error={error} message={message} />
@@ -1653,8 +1611,8 @@ function AudienceBroadcastFrame({
             <span>{settings.eventSubtitle}</span>
           ) : null}
           <div className="audience-patronage">
-            <span>{PATRONAGE_LINE}</span>
-            <span>{SUPERVISION_LINE}</span>
+            <span>{settings.copy.patronageLine}</span>
+            <span>{settings.copy.supervisionLine}</span>
           </div>
           {meta ? <small>{meta}</small> : null}
         </div>
@@ -2458,8 +2416,8 @@ function AudiencePreShowSurface({
               <div className="preshow-v2-title-rule" />
 
               <div className="preshow-v3-patronage">
-                <p>{PATRONAGE_LINE}</p>
-                <p>{SUPERVISION_LINE}</p>
+                <p>{settings.copy.patronageLine}</p>
+                <p>{settings.copy.supervisionLine}</p>
               </div>
 
               {settings.copy.preShow.identityLine.trim() ? (
@@ -4262,8 +4220,8 @@ function OfficialResultsReport({
       </header>
 
       <div className="report-patronage">
-        <strong>{PATRONAGE_LINE}</strong>
-        <strong>{SUPERVISION_LINE}</strong>
+        <strong>{settings.copy.patronageLine}</strong>
+        <strong>{settings.copy.supervisionLine}</strong>
       </div>
 
       <div className="report-meta">
@@ -4894,6 +4852,9 @@ export function App() {
               <a className="button-link" href="/operator">
                 الانتقال إلى لوحة التحكم
               </a>
+              <a className="button-link" href="/archives">
+                أرشيف المسابقات
+              </a>
             </div>
           ) : surface === "draw" ? (
             <div className="surface-switcher">
@@ -4912,6 +4873,9 @@ export function App() {
               <a className="button-link" href="/draw">
                 القرعة الرسمية
               </a>
+              <a className="button-link" href="/archives">
+                أرشيف المسابقات
+              </a>
             </div>
           ) : null}
         </section>
@@ -4920,6 +4884,7 @@ export function App() {
       {surface === "setup" && competition ? (
         <>
           <BulkImportPanel questionBank={questionBank} />
+          <CategoryLabelsPanel questionBank={questionBank} />
           <SetupSurface snapshot={competition} />
           <DrawSurface snapshot={competition} />
           <QuestionAllocationPanel allocation={questionAllocation} />
@@ -4927,6 +4892,8 @@ export function App() {
           <ResetAllCompetitionPanel />
         </>
       ) : null}
+
+      {surface === "archives" ? <ArchivesPanel /> : null}
 
       {surface === "draw" && competition ? (
         <DrawSurface snapshot={competition} />
@@ -5044,6 +5011,7 @@ export function App() {
       ) : null}
 
       {surface !== "setup" &&
+      surface !== "archives" &&
       surface !== "draw" &&
       surface !== "operator" &&
       surface !== "display" &&

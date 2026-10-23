@@ -64,6 +64,7 @@ export function openDatabase(databasePath: string) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       category_key TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL UNIQUE,
+      display_name TEXT,
       sort_order INTEGER NOT NULL UNIQUE
     );
 
@@ -299,6 +300,21 @@ export function openDatabase(databasePath: string) {
     )
     ON CONFLICT(id) DO NOTHING;
 
+    -- Immutable records of completed or in-progress competition snapshots.
+    -- Archive rows are never touched by reset/import operations.
+    CREATE TABLE IF NOT EXISTS competition_archives (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      archived_at TEXT NOT NULL,
+      participant_count INTEGER NOT NULL,
+      round_count INTEGER NOT NULL,
+      question_count INTEGER NOT NULL,
+      payload_json TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_competition_archives_date
+      ON competition_archives(archived_at DESC);
+
     CREATE TABLE IF NOT EXISTS operations_state (
       id INTEGER PRIMARY KEY CHECK (id = 1),
       osc_test_sent_at TEXT,
@@ -315,11 +331,16 @@ export function openDatabase(databasePath: string) {
     VALUES (1, NULL, NULL, CURRENT_TIMESTAMP)
     ON CONFLICT(id) DO NOTHING;
 
-    UPDATE app_meta
-    SET value = '12'
-    WHERE key = 'schema_version';
   `);
 
+  // SQLite CREATE TABLE IF NOT EXISTS does not add columns to older databases.
+  // Keep the internal name stable and let the presenter use display_name.
+  const categoryColumns = db.pragma("table_info(categories)") as Array<{ name: string }>;
+  if (!categoryColumns.some((column) => column.name === "display_name")) {
+    db.exec("ALTER TABLE categories ADD COLUMN display_name TEXT");
+  }
+
+  db.prepare("UPDATE app_meta SET value = '13' WHERE key = 'schema_version'").run();
   return db;
 }
 
