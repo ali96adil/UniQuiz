@@ -443,3 +443,28 @@ independent archive removes the easy UI access to those results. Export or
 archive the results FIRST; restoration requires a separate verified backup
 restore procedure. These features are **draft** and must be rehearsed on the
 private copy before applying to the official event.
+
+## PDF results for a completed historical competition
+
+On `/archives`, each saved archive now has **تصدير النتائج PDF**.
+This opens `/archives/<archive-id>/report?print=1` in a separate operator
+tab and uses the **same A4 print stylesheet** as the official `/report`
+screen: archived event title, the saved logo assets, patronage lines,
+podium, every saved rank and entrant, score, total time in seconds
+(three decimal places), correct and incorrect answer counts, footer,
+archive timestamp and statement issue timestamp. The user chooses
+**Save as PDF** from the browser's print destination (Safari or Chrome).
+The operation does not create a new archive, change official results or
+ask the server to regenerate ranking.
+
+The report is based on the archived `snapshot.ranking` and
+`snapshot.audienceSettings`, **never** on live `/api/ranking`.
+Archive logo endpoints read the stored BLOBs instead of
+`/api/audience/assets/*` from the currently active tournament. Archive
+payloads saved before the participant-type metadata was added use the
+neutral label "المشارك" instead of guessing "كلية".
+
+**نسخة احتياطية JSON** remains available separately for lossless event
+data, reprocessing, and future recovery workflows. JSON is not a document
+for presenting rankings; PDF is the human-readable signed/printed artifact.
+Keep JSON if the goal includes preserving a complete copy for future reuse.
