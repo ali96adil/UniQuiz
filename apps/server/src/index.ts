@@ -29,7 +29,7 @@ import { OscOutput } from "./osc-output.js";
 import { registerOperationsRoutes } from "./operations.js";
 import { registerResultsExportRoutes } from "./results-export.js";
 import { registerCompetitionArchiveRoutes } from "./competition-archives.js";
-import { registerCompetitionWorkspaceRoutes } from "./competition-workspaces.js";
+import { registerCompetitionWorkspaceRoutes, listCompetitionWorkspaces } from "./competition-workspaces.js";
 import {
   ensureStationCredentials,
   registerStationAuthRoutes,
@@ -276,6 +276,11 @@ io.on("connection", (socket) => {
     "audience:presentation",
     getAudiencePresentation(database),
   );
+
+  // A reconnecting operator may have missed an activation while offline.
+  // Send the current workspace ID after the new competition snapshots so
+  // React can remount its per-workspace editors with up-to-date state.
+  socket.emit("competition:workspaces", listCompetitionWorkspaces(database));
 
   const teamState = liveSession.getTeamSubmissionState(role);
   if (teamState) {

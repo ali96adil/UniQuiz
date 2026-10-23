@@ -4694,6 +4694,9 @@ export function App() {
   const [runtimeMode, setRuntimeMode] =
     useState<RuntimeMode>("official");
   const [participantType, setParticipantType] = useState<ParticipantType>("college");
+  // This identity (not just the entrant type) keys all competition-scoped
+  // editors. Other operator tabs can activate a new workspace at any time.
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [gameplayRules, setGameplayRules] = useState<CompetitionGameplayRules | null>(null);
 
   useEffect(() => {
@@ -4746,16 +4749,9 @@ export function App() {
     }
   };
 
-  useEffect(() => {
-    void fetch("/api/competitions")
-      .then((response) => response.ok ? response.json() : null)
-      .then((response: { competitions?: Array<{ active: boolean; participantType: ParticipantType }> } | null) => {
-        const current = response?.competitions?.find((row) => row.active);
-        if (current) setParticipantType(current.participantType);
-      })
-      .catch(() => { /* Existing legacy runtime can still operate. */ });
-  }, []);
-
+  // Active workspace is supplied on every Socket.IO connection/reconnection
+  // and after each activation. Avoid a racing HTTP response resetting the ID
+  // to the previous competition after a realtime switch.
   useEffect(() => {
     const displayMode = surface === "display";
     const teamMode = surface === "team-a" || surface === "team-b";
@@ -4856,9 +4852,12 @@ export function App() {
         setRuntimeMode(payload.mode);
       },
     );
-    socket.on("competition:workspaces", (items: Array<{ active: boolean; participantType: ParticipantType }>) => {
+    socket.on("competition:workspaces", (items: Array<{ id: string; active: boolean; participantType: ParticipantType }>) => {
       const active = items.find((item) => item.active);
-      if (active) setParticipantType(active.participantType);
+      if (active) {
+        setParticipantType(active.participantType);
+        setActiveWorkspaceId(active.id);
+      }
     });
     socket.on("presence:snapshot", (snapshot: PresenceSnapshot) => {
       setPresence(snapshot);
@@ -4932,6 +4931,10 @@ export function App() {
       socket.disconnect();
     };
   }, [role, stationToken, operatorSurface, operatorAccess]);
+
+  // Never keep a draw animation belonging to a competition that is no longer
+  // selected (including a switch initiated by another operator browser tab).
+  useEffect(() => { setDrawPresentation(null); }, [activeWorkspaceId]);
 
   const showPresence = surface === "operator";
 
@@ -5109,6 +5112,7 @@ export function App() {
 
       {surface === "setup" && competition ? (
         <SetupJourney
+          key={activeWorkspaceId ?? "loading"}
           competition={competition}
           questionBank={questionBank}
           allocation={questionAllocation}

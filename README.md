@@ -44,7 +44,8 @@ All M7 work is currently in **stacked draft PRs**. Review in this order:
 [#33](https://github.com/ali96adil/UniQuiz/pull/33) →
 [#34](https://github.com/ali96adil/UniQuiz/pull/34) →
 [#39](https://github.com/ali96adil/UniQuiz/pull/39) →
-[#40](https://github.com/ali96adil/UniQuiz/pull/40).
+[#40](https://github.com/ali96adil/UniQuiz/pull/40) →
+[#41](https://github.com/ali96adil/UniQuiz/pull/41).
 
 A green CI check on synthetic data is **not** acceptance for upgrading the
 official Mac. Follow the offline rehearsal and original-result verification
@@ -67,6 +68,15 @@ For password setup, local restart/logout and safe rehearsal instructions, see
 **does not make the existing HTTP-only LAN deployment safe to expose** to an
 untrusted network or public tunnel; TLS and a deployment-specific security
 review remain required.
+
+## Cross-browser tournament switching (draft)
+
+Each connected client receives the active workspace ID on initial Socket.IO
+connection and after an activation. The setup journey is remounted when that ID
+changes, so per-round question quotas, gameplay timing/scoring and editable
+local drafts never remain attached to the prior tournament in a second
+operator browser tab. See the two-browser acceptance procedure in
+[docs/M7-INTEGRATION-REHEARSAL.md](docs/M7-INTEGRATION-REHEARSAL.md).
 
 ## Windows team station enrollment (draft)
 
