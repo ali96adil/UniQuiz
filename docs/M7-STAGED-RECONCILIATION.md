@@ -42,3 +42,29 @@ app server, OSC transport, or port listener is started.
 script. The user should still inspect the resulting inactive workspaces
 and archives before deciding whether experimental competitions belong in the
 official installation. A fresh M6 backup remains the rollback anchor.
+
+
+## Independent read-only candidate verification
+
+Before any runtime test or production deployment, run the independent audit
+against the same immutable source databases:
+
+\`\`\`bash
+python3 scripts/m7_verify_candidate.py \
+  --official-migrated "$OFFICIAL_MIGRATED" \
+  --m7-rehearsal "$REHEARSAL" \
+  --candidate "$CANDIDATE_DIR/candidate.db"
+\`\`\`
+
+Require \`M7_CANDIDATE_INDEPENDENT_CHECK_OK\`. It compares **every original
+official table**, the full bank, the original legacy workspace record, the
+complete rehearsal-only workspaces (including the active materialized one),
+and all historical archives byte-for-byte. It also checks SQLite and foreign
+keys for all databases and ensures official \`legacy\` remains active. If
+the rehearsal database changes after the candidate is generated, the check
+may fail: recreate the candidate from a fresh snapshot instead of copying
+rows selectively.
+
+Do not serve the one-time verified candidate DB directly during rehearsal.
+First make a separate SQLite backup copy of the candidate and run the test
+server on **that new runtime copy**, never the candidate or original.
