@@ -50,6 +50,12 @@ jobs:
       - name: Verify read-only historical migration fingerprints
         run: python3 -m unittest discover -s scripts -p "test_m7_rehearsal_verify.py" -v
 
+      - name: Verify isolated M7 official and rehearsal reconciliation
+        run: python3 -m unittest discover -s scripts -p "test_m7_reconcile_official.py" -v
+
+      - name: Independently audit staged M7 candidate integrity
+        run: python3 -m unittest discover -s scripts -p "test_m7_verify_candidate.py" -v
+
       - name: Build
         run: pnpm build
 
